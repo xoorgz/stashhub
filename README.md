@@ -11,7 +11,7 @@ viewing mode and a few quality-of-life changes on top.
 
 ---
 
-![Feed](docs/img/feed.png)
+<img width="1440" height="900" alt="image" src="https://github.com/user-attachments/assets/a911f8c5-acf4-4d8d-9a89-4c3097ca70ab" />
 
 ## Features at a glance
 
