@@ -1,11 +1,10 @@
 # stashhub
 
-![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?style=for-the-badge&logo=go&logoColor=white)
-![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
-![GraphQL](https://img.shields.io/badge/GraphQL-E10098?style=for-the-badge&logo=graphql&logoColor=white)
-![License](https://img.shields.io/badge/License-AGPL_3.0-df73ff?style=for-the-badge)
+![Go](https://img.shields.io/badge/Go-df73ff?style=for-the-badge&logo=go&logoColor=white)
+![React](https://img.shields.io/badge/React-df73ff?style=for-the-badge&logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-df73ff?style=for-the-badge&logo=typescript&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-df73ff?style=for-the-badge&logo=sqlite&logoColor=white)
+![GraphQL](https://img.shields.io/badge/GraphQL-df73ff?style=for-the-badge&logo=graphql&logoColor=white)
 
 A fork of [Stash](https://github.com/stashapp/stash) that adds a TikTok-style
 vertical feed, a configurable recommendation algorithm, per-scene likes in
@@ -13,23 +12,47 @@ the database, and a dark theme baked into the binary. Everything Stash
 already does (ingestion, scanning, scraping, performer and tag management)
 is untouched.
 
-- 📱 **TikTok-style vertical feed** at `/`
-- 🎛️ **Configurable recommendation algorithm** with five weighted buckets
-- ❤️ **Per-scene likes** persisted to the database
+- 📱 **TikTok-style vertical feed**
+- 🎛️ **Configurable recommendation algorithm**
+- ❤️ **Per-scene likes**
 
 <img width="1440" height="900" alt="image" src="https://github.com/user-attachments/assets/a911f8c5-acf4-4d8d-9a89-4c3097ca70ab" />
 
 ## Features
 
-- 📱 **TikTok-style vertical feed.** Snap-scroll at `/`. Tap to toggle play, double-tap for fullscreen, arrow keys scroll and seek, the current scene resumes across reloads.
-- 🎛️ **Configurable recommendation algorithm.** Five toggleable buckets (hottest, liked, top-rated, stale, random) with per-bucket weights and thresholds. Reshuffles on every Feed open.
-- ❤️ **First-class likes.** New `scenes.like_count` column with GraphQL mutations. The heart on both the Feed and the scene detail page writes straight to the database.
-- 🔔 **Live notification bell.** Top-right counts for new scenes, unorganized scenes, and performers without an image. Refreshes on focus, visibility change, route change, and every 30 s.
-- 🧭 **Sidebar replaces the top nav.** Persistent left sidebar with library tabs and logout pinned to the bottom. Top-right bar holds the bell plus Scenes / Feed shortcuts.
-- 🎨 **Modern dark theme in the binary.** Hub-purple accent (`#df73ff`) across cards, scrubber, sliders, dot indicators, and progress strips. No `custom.css` required.
-- 🗓️ **Smart date display.** Relative dates ("3 days ago") with the absolute date on hover. Format strings configurable.
-- 🔕 **Toast notice toggles.** The websocket-status toast that fires on every brief network blip is off by default and switchable per type.
-- 🔐 **No phone-home.** Update check unwired, no telemetry, no donate button.
+📱 **TikTok-style vertical feed.** Snap-scroll your library. Tap to play, double-tap for fullscreen.
+
+<br><br>
+
+🎛️ **Configurable recommendation algorithm.** Five weighted buckets, reshuffled every open.
+
+<br><br>
+
+❤️ **First-class likes.** Heart button persists straight to the database.
+
+<br><br>
+
+🔔 **Live notification bell.** Counts for new scenes, unorganized scenes, and performers without an image.
+
+<br><br>
+
+🧭 **Sidebar navigation.** Persistent left rail, top-right bar for quick links.
+
+<br><br>
+
+🎨 **Modern dark theme.** Hub-purple accent baked into the binary.
+
+<br><br>
+
+🗓️ **Smart date display.** Relative dates with the absolute on hover. Format configurable.
+
+<br><br>
+
+🔕 **Toast toggles.** Per-notice enable / disable.
+
+<br><br>
+
+🔐 **No phone-home.** No update check, no telemetry, no donate button.
 
 ## Technical details
 
