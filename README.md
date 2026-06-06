@@ -12,52 +12,22 @@ the database, and a dark theme baked into the binary. Everything Stash
 already does (ingestion, scanning, scraping, performer and tag management)
 is untouched.
 
-📱 **TikTok-style vertical feed**
-
-<br><br>
-
-🎛️ **Configurable recommendation algorithm**
-
-<br><br>
-
+📱 **TikTok-style vertical feed**<br><br>
+🎛️ **Configurable recommendation algorithm**<br><br>
 ❤️ **Per-scene likes**
 
 <img width="1440" height="900" alt="image" src="https://github.com/user-attachments/assets/a911f8c5-acf4-4d8d-9a89-4c3097ca70ab" />
 
 ## Features
 
-📱 **TikTok-style vertical feed.** Snap-scroll your library. Tap to play, double-tap for fullscreen.
-
-<br><br>
-
-🎛️ **Configurable recommendation algorithm.** Five weighted buckets, reshuffled every open.
-
-<br><br>
-
-❤️ **First-class likes.** Heart button persists straight to the database.
-
-<br><br>
-
-🔔 **Live notification bell.** Counts for new scenes, unorganized scenes, and performers without an image.
-
-<br><br>
-
-🧭 **Sidebar navigation.** Persistent left rail, top-right bar for quick links.
-
-<br><br>
-
-🎨 **Modern dark theme.** Hub-purple accent baked into the binary.
-
-<br><br>
-
-🗓️ **Smart date display.** Relative dates with the absolute on hover. Format configurable.
-
-<br><br>
-
-🔕 **Toast toggles.** Per-notice enable / disable.
-
-<br><br>
-
+📱 **TikTok-style vertical feed.** Snap-scroll your library. Tap to play, double-tap for fullscreen.<br><br>
+🎛️ **Configurable recommendation algorithm.** Five weighted buckets, reshuffled every open.<br><br>
+❤️ **First-class likes.** Heart button persists straight to the database.<br><br>
+🔔 **Live notification bell.** Counts for new scenes, unorganized scenes, and performers without an image.<br><br>
+🧭 **Sidebar navigation.** Persistent left rail, top-right bar for quick links.<br><br>
+🎨 **Modern dark theme.** Hub-purple accent baked into the binary.<br><br>
+🗓️ **Smart date display.** Relative dates with the absolute on hover. Format configurable.<br><br>
+🔕 **Toast toggles.** Per-notice enable / disable.<br><br>
 🔐 **No phone-home.** No update check, no telemetry, no donate button.
 
 ## Technical details
