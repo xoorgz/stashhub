@@ -483,7 +483,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
           <button
             type="button"
             className={`feed-action feed-o-btn${oing ? " liking" : ""}`}
-            title="Orgasm (+1)"
+            title="O (+1)"
             onClick={handleO}
           >
             <DropIcon />
