@@ -1,4 +1,4 @@
-# stashhub
+# 🫦 stashhub
 
 ![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)
 ![React](https://img.shields.io/badge/React-191970?style=for-the-badge&logo=react&logoColor=white)
@@ -12,8 +12,8 @@ the database, and a dark theme baked into the binary. Everything Stash
 already does (ingestion, scanning, scraping, performer and tag management)
 is untouched.
 
-📱 **TikTok-style vertical feed**<br><br>
-🎛️ **Configurable recommendation algorithm**<br><br>
+📱 **TikTok-style vertical feed**<br>
+🎛️ **Configurable recommendation algorithm**<br>
 ❤️ **Per-scene likes**
 
 <img width="1440" height="900" alt="image" src="https://github.com/user-attachments/assets/a911f8c5-acf4-4d8d-9a89-4c3097ca70ab" />
