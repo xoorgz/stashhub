@@ -409,7 +409,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
   const performer = scene.performers?.[0];
   const performerImage = performer?.image_path ? relativize(performer.image_path) : "";
-  const tags = (scene.tags ?? []).slice(0, 8);
+  const tags = scene.tags ?? [];
   const title =
     scene.title || scene.files?.[0]?.basename || `Scene ${scene.id}`;
 

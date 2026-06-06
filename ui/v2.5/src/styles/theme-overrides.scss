@@ -1792,3 +1792,33 @@ body input[type="number"]::-webkit-outer-spin-button {
   opacity: 1;
   filter: invert(0.85);
 }
+
+/* Bootstrap's $info cyan (#17a2b8) leaks through several utility classes.
+   Repaint every "info" surface with the hub-purple accent. */
+body .badge-info,
+body .bg-info,
+body .btn-info,
+body .table-info,
+body .text-bg-info {
+  background-color: var(--color-hubs, #df73ff) !important;
+  border-color: var(--color-hubs, #df73ff) !important;
+  color: #000 !important;
+}
+body .btn-info:hover,
+body .btn-info:focus,
+body .btn-info:active,
+body .btn-info.active {
+  background-color: color-mix(in srgb, var(--color-hubs, #df73ff) 85%, #000) !important;
+  border-color: color-mix(in srgb, var(--color-hubs, #df73ff) 85%, #000) !important;
+  color: #000 !important;
+}
+body .text-info,
+body .alert-info {
+  color: var(--color-hubs, #df73ff) !important;
+}
+body .alert-info {
+  background-color: rgba(223, 115, 255, 0.1) !important;
+  border-color: rgba(223, 115, 255, 0.3) !important;
+}
+body .border-info { border-color: var(--color-hubs, #df73ff) !important; }
+body .link-info { color: var(--color-hubs, #df73ff) !important; }

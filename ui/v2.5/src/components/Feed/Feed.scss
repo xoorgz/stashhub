@@ -208,13 +208,15 @@
 .feed-tags {
   font-size: 12px;
   opacity: 0.75;
-  white-space: nowrap;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  max-height: 4.2em;     /* room for ~3 lines before clipping kicks in */
   overflow: hidden;
-  text-overflow: ellipsis;
 
   span {
-    margin-right: 6px;
     color: var(--feed-hubs);
+    white-space: nowrap;
   }
 }
 
