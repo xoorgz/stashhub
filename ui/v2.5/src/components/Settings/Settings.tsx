@@ -7,6 +7,9 @@ import { Helmet } from "react-helmet";
 import { useTitleProps } from "src/hooks/title";
 import { SettingsAboutPanel } from "./SettingsAboutPanel";
 import { SettingsConfigurationPanel } from "./SettingsSystemPanel";
+import { SettingsNotificationsPanel } from "./SettingsNotificationsPanel";
+import { SettingsAlgorithmPanel } from "./SettingsAlgorithmPanel";
+import { SettingsNoticesPanel } from "./SettingsNoticesPanel";
 import { SettingsInterfacePanel } from "./SettingsInterfacePanel/SettingsInterfacePanel";
 import { SettingsLogsPanel } from "./SettingsLogsPanel";
 import { SettingsTasksPanel } from "./Tasks/SettingsTasksPanel";
@@ -21,6 +24,9 @@ import Changelog from "../Changelog/Changelog";
 
 const validTabs = [
   "tasks",
+  "notifications",
+  "algorithm",
+  "notices",
   "library",
   "interface",
   "security",
@@ -57,6 +63,21 @@ const SettingTabs: React.FC<{ tab: TabKey }> = ({ tab }) => {
                 <Nav.Link eventKey="tasks">
                   <FormattedMessage id="config.categories.tasks" />
                 </Nav.Link>
+              </LinkContainer>
+            </Nav.Item>
+            <Nav.Item>
+              <LinkContainer to="/settings?tab=notifications">
+                <Nav.Link eventKey="notifications">Notifications</Nav.Link>
+              </LinkContainer>
+            </Nav.Item>
+            <Nav.Item>
+              <LinkContainer to="/settings?tab=algorithm">
+                <Nav.Link eventKey="algorithm">Algorithm</Nav.Link>
+              </LinkContainer>
+            </Nav.Item>
+            <Nav.Item>
+              <LinkContainer to="/settings?tab=notices">
+                <Nav.Link eventKey="notices">Notices</Nav.Link>
               </LinkContainer>
             </Nav.Item>
             <Nav.Item>
@@ -169,6 +190,15 @@ const SettingTabs: React.FC<{ tab: TabKey }> = ({ tab }) => {
             </Tab.Pane>
             <Tab.Pane eventKey="tasks">
               <SettingsTasksPanel />
+            </Tab.Pane>
+            <Tab.Pane eventKey="notifications" unmountOnExit>
+              <SettingsNotificationsPanel />
+            </Tab.Pane>
+            <Tab.Pane eventKey="algorithm" unmountOnExit>
+              <SettingsAlgorithmPanel />
+            </Tab.Pane>
+            <Tab.Pane eventKey="notices" unmountOnExit>
+              <SettingsNoticesPanel />
             </Tab.Pane>
             <Tab.Pane eventKey="services" unmountOnExit>
               <SettingsServicesPanel />

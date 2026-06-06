@@ -1,7 +1,7 @@
 /* Blueprint dark theme */
 
-$secondary: #394b59;
-$muted-gray: #bfccd6;
+$secondary: #2f2f2f;
+$muted-gray: #c6c6c6;
 $success: #0f9960;
 $warning: #d9822b;
 $danger: #db3737;
@@ -12,20 +12,20 @@ $theme-colors: (
   success: $success,
   warning: $warning,
   danger: $danger,
-  dark: #394b59,
+  dark: #2f2f2f,
 );
 
-$body-bg: #202b33;
+$body-bg: #151515;
 $text-muted: $muted-gray;
 $link-color: #48aff0;
 $link-hover-color: $link-color;
-$text-color: #f5f8fa;
+$text-color: #fff;
 $pre-color: $text-color;
 $navbar-dark-color: rgb(245, 248, 250);
 $popover-bg: $secondary;
-$dark-text: #182026;
+$dark-text: #000;
 $textfield-bg: rgba(16, 22, 26, 0.3);
-$card-bg: #30404d;
+$card-bg: #1b1b1b;
 $card-cap-bg: rgba(#000, 0.03);
 
 @import "node_modules/bootstrap/scss/bootstrap";
@@ -33,8 +33,8 @@ $card-cap-bg: rgba(#000, 0.03);
 $red1: #a82a2a;
 $orange1: #a66321;
 $sepia1: #63411e;
-$dark-gray2: #202b33;
-$dark-gray5: #394b59;
+$dark-gray2: #151515;
+$dark-gray5: #2f2f2f;
 
 .btn.active:not(.disabled),
 .btn.active.minimal:not(.disabled) {

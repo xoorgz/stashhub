@@ -1,0 +1,217 @@
+/* Left-side TikTok-style sidebar */
+
+:root {
+  --sidenav-width: 200px;
+  --sidenav-width-collapsed: 64px;
+  --sidenav-hubs: var(--color-hubs, #df73ff);
+}
+
+.sidenav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidenav-width);
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 18px 12px;
+  background: var(--color-black, #000);
+  gap: 6px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.sidenav::-webkit-scrollbar { display: none; }
+
+.sidenav-logo {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px 14px;
+  margin-bottom: 8px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 22px;
+  color: #fff;
+  letter-spacing: -0.02em;
+
+  &:hover, &:focus { text-decoration: none; }
+}
+.sidenav-logo-text {
+  color: #fff;
+
+  em {
+    background: var(--sidenav-hubs);
+    color: #000;
+    padding: 0 6px;
+    border-radius: 6px;
+    margin-left: 0;          /* sit flush against "stash". reads "stashhub" */
+    font-style: normal;
+    font-weight: 800;
+  }
+}
+
+.sidenav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;        /* don't shrink items to make space for logout */
+}
+
+/* Logout: in-flow flex child, margin-top: auto pushes it to the bottom of the
+   flex column. Simple, robust, no positioning context confusion. */
+.sidenav-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.4);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 400;
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover, &:focus {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+  }
+  .sidenav-icon {
+    width: 18px;
+    height: 18px;
+    svg { width: 18px; height: 18px; }
+  }
+}
+
+.sidenav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover, &:focus {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    text-decoration: none;
+  }
+  &.sidenav-active {
+    color: var(--sidenav-hubs);
+    font-weight: 700;
+
+    svg { stroke: var(--sidenav-hubs); }
+  }
+}
+.sidenav-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  svg { display: block; }
+}
+.sidenav-label { line-height: 1; }
+
+/* Collapse to icon-only on narrow desktops */
+@media (max-width: 1024px) and (min-width: 641px) {
+  .sidenav {
+    width: var(--sidenav-width-collapsed);
+    padding: 18px 8px;
+  }
+  .sidenav-label,
+  .sidenav-logo-text { display: none; }
+  .sidenav-item { justify-content: center; padding: 11px 8px; }
+}
+
+/* Mobile: narrow vertical column on the LEFT (icons only), with border-right.
+   No more bottom strip. Logo visible but compact. */
+@media (max-width: 640px) {
+  .sidenav {
+    width: 56px;
+    height: 100%;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 4px;
+    gap: 4px;
+    background: var(--color-black, #000);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .sidenav-logo {
+    display: flex;
+    padding: 4px 0 10px;
+    font-size: 0;          /* hide "stash" word; show only the colored "hub" chip */
+    margin-bottom: 4px;
+  }
+  .sidenav-logo-text { color: transparent; font-size: 0; }
+  .sidenav-logo-text em {
+    color: #000;
+    background: var(--sidenav-hubs);
+    font-size: 12px;
+    font-weight: 800;
+    padding: 2px 5px;
+    border-radius: 5px;
+    margin: 0;               /* flush. reads "hub" attached to "stash" */
+  }
+  .sidenav-items { flex-direction: column; gap: 4px; width: 100%; }
+  .sidenav-label { display: none; }
+  .sidenav-item {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 0;
+  }
+  .sidenav-icon { width: 22px; height: 22px; }
+  .sidenav-logout {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 0;
+  }
+}
+
+/* Always hide Stash's MainNavbar. the sidebar replaces it on every viewport */
+body .top-nav { display: none !important; }
+body { padding-top: 0 !important; }
+
+@media (min-width: 641px) {
+  body .main {
+    margin-left: var(--sidenav-width);
+    width: calc(100% - var(--sidenav-width));
+  }
+}
+@media (max-width: 1024px) and (min-width: 641px) {
+  body .main {
+    margin-left: var(--sidenav-width-collapsed);
+    width: calc(100% - var(--sidenav-width-collapsed));
+  }
+}
+@media (max-width: 640px) {
+  body .main {
+    margin-left: 56px;
+    width: calc(100% - 56px);
+  }
+}
+
+/* Feed sits to the right of the sidebar at all viewports */
+@media (min-width: 1025px) {
+  .feed-root { left: var(--sidenav-width) !important; }
+}
+@media (max-width: 1024px) and (min-width: 641px) {
+  .feed-root { left: var(--sidenav-width-collapsed) !important; }
+}
+@media (max-width: 640px) {
+  .feed-root { left: 56px !important; }
+}

@@ -20,6 +20,7 @@ import {
   queryFindScenes,
   queryFindScenesByID,
   useSceneIncrementPlayCount,
+  useSceneIncrementLike,
 } from "src/core/StashService";
 
 import { SceneEditPanel } from "./SceneEditPanel";
@@ -43,9 +44,11 @@ import { objectPath, objectTitle } from "src/core/files";
 import { RatingSystem } from "src/components/Shared/Rating/RatingSystem";
 import TextUtils from "src/utils/text";
 import {
+  LikeCountButton,
   OCounterButton,
   ViewCountButton,
 } from "src/components/Shared/CountButton";
+import { useHeartBurst } from "src/hooks/HeartBurst";
 import { useRatingKeybinds } from "src/hooks/keybinds";
 import { lazyComponent } from "src/utils/lazyComponent";
 import cx from "classnames";
@@ -198,6 +201,17 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
         id: scene.id,
       },
     });
+  }
+
+  const [incrementLike] = useSceneIncrementLike();
+  const { burst: burstHearts, layer: heartLayer } = useHeartBurst();
+
+  function incrementLikeCount(e?: React.MouseEvent<HTMLButtonElement>) {
+    incrementLike({ variables: { id: scene.id } });
+    if (e) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      burstHearts(rect.left + rect.width / 2, rect.top + rect.height / 2, 6);
+    }
   }
 
   const [organizedLoading, setOrganizedLoading] = useState(false);
@@ -646,6 +660,12 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
                 />
               </span>
               <span>
+                <LikeCountButton
+                  value={(scene as { like_count?: number }).like_count ?? 0}
+                  onIncrement={(e) => incrementLikeCount(e)}
+                />
+              </span>
+              <span>
                 <OrganizedButton
                   loading={organizedLoading}
                   organized={scene.organized}
@@ -670,6 +690,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
         show={showDraftModal}
         onHide={() => setShowDraftModal(false)}
       />
+      {heartLayer}
     </>
   );
 });

@@ -911,6 +911,53 @@ export const useSceneSaveActivity = () =>
     },
   });
 
+/** Increment scenes.like_count. Updates the Scene entity in the Apollo cache
+ *  and rewrites the SlimSceneData fragment so list views and the detail page
+ *  pick up the new value without a refetch. Evicts FindScenes so filters that
+ *  depend on like_count ordering refresh. */
+export const useSceneIncrementLike = () =>
+  GQL.useSceneIncrementLikeMutation({
+    update(cache, result, { variables }) {
+      const next = result.data?.sceneIncrementLike;
+      if (typeof next !== "number" || !variables) return;
+      const { id } = variables;
+      const cacheId = cache.identify({ __typename: "Scene", id });
+      if (cacheId) {
+        cache.modify({
+          id: cacheId,
+          fields: {
+            like_count() {
+              return next;
+            },
+          },
+        });
+        // Rewrite the slim fragment so subscribers watching the fragment
+        // shape pick up the new value if the modify() call did not invalidate
+        // their query.
+        try {
+          const slim = cache.readFragment<GQL.SlimSceneDataFragment>({
+            id: cacheId,
+            fragment: GQL.SlimSceneDataFragmentDoc,
+            fragmentName: "SlimSceneData",
+          });
+          if (slim) {
+            cache.writeFragment({
+              id: cacheId,
+              fragment: GQL.SlimSceneDataFragmentDoc,
+              fragmentName: "SlimSceneData",
+              data: { ...slim, like_count: next },
+            });
+          }
+        } catch {
+          /* fragment not in cache; that's fine */
+        }
+      }
+      evictQueries(cache, [GQL.FindScenesDocument]);
+    },
+    refetchQueries: ["FindScene"],
+    awaitRefetchQueries: false,
+  });
+
 export const useSceneIncrementPlayCount = () =>
   GQL.useSceneAddPlayMutation({
     update(cache, result, { variables }) {

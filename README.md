@@ -1,92 +1,154 @@
-# Stash
+# stashhub
 
-[![Build](https://github.com/stashapp/stash/actions/workflows/build.yml/badge.svg?branch=develop&event=push)](https://github.com/stashapp/stash/actions/workflows/build.yml)
-[![Docker pulls](https://img.shields.io/docker/pulls/stashapp/stash.svg)](https://hub.docker.com/r/stashapp/stash 'DockerHub')
-[![GitHub Sponsors](https://img.shields.io/github/sponsors/stashapp?logo=github)](https://github.com/sponsors/stashapp)
-[![Open Collective backers](https://img.shields.io/opencollective/backers/stashapp?logo=opencollective)](https://opencollective.com/stashapp)
-[![Go Report Card](https://goreportcard.com/badge/github.com/stashapp/stash)](https://goreportcard.com/report/github.com/stashapp/stash)
-[![Matrix](https://img.shields.io/matrix/stashapp:unredacted.org?logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#stashapp:unredacted.org)
-[![Discord](https://img.shields.io/discord/559159668438728723.svg?logo=discord)](https://discord.gg/2TsNFKt)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/stashapp/stash?logo=github)](https://github.com/stashapp/stash/releases/latest)
-[![GitHub issues by-label](https://img.shields.io/github/issues-raw/stashapp/stash/bounty)](https://github.com/stashapp/stash/labels/bounty)
+A fork of [Stash](https://github.com/stashapp/stash) with a TikTok-style
+vertical feed, a configurable recommendation algorithm, a per-scene like
+button persisted to the database, and a dark, modern theme baked into the
+binary.
 
-### **Stash is a self-hosted webapp written in Go which organizes and serves your porn.**
-![demo image](docs/readme_assets/demo_image.png)
+The upstream Stash project does everything stashhub does in terms of
+ingestion, scanning, scraping, performer and tag management. stashhub adds a
+viewing mode and a few quality-of-life changes on top.
 
-* Stash gathers information about videos in your collection from the internet, and is extensible through the use of community-built plugins for a large number of content producers and sites.
-* Stash supports a wide variety of both video and image formats.
-* You can tag videos and find them later.
-* Stash provides statistics about performers, tags, studios and more.
+---
 
-You can [watch a SFW demo video](https://vimeo.com/545323354) to see it in action.
+![Feed](docs/img/feed.png)
 
-For further information you can consult the [documentation](https://docs.stashapp.cc) or [read the in-app manual](ui/v2.5/src/docs/en).
+## What it adds
 
-# Installing Stash
+### Feed at `/`
 
-#### Windows Users:
+A vertical, snap-scrolling video feed that loads scenes from the library on
+demand. Hearts persist to the database, double-tap goes fullscreen, tap
+toggles play and pause, arrow keys scroll and seek, the current scene id is
+remembered across reloads.
 
-As of version 0.27.0, Stash doesn't support anymore _Windows 7, 8, Server 2008 and Server 2012._  
-Windows 10 or Server 2016 are at least required.
+### Configurable recommendation algorithm
 
-<img src="docs/readme_assets/windows_logo.svg" width="100%" height="75"> Windows | <img src="docs/readme_assets/mac_logo.svg" width="100%" height="75"> macOS | <img src="docs/readme_assets/linux_logo.svg" width="100%" height="75"> Linux | <img src="docs/readme_assets/docker_logo.svg" width="100%" height="75"> Docker
-:---:|:---:|:---:|:---:
-[Latest Release](https://github.com/stashapp/stash/releases/latest/download/stash-win.exe) <br /> <sup><sub>[Development Preview](https://github.com/stashapp/stash/releases/download/latest_develop/stash-win.exe)</sub></sup> | [Latest Release](https://github.com/stashapp/stash/releases/latest/download/Stash.app.zip) <br /> <sup><sub>[Development Preview](https://github.com/stashapp/stash/releases/download/latest_develop/Stash.app.zip)</sub></sup> | [Latest Release (amd64)](https://github.com/stashapp/stash/releases/latest/download/stash-linux) <br /> <sup><sub>[Development Preview (amd64)](https://github.com/stashapp/stash/releases/download/latest_develop/stash-linux)</sub></sup> <br /> [More Architectures...](https://github.com/stashapp/stash/releases/latest) | [Instructions](docker/production/README.md) <br /> <sup><sub>[Sample docker-compose.yml](docker/production/docker-compose.yml)</sub></sup>
+Five toggleable buckets, each with its own weight (0 to 10):
 
-Download links for other platforms and architectures are available on the [Releases page](https://github.com/stashapp/stash/releases).
+| Bucket    | What it returns                                          |
+|-----------|----------------------------------------------------------|
+| Hottest   | Scenes tagged with a configurable tag                    |
+| Liked     | Scenes with `like_count > 0`, ordered by likes desc      |
+| Top rated | Scenes with `rating100` at or above a threshold          |
+| Stale     | Scenes whose `last_played_at` is older than N days       |
+| Random    | Unfiltered random fallback                               |
 
-## First Run
+Weights and thresholds live under Settings, Algorithm. Already-viewed scene
+ids are excluded from the queue. The whole queue reshuffles on every Feed
+open.
 
-#### Windows/macOS Users: Security Prompt
+### Likes in the database
 
-On Windows or macOS, running the app might present a security prompt since the binary isn't yet signed. 
+Migration 73 adds a `scenes.like_count` column and three GraphQL mutations
+(`sceneIncrementLike`, `sceneDecrementLike`, `sceneSetLikeCount`). The Feed
+heart button and a new heart button on the scene detail page both call
+`sceneIncrementLike`. The Apollo cache is patched in place so the count
+updates without a refetch.
 
-On Windows, bypass this by clicking "more info" and then the "run anyway" button. On macOS, Control+Click the app, click "Open", and then "Open" again.
+### Notification bell
 
-#### FFmpeg
-Stash requires FFmpeg. If you don't have it installed, Stash will download a copy for you. It is recommended that Linux users install `ffmpeg` from their distro's package manager.
+Top-right corner. Shows live counts for:
 
-# Usage
+- Scenes created within a configurable window (default 24 hours)
+- Unorganized scenes
+- Performers with no `image_path`
 
-## Quickstart Guide
-Stash is a web-based application. Once the application is running, the interface is available (by default) from http://localhost:9999.
+Counts refresh on focus, visibility change, route change, and every 30
+seconds. Each row links to the filtered list view applied as if the criterion
+had been configured manually. Toggleable individually under Settings,
+Notifications.
 
-On first run, Stash will prompt you for some configuration options and media directories to index, called "Scanning" in Stash. After scanning, your media will be available for browsing, curating, editing, and tagging.
+### Sidebar replaces the top nav
 
-Stash can pull metadata (performers, tags, descriptions, studios, and more) directly from many sites through the use of [scrapers](https://github.com/stashapp/stash/blob/develop/ui/v2.5/src/docs/en/Manual/Scraping.md), which integrate directly into Stash. Identifying an entire collection will typically require a mix of multiple sources:
-- The project maintains [StashDB](https://stashdb.org/), a crowd-sourced repository of scene, studio, and performer information. Connecting it to Stash will allow you to automatically identify much of a typical media collection. It runs on our stash-box software and is primarily focused on mainstream digital scenes and studios. Instructions, invite codes, and more can be found in this guide to [Accessing StashDB](https://guidelines.stashdb.org/docs/faq_getting-started/stashdb/accessing-stashdb/).
-- Several community-managed stash-box databases can also be connected to Stash in a similar manner. Each one serves a slightly different niche and follows their own methodology. A rundown of each stash-box, their differences, and the information you need to sign up can be found in this guide to [Accessing Stash-Boxes](https://guidelines.stashdb.org/docs/faq_getting-started/stashdb/accessing-stash-boxes/).
-- Many community-maintained scrapers can also be downloaded, installed, and updated from within Stash, allowing you to pull data from a wide range of other websites and databases. They can be found by navigating to Settings -> Metadata Providers -> Available Scrapers -> Community (stable). These can be trickier to use than a stash-box because every scraper works a little differently. For more information, please visit the [CommunityScrapers repository](https://github.com/stashapp/CommunityScrapers).
-- All of the above methods of scraping data into Stash are also covered in more detail in our [Guide to Scraping](https://docs.stashapp.cc/beginner-guides/guide-to-scraping/).
+Persistent sidebar on the left, logout at the bottom, library tabs in the
+middle, logo at the top. The top-right bar holds the notification bell, a
+shortcut to Scenes, and a shortcut back to the Feed. The default Stash
+top-nav is hidden everywhere.
 
-<sub>[StashDB](http://stashdb.org) is the canonical instance of our open source metadata API, [stash-box](https://github.com/stashapp/stash-box).</sub>
+### Theme
 
-# Translation
-[![Translate](https://translate.codeberg.org/widget/stash/stash/svg-badge.svg)](https://translate.codeberg.org/engage/stash/)
+Hub-purple (`--color-hubs: #df73ff`) replaces the Blueprint-blue accent
+across cards, progress bars, the scrubber play-progress, slick dots,
+sliders, and the watched-progress strip on thumbnails. Blueprint-teal hex
+values (`#192127`, `#202b33`, `#394b59`, and so on) are swept out and
+replaced with neutral dark variants. All theme rules ship in the binary; no
+separate `custom.css` is required.
 
-Stash is available in 32 languages (so far!) and it could be in your language too. We use Weblate to coordinate community translations. If you want to help us translate Stash into your language, you can make an account at [Codeberg's Weblate](https://translate.codeberg.org/projects/stash/stash/) to get started contributing new languages or improving existing ones. Thanks!
+### Settings tabs added
 
-[![Translation status](https://translate.codeberg.org/widget/stash/stash/multi-auto.svg)](https://translate.codeberg.org/engage/stash/)
+- **Notifications**: toggle each bell row, set the new-videos window, and
+  configure date display (relative dates with an absolute tooltip, plus
+  configurable date and date-time format strings)
+- **Algorithm**: per-bucket toggles and weights, thresholds, tag picker
+- **Notices**: toggle UI toast notices. The websocket-status toast is
+  disabled by default since it fires on every brief network blip.
 
-# Support (FAQ)
+### Other behaviour changes
 
-Check out our documentation on [Stash-Docs](https://docs.stashapp.cc) for information about the software, questions, guides, add-ons and more. 
+- `/login` rewritten as a minimal pill-form layout in `ui/login/login.css`
+- Modal footer left-aligned, no top border, no top padding
+- Settings and Changelog pages flattened, no nested card chrome
+- Pagination buttons rendered as compact chevrons
+- Toolbar buttons consistent 35px pills, with 23px variants attached to the
+  search input
+- Tables get soft row dividers instead of borders, empty cells collapse
+- Automatic update check disabled
 
-For more help you can:
-* Check the in-app documentation, in the top right corner of the app (it's also mirrored on [Stash-Docs](https://docs.stashapp.cc/in-app-manual))
-* Join the [Matrix space](https://matrix.to/#/#stashapp:unredacted.org)
-* Join the [Discord server](https://discord.gg/2TsNFKt), where the community can offer support.
-* Start a [discussion on GitHub](https://github.com/stashapp/stash/discussions)
+---
 
-# Customization
+## Build
 
-## Themes and CSS Customization
-There is a [directory of community-created themes](https://docs.stashapp.cc/themes/list) on Stash-Docs.
+```bash
+git clone https://github.com/xoorgz/stashhub.git
+cd stashhub
 
-You can also change the Stash interface to fit your desired style with various snippets from [Custom CSS snippets](https://docs.stashapp.cc/themes/custom-css-snippets).
+# Build the UI bundle
+cd ui/v2.5
+yarn install
+yarn build
+cd ../..
 
-# For Developers
+# Build the Go binary (needs Go 1.22 or newer)
+make stash
+./stash
+```
 
-Pull requests are welcome! 
+The resulting binary embeds the UI and is the only thing needed to ship. No
+`custom.css`, no separate plugin install.
 
-See [Development](docs/DEVELOPMENT.md) and [Contributing](docs/CONTRIBUTING.md) for information on working with the codebase, getting a local development setup, and contributing changes.
+### Configuration
+
+stashhub reads the same `config.yml` as upstream Stash and respects the same
+command-line flags (`-c config.yml`, `--port`, `--host`, `--nobrowser`,
+`-u ui-location`). First boot writes a default config; everything is
+editable from the Settings UI.
+
+### Upgrading from upstream Stash
+
+stashhub is a forward fork from Stash `v0.28.1` plus migration 73. If you
+point stashhub at an existing Stash database, it will run the schema
+migration on first start (a backup is written next to `config.yml`).
+Downgrading back to upstream Stash after running migration 73 is not
+supported because the unknown `like_count` column blocks startup.
+
+---
+
+## What is not in the binary
+
+- Anything that talks to upstream stashapp.com servers for telemetry, update
+  checks, or analytics. The update endpoint is unwired in the About panel.
+- A donate button. Upstream Stash takes donations through Open Collective;
+  the fork does not solicit funds.
+
+---
+
+## License
+
+[AGPL-3.0](LICENSE), same as upstream Stash.
+
+Upstream Stash is the project this fork is built on. All credit for the
+underlying server, scanner, scraper system, and GraphQL API goes to the
+Stash maintainers. The changes in this repository are limited to UI, theme,
+the recommendation algorithm, the `like_count` column, and a handful of
+settings panels.

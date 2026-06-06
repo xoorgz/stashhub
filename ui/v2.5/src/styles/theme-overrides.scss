@@ -1,0 +1,1794 @@
+/* ---------- Forked theme overrides ----------
+   Hub-purple accent + dark/glass UI built on top of Stash's base.
+   This file is the single source of truth for the theme: edit here, rebuild,
+   and the binary ships the look. No separate custom.css required.
+
+   Imported LAST from index.scss so it wins over every component stylesheet
+   without needing per-rule !important wars (we keep !important on rules
+   that explicitly fight Bootstrap / Video.js defaults). */
+
+/* === Variables === */
+:root {
+  --color-black: #000;
+  --color-text: #c6c6c6;
+  --color-text-dim: #969696;
+  --color-border: var(--color-black);
+  --color-hubs: #df73ff;
+  --color-cod-gray: #151515;
+  --color-silver: #cacaca;
+  --color-dark: #1b1b1b;
+  --color-dim: #2f2f2f;
+  --color-icon-toggled: #5faa01;
+  --color-star: #f5c518;
+  --color-white: #fff;
+  --color-favorite: #c71d1d;
+
+  --media-radius: 18px;
+  --card-radius: 22px;
+}
+
+body {
+  background-attachment: fixed;
+  background-color: var(--color-black);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  color: var(--color-text);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen-Sans, Ubuntu, Cantarell, Helvetica Neue, sans-serif;
+  height: 100%;
+  padding: 6rem 0 0;
+  width: 100%;
+}
+
+body.login {
+  padding-top: 0 !important;
+}
+
+/* === Login page: minimal, no card chrome, no caps, no padding bloat ===
+   Stash defaults give login a Bootstrap card with title-cased headings and
+   a lot of empty space. Flatten it. */
+body.login .login-container,
+body.login .login-content,
+body.login form,
+body.login .dialog,
+body.login .card {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+body.login .dialog {
+  margin: 0 auto !important;
+  max-width: 360px;
+  width: 100%;
+}
+/* Title not uppercased; smaller */
+body.login h1,
+body.login h2,
+body.login h3,
+body.login .login-title,
+body.login .card-header {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-weight: 600 !important;
+  font-size: 1.1rem !important;
+  margin-bottom: 0.75rem !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+/* Labels hidden. fields use placeholder text */
+body.login label,
+body.login .form-label,
+body.login .col-form-label {
+  display: none !important;
+}
+/* Errors. collapse when empty, no top padding */
+body.login .login-error,
+body.login .form-error,
+body.login .error-message {
+  padding: 0 !important;
+  margin: 0 !important;
+  color: #ff6b88;
+  font-size: 13px;
+}
+body.login .login-error:empty,
+body.login .form-error:empty,
+body.login .error-message:empty {
+  display: none !important;
+}
+/* Tighter form-group spacing */
+body.login .form-group {
+  margin-bottom: 10px !important;
+}
+/* Submit button full-width hub-purple */
+body.login button[type="submit"],
+body.login .btn-primary {
+  width: 100%;
+  background-color: var(--color-hubs, #df73ff) !important;
+  border-color: var(--color-hubs, #df73ff) !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  border-radius: 999px !important;
+  padding: 8px 16px !important;
+  margin-top: 6px;
+}
+
+@media (max-width: 1200px) {
+  body { padding-top: 0 !important; }
+  .main.container-fluid { padding-top: 2.2rem !important; }
+}
+
+@media (max-width: 700px) {
+  body { padding-top: 0 !important; }
+  body .main.container-fluid { padding-top: 0rem !important; }
+}
+
+.top-nav .navbar-toggler { width: auto !important; }
+
+.top-nav a[href="/scenes/new"] button.btn {
+  color: var(--color-hubs);
+  font-size: 14px !important;
+}
+
+body .badge,
+body a,
+body .tag-item { transition: all 100ms; }
+
+body div,
+body p,
+body a {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen-Sans, Ubuntu, Cantarell, Helvetica Neue, sans-serif;
+}
+
+.show-carat.dropdown .btn,
+.fa-icon,
+.btn.minimal { color: var(--color-silver) !important; }
+
+.rating-stars .set { color: var(--color-star) !important; }
+
+.organized-button.organized svg { color: var(--color-icon-toggled) !important; }
+
+.favorite svg,
+.favorite {
+  color: var(--color-favorite) !important;
+  filter: none !important;
+}
+
+.thumbnail-section .favorite svg { height: 20px; width: 20px; }
+
+.show-carat.dropdown .btn,
+.btn.minimal {
+  background-color: transparent !important;
+  border: 0 !important;
+}
+
+#root {
+  height: 100%;
+  position: absolute;
+  width: 100%;
+  z-index: 2;
+}
+
+* { scrollbar-color: hsl(0deg 0% 100% / .2) transparent; }
+
+.bg-dark { background-color: var(--color-black) !important; }
+
+.card {
+  background-color: var(--color-black);
+  background-color: rgb(0 0 0 / .3);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgb(16 22 26 / .4), 0 0 0 rgb(16 22 26 / 0), 0 0 0 rgb(16 22 26 / 0);
+  padding: 20px;
+}
+
+.bg-secondary { background-color: var(--color-black) !important; }
+
+.pagination .btn {
+  align-items: center;
+  appearance: none;
+  background-color: var(--color-cod-gray) !important;
+  border: none;
+  border-radius: 4px;
+  color: var(--color-text) !important;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 20px !important;
+  font-weight: 700;
+  height: 60px !important;
+  justify-content: center;
+  margin: 0 4px !important;
+  min-width: 60px !important;
+  outline: 0 none;
+  padding: 0 20px;
+  position: relative;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: top;
+}
+
+.pagination .btn:hover,
+.pagination .btn:focus { background-color: var(--color-dim) !important; }
+
+.pagination .btn:first-of-type,
+.pagination .btn:last-of-type { background: var(--color-black) !important; }
+
+.pagination .btn.active { background: var(--color-hubs) !important; }
+
+.text-white,
+body p { color: var(--color-text) !important; }
+
+.border-secondary { border-color: var(--color-border) !important; }
+
+.btn-secondary.filter-item.col-1.d-none.d-sm-inline.form-control { background-color: rgb(0 0 0 / .15); }
+
+.btn.active,
+.btn-secondary {
+  color: var(--color-black) !important;
+  font-weight: 700;
+}
+
+.btn-primary.disabled,
+.btn-primary:disabled,
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary.focus,
+minimal.w-100.active.btn.btn-primary,
+.btn-primary {
+  background-color: var(--color-hubs);
+  border-color: var(--color-hubs);
+  box-shadow: none !important;
+  color: var(--color-black);
+  font-weight: 700;
+  outline: 0 !important;
+}
+
+.nav-tabs .nav-link.active:hover,
+.nav-tabs .nav-link.active:focus {
+  border-bottom-color: var(--color-text);
+  outline: 0;
+}
+
+.nav-tabs .nav-link { outline: 0; }
+
+.btn-primary:not(:disabled):not(.disabled).active,
+.btn-primary:not(:disabled):not(.disabled):active,
+.show > .btn-primary.dropdown-toggle {
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link { background-color: var(--color-black); }
+
+input[type="range"]::-moz-range-track { background: hsl(0deg 0% 100% / .25); }
+input[type="range"]::-moz-range-thumb { background: #bcbcbc; }
+
+div.react-select__control {
+  background-color: hsl(0deg 0% 39.2% / .4);
+  border-color: #2f2f2f;
+  color: #000;
+  cursor: pointer;
+}
+
+.navbar-nav a,
+.navbar-nav button {
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.TruncatedText { line-height: 1.3; }
+
+.navbar-nav { gap: 1rem; }
+
+.scene-wall-item-text-container {
+  background: radial-gradient(farthest-corner at 50% 50%, rgb(50 50 50 / .5) 50%, #323232 100%);
+  color: #eee;
+}
+
+body .scene-header {
+  color: var(--color-white);
+  font-size: 17px;
+  font-weight: 700;
+  word-break: break-word;
+  word-wrap: break-word;
+}
+
+.filter-container,
+.operation-container {
+  box-shadow: none;
+  color: var(--color-text-dim) !important;
+  margin-top: -10px;
+  padding: 10px;
+}
+
+.container-fluid,
+.container-lg,
+.container-md,
+.container-sm,
+.container-xl {
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+}
+
+.btn-link {
+  color: #eee;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+button.minimal.brand-link.d-none.d-md-inline-block.btn.btn-primary {
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+a:hover,
+a:focus { color: hsl(0deg 0% 100% / .7); }
+
+option {
+  background-color: var(--color-black);
+  color: var(--color-white);
+}
+
+select:focus > option:checked,
+select option:hover,
+option:checked,
+option:hover,
+option:focus {
+  background-color: var(--color-hubs) !important;
+  color: var(--color-black) !important;
+}
+
+.folder-list .btn-link { color: #2c2e30; }
+
+#performer-scraper-popover { z-index: 10; }
+
+#root,
+body { background: var(--color-black) !important; }
+
+.card {
+  background: var(--color-black) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+  background-color: #131313 !important;
+  border-color: #131313 !important;
+}
+
+#tasks-panel .tasks-panel-queue { background-color: var(--color-black) !important; }
+
+.top-nav .bg-dark,
+.top-nav.navbar { background: var(--color-dark) !important; }
+
+body .top-nav {
+  border-radius: 0 !important;
+  padding: 10px 15px !important;
+}
+
+.top-nav .btn {
+  border: 0 !important;
+  border-radius: 0 !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+  gap: 8px;
+  padding: 6px 8px !important;
+}
+
+.top-nav .btn:hover svg,
+.top-nav .btn:focus svg,
+.top-nav .btn:hover,
+.top-nav .btn:focus {
+  color: var(--color-white) !important;
+  opacity: 1 !important;
+}
+
+.top-nav .btn .fa-icon { margin: 0 !important; }
+
+body .top-nav .navbar-brand {
+  margin-left: 0 !important;
+  margin-right: 1.5rem;
+  padding: 0 !important;
+}
+
+body .top-nav .navbar-brand button {
+  color: var(--color-white) !important;
+  display: inline-block !important;
+  font-weight: 700 !important;
+  padding: 0 !important;
+}
+
+body .top-nav .navbar-brand button::after {
+  background: var(--color-hubs);
+  border-radius: 3px;
+  color: var(--color-black);
+  content: 'hub';
+  display: inline-block;
+  font-weight: 700 !important;
+  margin: 0 0 0 3px;
+  padding: 0 2px;
+}
+
+.top-nav .btn.active {
+  border: 0 !important;
+  color: var(--color-white) !important;
+}
+
+.navbar-dark .navbar-toggler { border-color: transparent !important; }
+
+button[title="Donate"] { display: none !important; }
+
+* { outline: none !important; }
+
+.grid-card a .card-section-title,
+.section-title {
+  color: var(--color-text) !important;
+  font-size: 15px !important;
+  line-height: 17px !important;
+}
+
+.card-section > a + span,
+.card-section > a + span + p { color: var(--color-text-dim) !important; }
+
+.bg-secondary,
+.btn-secondary,
+.border-secondary {
+  background-color: var(--color-hubs) !important;
+  border-color: var(--color-black) !important;
+}
+
+/* [Scenes tab] Allow longer "Studio as Text" string + then hide it */
+.scene-studio-overlay {
+  font-weight: 600 !important;
+  opacity: 1 !important;
+  text-overflow: ellipsis !important;
+  width: 60% !important;
+}
+.scene-studio-overlay { display: none; }
+
+/* [Scenes tab] Fit more thumbnails per row */
+.grid { padding: 0 !important; }
+
+/* [Scenes tab] Make tag popovers narrower */
+.bs-popover-bottom { max-width: 500px; }
+
+/* [Scenes tab] Wall-mode hover behavior */
+@media (min-width: 576px) {
+  .wall-item:hover::before,
+  .wall-item:focus::before { opacity: 0; }
+  .wall-item:hover .wall-item-container,
+  .wall-item:focus .wall-item-container { transform: scale(1.5); }
+}
+.wall-item:hover .wall-item-container,
+.wall-item:focus .wall-item-container { transform: none; }
+.wall-item::before { opacity: 0 !important; }
+
+/* [Scenes tab] Hide scrubber strip + truncated description on cards */
+.scrubber-wrapper { display: none; }
+.TruncatedText.scene-card__description { display: none; }
+
+.col-md-8 { flex: 0 0 50%; max-width: 50%; }
+
+/* [Performers tab] Move edit-panel buttons to top + tags row up */
+form#performer-edit {
+  display: flex;
+  flex-direction: column;
+}
+#performer-edit > .row { order: 1; }
+#performer-edit > .row:last-child {
+  margin-bottom: 1rem;
+  order: 0;
+}
+#performer-edit > .row:nth-child(21) { order: -1; }
+#performer-edit > .row:first-child { order: -2; }
+
+.scene-tabs .studio-logo { display: none !important; }
+
+/* Custom rating banner. a tiny corner pill */
+body .rating-banner {
+  background: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  color: #fff;
+  display: block;
+  font-size: .86rem;
+  font-weight: 400;
+  height: 0;
+  left: 0;
+  letter-spacing: 1px;
+  line-height: 1.6rem;
+  margin: 6px 10px;
+  padding: 10px;
+  position: absolute;
+  text-indent: 0;
+  top: 0;
+  transform: none;
+  visibility: hidden;
+  width: 88px;
+}
+body .rating-banner { background: none; }
+body .rating-banner::after {
+  background: var(--color-star);
+  border-radius: 5px;
+  color: var(--color-black);
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 800;
+  height: 30px;
+  left: 0;
+  margin-top: 5px;
+  padding: 5px;
+  position: absolute;
+  text-indent: 0;
+  top: 0;
+  visibility: visible;
+  width: 30px;
+}
+body .rating-banner.rating-3::after { content: '3'; }
+body .rating-banner.rating-4::after { content: '4'; }
+body .rating-banner.rating-5::after { content: '5'; }
+
+.wall-item-text { display: none !important; }
+
+body .scene-card-preview-video,
+.scene-card-preview.portrait .scene-card-preview-image,
+.scene-card-preview.portrait .scene-card-preview-video,
+.gallery-card-preview.portrait .scene-card-preview-image,
+.gallery-card-preview.portrait .scene-card-preview-video {
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+.bs-popover-bottom > .arrow::after,
+.bs-popover-auto[x-placement^="bottom"] > .arrow::after,
+.bs-popover-bottom > .arrow::before,
+.bs-popover-auto[x-placement^="bottom"] > .arrow::before { border-bottom-color: var(--color-cod-gray) !important; }
+
+[role="tooltip"],
+.popover,
+.input-control,
+.input-control:focus,
+.input-control:disabled,
+.dropdown-menu,
+.dropdown-menu .bg-secondary,
+.dropdown-menu .btn-secondary,
+.dropdown-menu a,
+.scraper-group .btn,
+.scraper-group input,
+[role="toolbar"] ::-webkit-keygen-select,
+[role="toolbar"] input,
+[role="toolbar"] .btn,
+[role="toolbar"] .btn-secondary {
+  background-color: var(--color-cod-gray) !important;
+  border-color: var(--color-cod-gray) !important;
+  color: var(--color-silver) !important;
+}
+
+.tag-item {
+  background: var(--color-dark);
+  border-radius: 8px;
+  color: var(--color-white);
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 400;
+  margin-bottom: 8px;
+  padding: 8px 18px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.tag-item:hover,
+.tag-item:focus { background: var(--color-dim); }
+.tag-item:first-of-type { margin-left: 0; }
+
+.row h6 { margin-top: 10px; }
+
+body .nav-tabs .nav-link {
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--color-text);
+  font-size: 11px;
+  padding: 8px 15px;
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link,
+body .nav-tabs .nav-link.active {
+  background-color: var(--color-black) !important;
+  border-bottom: 1px solid var(--color-hubs) !important;
+  color: var(--color-white) !important;
+}
+
+@media (min-width: 1200px) {
+  body .navbar-expand-xl .navbar-nav .nav-link {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+body .text-muted { color: var(--color-text-dim) !important; }
+
+/* Range input */
+input::-webkit-slider-runnable-track,
+input::-moz-range-track,
+input::-ms-track,
+input,
+input[type="range"] {
+  accent-color: var(--color-hubs) !important;
+  appearance: none;
+}
+
+.custom-control-input:checked ~ .custom-control-label::before {
+  background-color: var(--color-hubs) !important;
+  border-color: var(--color-hubs) !important;
+}
+
+input[type="range"] {
+  appearance: none;
+  height: 38px;
+  margin: 10px 0;
+  width: 100%;
+}
+input[type="range"]:focus { outline: none; }
+
+input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--color-hubs);
+  border-radius: 5px;
+  cursor: pointer;
+  height: 8px;
+  width: 100%;
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  background: #fff;
+  border-radius: 5px;
+  cursor: pointer;
+  height: 20px;
+  width: 8px;
+}
+input[type="range"]:focus::-webkit-slider-runnable-track { background: var(--color-hubs); }
+
+input[type="range"]::-moz-range-track {
+  background: var(--color-hubs);
+  border-radius: 5px;
+  cursor: pointer;
+  height: 10px;
+  width: 100%;
+}
+input[type="range"]::-moz-range-thumb {
+  background: #fff;
+  border-radius: 5px;
+  cursor: pointer;
+  height: 30px;
+  width: 12px;
+}
+
+input[type="range"]::-ms-track {
+  background: transparent;
+  border-color: transparent;
+  color: transparent;
+  cursor: pointer;
+  height: 10px;
+  width: 100%;
+}
+input[type="range"]::-ms-fill-lower { background: var(--color-hubs); border-radius: 10px; }
+input[type="range"]::-ms-fill-upper { background: var(--color-hubs); border-radius: 10px; }
+input[type="range"]::-ms-thumb {
+  background: #fff;
+  border-radius: 5px;
+  cursor: pointer;
+  height: 30px;
+  margin-top: 1px;
+  width: 12px;
+}
+input[type="range"]:focus::-ms-fill-lower { background: var(--color-hubs); }
+input[type="range"]:focus::-ms-fill-upper { background: var(--color-hubs); }
+
+.top-nav .navbar-buttons .btn[title="Help"],
+.top-nav .navbar-buttons .btn.donate { display: none !important; }
+
+.stats-element .title {
+  color: var(--color-white) !important;
+  font-weight: 700 !important;
+}
+
+div[role="toolbar"] + .d-flex > .tag-item.badge.badge-secondary {
+  align-items: center;
+  background: none !important;
+  bottom: 0;
+  display: inline-flex;
+  gap: 10px;
+}
+div[role="toolbar"] + .d-flex > .tag-item.badge.badge-secondary button[type="button"] {
+  align-items: center;
+  background: none !important;
+  bottom: 0 !important;
+  display: inline-flex;
+  margin: 0 !important;
+}
+
+.recommendation-row.studio-recommendations,
+.recommendation-row.movie-recommendations { display: none !important; }
+
+a { color: var(--color-hubs); }
+
+.btn,
+.btn-primary,
+.btn-secondary { border-radius: 3px !important; }
+
+/* Slick carousel arrows hidden (we use dots only) */
+.slick-slider .slick-prev,
+.slick-slider .slick-next { display: none !important; }
+
+.recommendations-container {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+h2 { text-transform: unset !important; }
+
+.recommendation-row-head { position: relative; z-index: 100; }
+.recommendation-row-head a { font-size: 14px; }
+
+@media (max-width: 1200px) {
+  .container,
+  .container-xl,
+  .container-lg,
+  .container-md,
+  .container-sm {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    width: unset !important;
+  }
+  .filter-container {
+    flex-wrap: wrap !important;
+    margin: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .top-nav .navbar-buttons {
+    margin-left: unset !important;
+    margin-right: unset !important;
+  }
+  .fixed-top {
+    justify-content: space-between !important;
+    margin-left: unset !important;
+    margin-right: unset !important;
+    position: unset !important;
+  }
+  .navbar-dark .navbar-nav .nav-link {
+    display: block;
+    flex-basis: 100%;
+    max-width: 100%;
+    width: 100%;
+  }
+  .navbar-nav { gap: 0; }
+  .navbar-dark .navbar-nav .nav-link a {
+    gap: 14px;
+    justify-content: flex-start !important;
+    padding-bottom: 15px !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 15px !important;
+  }
+  .top-nav .btn .fa-icon { height: 22px; width: 22px; }
+  .top-nav .navbar-collapse .navbar-nav {
+    justify-content: flex-start;
+    padding-bottom: 0;
+    padding-top: 1rem;
+  }
+  .pagination .btn {
+    font-size: 16px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+  }
+  .slick-slide .card { height: unset; }
+}
+
+[data-rb-event-key="https://opencollective.com/stashapp"] { display: none !important; }
+
+@media (max-width: 576px) {
+  .top-nav .navbar-collapse .navbar-nav {
+    padding-bottom: 1rem;
+    padding-top: 0;
+  }
+}
+
+[href="/performers/new"],
+[href="/scenes/new"] { display: none; }
+
+.VideoPlayer { max-height: calc(100vh - 8rem) !important; }
+
+.pagination-footer { background: #000; bottom: 0; }
+
+.pagination .btn,
+.pagination * { font-size: 14px !important; }
+
+.pagination-footer .btn,
+.pagination-footer button {
+  height: auto !important;
+  white-space: nowrap !important;
+  font-weight: 500 !important;
+}
+
+.clearable-text-field,
+.clearable-text-field:active,
+.clearable-text-field:focus,
+body .sidebar-toolbar,
+body .sidebar-pane .sidebar { background: #000 !important; }
+
+.clearable-text-field,
+.clearable-text-field:active,
+.clearable-text-field:focus {
+  box-shadow: none !important;
+  border-color: #000 !important;
+}
+
+.sidebar-section .collapse-header .collapse-button,
+b,
+strong { font-weight: 500 !important; }
+
+/* Random shuffle button gets a feather icon */
+.mr-2 a[href="javascript:void(0)"] > button {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23cacaca' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='feather feather-shuffle'%3E%3Cpolyline points='16 3 21 3 21 8'%3E%3C/polyline%3E%3Cline x1='4' y1='20' x2='21' y2='3'%3E%3C/line%3E%3Cpolyline points='21 16 21 21 16 21'%3E%3C/polyline%3E%3Cline x1='15' y1='15' x2='21' y2='21'%3E%3C/line%3E%3Cline x1='4' y1='4' x2='9' y2='9'%3E%3C/line%3E%3C/svg%3E") !important;
+  width: 18px !important;
+  height: 18px !important;
+  text-indent: -9999px !important;
+  overflow: hidden !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  margin: 6px 8px 0 0 !important;
+  padding: 0 !important;
+}
+
+@media (max-width: 800px) {
+  .mr-2 a[href="javascript:void(0)"] > button {
+    margin-left: 12px !important;
+    margin-right: -6px !important;
+    position: relative !important;
+    top: 3px !important;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1300px) {
+  .collapse:not(.show):has(.navbar-nav) {
+    display: flex !important;
+    overflow-x: scroll;
+    gap: 10px !important;
+  }
+
+  .top-nav .navbar-collapse .navbar-nav,
+  body .navbar-nav {
+    flex-direction: unset !important;
+    flex-wrap: unset !important;
+    gap: 10px !important;
+    justify-content: flex-start !important;
+    max-width: 80vw !important;
+    overflow-x: scroll !important;
+  }
+  .top-nav .navbar-collapse .navbar-nav .nav-link,
+  body .navbar-nav .nav-link {
+    width: auto !important;
+    flex-basis: unset !important;
+  }
+
+  body .top-nav { flex-wrap: nowrap !important; }
+
+  .top-nav .navbar-buttons {
+    order: 9999 !important;
+    gap: 10px !important;
+    padding-left: 20px !important;
+  }
+
+  .top-nav .navbar-collapse .navbar-nav {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .navbar-brand { order: -1 !important; }
+}
+
+@media (max-width: 600px) {
+  .navbar-buttons { gap: 12px !important; }
+}
+
+/* === Modern floating glass top-nav === */
+body .top-nav,
+.top-nav.navbar {
+  border-radius: 2rem !important;
+  margin: 10px !important;
+  padding: 8px 15px !important;
+  background: rgba(20, 20, 22, 0.55) !important;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  width: auto !important;
+  left: 0;
+  right: 0;
+}
+.top-nav .bg-dark,
+.top-nav .navbar-collapse,
+.top-nav .navbar-buttons { background: transparent !important; }
+
+.top-nav .btn {
+  font-size: 14px !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+}
+
+/* Slight padding on body so nothing slides under the floating bar */
+body { padding-top: 5.5rem !important; }
+
+/* === TikTok-ish rounded media everywhere === */
+.grid-card,
+.scene-card,
+.gallery-card,
+.image-card,
+.performer-card,
+.studio-card,
+.tag-card,
+.movie-card,
+.group-card,
+.marker-card {
+  border-radius: var(--card-radius) !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background: rgba(20, 20, 22, 0.5) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  /* Modern breathable spacing. Library cards live in a grid; an outside margin
+     gives the column gutter, the inside padding gives the content room. */
+  margin: 8px !important;
+  padding: 12px !important;
+}
+/* Caption / details strip inside a library card */
+body .grid-card .card-section,
+body .scene-card .card-section,
+body .performer-card .card-section,
+body .studio-card .card-section,
+body .tag-card .card-section,
+body .gallery-card .card-section,
+body .image-card .card-section,
+body .group-card .card-section,
+body .movie-card .card-section,
+body .marker-card .card-section {
+  padding: 8px 4px 4px 4px !important;
+}
+
+.grid-card:hover,
+.scene-card:hover,
+.gallery-card:hover,
+.image-card:hover,
+.performer-card:hover,
+.studio-card:hover,
+.tag-card:hover,
+.movie-card:hover,
+.group-card:hover,
+.marker-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* The preview image/video inside cards */
+.scene-card-preview,
+.scene-card-preview-image,
+.scene-card-preview-video,
+.gallery-card-preview,
+.image-card .image-card-preview,
+.image-thumb-section img,
+.image-thumb-section,
+.performer-card .thumbnail-section img,
+.performer-card .thumbnail-section,
+.studio-card .thumbnail-section img,
+.studio-card .thumbnail-section,
+.tag-card .thumbnail-section img,
+.tag-card .thumbnail-section,
+.movie-card .thumbnail-section img,
+.movie-card .thumbnail-section,
+.group-card .thumbnail-section img,
+.group-card .thumbnail-section {
+  border-radius: var(--media-radius) !important;
+  overflow: hidden !important;
+}
+
+/* The big scene player */
+.video-js,
+.VideoPlayer,
+.scene-player,
+.player-container,
+.vjs-tech,
+#VideoJsPlayer {
+  border-radius: var(--media-radius) !important;
+  overflow: hidden !important;
+}
+
+.image-lightbox,
+.image-lightbox img,
+.lightbox-image,
+.lightbox-image img { border-radius: var(--media-radius) !important; }
+
+.detail-header .detail-header-image,
+.performer-head img,
+.studio-head img,
+.tag-head img {
+  border-radius: var(--media-radius) !important;
+  overflow: hidden !important;
+}
+
+.modal-content {
+  border-radius: var(--card-radius) !important;
+  overflow: hidden !important;
+}
+
+.recommendation-row,
+.recommendations-container { border-radius: var(--card-radius) !important; }
+
+.filter-tags .pill,
+.filter-container .pill,
+.tag-item { border-radius: 999px !important; }
+
+/* Smoother scrollbars (webkit) */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+/* === TikTok Sans on body chrome === */
+html, body,
+body div, body p, body a, body span, body li, body td, body th,
+body input, body select, body textarea, body button, body label,
+body h1, body h2, body h3, body h4, body h5, body h6,
+body .badge, body .tag-item, body .btn,
+body .scene-header, body .scene-header-container,
+body .top-nav, body .navbar-nav, body .nav-link, body .nav-tabs,
+body .modal-content, body .card, body .grid-card, body .scene-card,
+body .form-control, body .dropdown-menu, body .toast {
+  font-family: 'TikTok Sans', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* === Scene player: round actual visible elements + scrubber strip === */
+.scene-player-container,
+.scene-player-container .VideoPlayer,
+.scene-player-container .video-wrapper,
+.scene-player-container video-js,
+.scene-player-container .video-js,
+.scene-player-container .vjs-tech,
+.scene-player-container video,
+.scene-player-container .vjs-poster,
+#VideoJsPlayer,
+.VideoPlayer .video-wrapper {
+  border-radius: var(--media-radius) !important;
+  overflow: hidden !important;
+}
+
+.scrubber-wrapper {
+  border-radius: var(--media-radius) !important;
+  overflow: hidden !important;
+  margin-top: 6px;
+}
+
+/* === Keep icon fonts intact ===
+   video.js controls render unicode glyphs in the 'VideoJS' font; if we let
+   them inherit from body (TikTok Sans) the code-points are missing and
+   render as boxes. Pin to the right family for every variant we've seen. */
+.vjs-icon-placeholder,
+.vjs-icon-placeholder::before,
+.vjs-icon-placeholder:before,
+[class^="vjs-icon-"],
+[class*=" vjs-icon-"],
+[class^="vjs-icon-"]::before,
+[class*=" vjs-icon-"]::before,
+[class^="vjs-icon-"]:before,
+[class*=" vjs-icon-"]:before,
+.vjs-button > .vjs-icon-placeholder::before,
+.video-js .vjs-control .vjs-icon-placeholder::before,
+.video-js .vjs-play-progress::before,
+.video-js .vjs-play-progress:before,
+.video-js.vjs-skip-buttons-prev .vjs-icon-previous-item,
+.video-js.vjs-skip-buttons-next .vjs-icon-next-item,
+.video-js.vjs-skip-buttons-prev .vjs-icon-previous-item::before,
+.video-js.vjs-skip-buttons-next .vjs-icon-next-item::before {
+  font-family: 'VideoJS' !important;
+}
+
+/* Scrubber play-progress fill = accent purple (was VideoJS default red) */
+body .video-js .vjs-play-progress,
+body .video-js .vjs-play-progress .vjs-time-tooltip { background-color: var(--color-hubs, #df73ff) !important; }
+body .video-js .vjs-play-progress::before,
+body .video-js .vjs-play-progress:before { color: var(--color-hubs, #df73ff) !important; }
+
+/* Scene-edit button strip: no opaque background fighting the card bg */
+body #scene-edit-details .edit-buttons-container,
+body #scene-edit-details .edit-buttons {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Font Awesome / Material Icons stay in their own families */
+.fa, .fas, .far, .fal, .fab,
+[class^="fa-"], [class*=" fa-"] { font-family: 'Font Awesome 5 Free', 'FontAwesome' !important; }
+.fab, [class^="fa-brand"], [class*=" fa-brand"] { font-family: 'Font Awesome 5 Brands' !important; }
+.material-icons { font-family: 'Material Icons' !important; }
+.material-symbols-outlined { font-family: 'Material Symbols Outlined' !important; }
+
+/* Everything else inside the player keeps its own font. don't force TikTok Sans. */
+.video-js,
+.video-js * { font-family: revert !important; }
+
+/* === Force radius on player even against Video.js defaults === */
+body .scene-player-container,
+body .scene-player-container .VideoPlayer,
+body .scene-player-container .video-wrapper,
+body .VideoPlayer,
+body .VideoPlayer .video-wrapper,
+body .video-js,
+body video-js,
+body #VideoJsPlayer,
+body #VideoJsPlayer .vjs-poster,
+body #VideoJsPlayer_html5_api {
+  border-radius: var(--media-radius, 18px) !important;
+  overflow: hidden !important;
+}
+body video { border-radius: var(--media-radius, 18px) !important; }
+
+/* === Nav items: 10px gap === */
+body .top-nav .navbar-nav,
+body .top-nav .navbar-buttons,
+body .top-nav.navbar > div,
+body .top-nav .navbar-collapse { gap: 10px !important; }
+
+/* === All buttons rounded === */
+body .btn,
+body button.btn,
+body .top-nav .btn,
+body .modal-content .btn,
+body .form-control[type="button"] { border-radius: 999px !important; }
+
+/* === Slick carousel dots: balls, not dashes === */
+body .slick-dots {
+  display: flex !important;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0;
+  list-style: none;
+}
+body .slick-dots li,
+body .slick-dots li button {
+  width: 10px !important;
+  height: 10px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+body .slick-dots li button {
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+body .slick-dots li button:hover { background: rgba(255, 255, 255, 0.55) !important; }
+body .slick-dots li.slick-active button,
+body .slick-dots li button.slick-active {
+  background: var(--color-hubs, #df73ff) !important;
+  transform: scale(1.25);
+}
+body .slick-dots li button::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* === Pagination next/prev: smaller + modern chevron icons === */
+body button[title="Next"],
+body button[title="Previous"],
+body button[title="Page Forward"],
+body button[title="Page Back"] {
+  font-size: 0 !important;
+  color: transparent !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  min-width: 32px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative;
+}
+body button[title="Next"]::before,
+body button[title="Previous"]::before,
+body button[title="Page Forward"]::before,
+body button[title="Page Back"]::before {
+  content: '';
+  display: block;
+  width: 14px;
+  height: 14px;
+  background-color: currentColor;
+  color: #fff;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 6 15 12 9 18'/></svg>") center / contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 6 15 12 9 18'/></svg>") center / contain no-repeat;
+}
+body button[title="Previous"]::before,
+body button[title="Page Back"]::before { transform: scaleX(-1); }
+
+/* Smaller slick dots. final pass */
+body .slick-dots li,
+body .slick-dots li button { width: 7px !important; height: 7px !important; }
+body .slick-dots { gap: 6px; margin-top: 20px; }
+
+/* === Prefer medium (500) for titles / headings === */
+body h1, body h2, body h3, body h4, body h5, body h6,
+body .scene-header,
+body .scene-header-container h3,
+body .scene-card .TruncatedText.scene-card__title,
+body .scene-card-link,
+body .grid-card .card-section-title,
+body .performer-card .card-section-title,
+body .studio-card .card-section-title,
+body .tag-card .card-section-title,
+body .gallery-card .card-section-title,
+body .group-card .card-section-title,
+body .movie-card .card-section-title,
+body .image-card .card-section-title,
+body .marker-card .card-section-title,
+body .recommendation-row-head,
+body .modal-title,
+body .navbar-brand,
+body .nav-link,
+body .nav-tabs .nav-link,
+body .stats-element h4,
+body .stats-element .title { font-weight: 500 !important; }
+
+/* Title weights. final overrides (must come after all other rules) */
+body .card-section-title,
+body .card-section-title *,
+body .grid-card .card-section-title,
+body .grid-card .card-section-title *,
+body .scene-card .card-section-title,
+body .scene-card .card-section-title *,
+body .scene-card .TruncatedText.scene-card__title,
+body .scene-card-link,
+body .scene-card-link *,
+body .scene-header-container h3,
+body .scene-header-container h3 *,
+body h1, body h2, body h3, body h4, body h5, body h6,
+body h1 *, body h2 *, body h3 *, body h4 *, body h5 *, body h6 *,
+body .recommendation-row-head,
+body .modal-title,
+body .nav-link { font-weight: 500 !important; }
+
+/* === Modern zoom slider (replaces ugly native range) === */
+body input.zoom-slider,
+body input[type="range"].zoom-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 110px;
+  height: 6px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px;
+  outline: none;
+  padding: 0 !important;
+  margin: 0 8px !important;
+  cursor: pointer;
+  border: 0;
+}
+body input.zoom-slider:focus { outline: none; }
+body input.zoom-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px;
+}
+body input.zoom-slider::-moz-range-track {
+  height: 6px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px;
+  border: 0;
+}
+body input.zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-hubs, #df73ff);
+  border: 2px solid #fff;
+  margin-top: -5px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+body input.zoom-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+body input.zoom-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-hubs, #df73ff);
+  border: 2px solid #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+/* === Filtered list toolbar: consistent spacing === */
+body .filtered-list-toolbar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 8px 0;
+}
+body .filtered-list-toolbar > * { margin: 0 !important; }
+body .filtered-list-toolbar .btn-group,
+body .filtered-list-toolbar .input-group,
+body .filtered-list-toolbar .dropdown { margin: 0 !important; }
+
+body .filtered-list-toolbar .clearable-text-field {
+  border-radius: 999px !important;
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: var(--color-text, #c6c6c6) !important;
+  padding: 6px 14px !important;
+}
+body .filtered-list-toolbar .clearable-text-field:focus {
+  border-color: var(--color-hubs, #df73ff) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-hubs, #df73ff) 25%, transparent) !important;
+  outline: none !important;
+}
+body .filtered-list-toolbar .page-size-selector select {
+  border-radius: 999px !important;
+  padding: 4px 28px 4px 14px !important;
+  background-color: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: var(--color-text, #c6c6c6) !important;
+  height: 34px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c6c6c6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+}
+
+/* Each toolbar button = full pill (Bootstrap btn-groups wrap so the
+   joined-edges look broke; pills are uniform regardless of wrapping). */
+body .filtered-list-toolbar .btn-group > .btn,
+body .filtered-list-toolbar .btn-group > .dropdown > .btn,
+body .filtered-list-toolbar .btn-group > .input-group-prepend > .btn,
+body .filtered-list-toolbar .btn-group > .dropdown,
+body .filtered-list-toolbar .btn-group > .input-group-prepend { border-radius: 999px !important; }
+body .filtered-list-toolbar .btn-group {
+  gap: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+body .filtered-list-toolbar .btn-group > .btn:not(:first-child),
+body .filtered-list-toolbar .btn-group > .dropdown:not(:first-child),
+body .filtered-list-toolbar .btn-group > .input-group-prepend:not(:first-child) { margin-left: 0 !important; }
+body .filtered-list-toolbar .btn-group .btn:first-child,
+body .filtered-list-toolbar .btn-group .btn:last-child,
+body .filtered-list-toolbar .btn-group .btn:not(:first-child):not(:last-child) { border-radius: 999px !important; }
+
+/* Active view button gets accent tint */
+body .filtered-list-toolbar .btn-group .btn.active {
+  background: var(--color-hubs, #df73ff) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+/* Toolbar buttons: 35px standard, but the buttons inside the .search-term-input
+   group (clear + submit) drop to 23px to sit flush inside the smaller field. */
+body .filtered-list-toolbar .btn {
+  height: 35px !important;
+  line-height: 1 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+body .filtered-list-toolbar .search-term-input .btn,
+body .filtered-list-toolbar div.search-term-input .btn {
+  height: 23px !important;
+}
+
+/* Hide rating-banner overlay where it competes with the artwork */
+body .thumbnail-section .rating-banner,
+body .video-section .rating-banner,
+body .scene-card .thumbnail-section .rating-banner,
+body .scene-card-preview .rating-banner { display: none !important; }
+
+/* Watched-progress strip on card thumbnails. Stash defaults to Blueprint
+   blue (#137cbd). Repaint with hub-purple. */
+body .grid-card .progress-indicator,
+body .scene-card .progress-indicator,
+body .scene-card-preview .progress-indicator {
+  background: var(--color-hubs, #df73ff) !important;
+  background-color: var(--color-hubs, #df73ff) !important;
+}
+body .grid-card .progress-bar,
+body .scene-card .progress-bar,
+body .scene-card-preview .progress-bar {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Modal footer: remove Bootstrap's bright top border + top padding, and
+   left-align the action buttons (Stash defaults to right-aligned). */
+body .modal-footer,
+body .modal-content .modal-footer {
+  border-top: 0 !important;
+  padding-top: 0 !important;
+  justify-content: flex-start !important;
+}
+/* The footer also has a >* > margin selector in Bootstrap that pushes
+   buttons apart. keep the gap, just kill the alignment override. */
+body .modal-footer > * { margin: 0 !important; }
+body .modal-footer { gap: 8px; }
+
+/* Header bright border too. keep it but make it match the dark theme */
+body .modal-header,
+body .modal-content .modal-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+/* === Flatten Settings + Changelog padding/indents ===
+   Stash nests .setting-section > .setting elements that render as box-in-box
+   indents on a uniform black bg. visually no contrast, just wasted space.
+   Drop side padding/margins; keep vertical spacing between cards. */
+body .settings-container .setting-section,
+body #settings-container .setting-section,
+body .setting-section {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+body .setting-section + .setting-section {
+  margin-top: 1.5rem !important;
+}
+body .setting,
+body .setting-group .setting {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+body .setting-section h1.heading,
+body .setting-section .heading {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+/* Changelog: drop card indents + chrome so each version reads as a flat row.
+   Stash wraps each version in `.changelog-version.card` with Bootstrap card
+   header/body padding; flatten the whole thing. */
+body .changelog,
+body .changelog h1.mb-4,
+body .changelog .changelog-version,
+body .changelog .changelog-version .card-header,
+body .changelog .changelog-version .card-body,
+body .changelog .changelog-version-body,
+body .changelog .changelog-version-body .markdown {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+body .changelog .changelog-version {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+body .changelog .changelog-version .card-header {
+  background: transparent !important;
+  border: 0 !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+body .changelog .changelog-version .card-body {
+  padding-top: 0 !important;
+  padding-bottom: 8px !important;
+}
+body .changelog .changelog-version-header .btn-link {
+  padding: 0 !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  width: 100%;
+}
+body .changelog .markdown h3,
+body .changelog .markdown h4,
+body .changelog .markdown h5 {
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.25rem !important;
+}
+body .changelog .markdown ul {
+  margin-bottom: 0.5rem !important;
+  padding-left: 1.2rem !important;
+}
+
+/* === Settings flatten, round 2 ===
+   .card inside settings sections still inherits Bootstrap margin/padding.
+   Zero them so the panel reads as a single flat column, no nested boxes. */
+body .setting-section .card,
+body .setting-section > .card,
+body .setting-section .content {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+/* Setting row layout: keep description side flexible, controls side stable,
+   never wrap button labels. */
+body .setting-section .setting {
+  display: flex !important;
+  gap: 16px;
+  align-items: center;
+  padding: 8px 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+body .setting-section .setting:last-child {
+  border-bottom: 0;
+}
+body .setting-section .setting > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+body .setting-section .setting > div:last-child {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+body .setting-section .setting .btn,
+body .setting-section .setting button {
+  white-space: nowrap !important;
+}
+
+/* === Checkboxes ===
+   Bare input[type=checkbox] and Bootstrap .form-check-input render as white
+   browser-native boxes. Replace with a dark glassy square that fills with the
+   hub-purple when checked. */
+body input[type="checkbox"],
+body .form-check-input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  vertical-align: middle;
+  margin: 0;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+body input[type="checkbox"]:hover,
+body .form-check-input[type="checkbox"]:hover {
+  border-color: var(--color-hubs, #df73ff);
+}
+body input[type="checkbox"]:checked,
+body .form-check-input[type="checkbox"]:checked {
+  background: var(--color-hubs, #df73ff);
+  border-color: var(--color-hubs, #df73ff);
+}
+body input[type="checkbox"]:checked::after,
+body .form-check-input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 0px;
+  width: 5px;
+  height: 10px;
+  border: solid #000;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+body input[type="checkbox"]:focus,
+body .form-check-input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-hubs, #df73ff) 25%, transparent);
+}
+
+/* === Tables ===
+   Stash uses .table with heavy borders. Strip borders, soft row dividers,
+   rounded container, sticky-friendly header. Works for plain .table and
+   package-manager-table-container. */
+body .table,
+body .package-manager-table-container .table {
+  border: 0 !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  margin: 0 !important;
+}
+body .table thead th,
+body .package-manager-table-container .table thead th {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.65) !important;
+  font-weight: 600 !important;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 8px 12px !important;
+}
+body .table tbody td,
+body .package-manager-table-container .table tbody td {
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  padding: 8px 12px !important;
+  vertical-align: middle !important;
+  color: var(--color-text, #c6c6c6);
+}
+body .table tbody tr:hover td,
+body .package-manager-table-container .table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+body .table tbody tr:last-child td,
+body .package-manager-table-container .table tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+/* Border-row "spacer" rows used in package-manager: hide them. */
+body .table .border-row,
+body .package-manager-table-container .border-row {
+  display: none !important;
+}
+/* Empty header/body cells reserve column width for nothing.
+   Collapse them so the visible cells get the whole width. */
+body .table thead th:empty,
+body .table tbody td:empty,
+body .package-manager-table-container .table thead th:empty,
+body .package-manager-table-container .table tbody td:empty {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+body .table .check-cell:empty,
+body .table tr > th.check-cell {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+}
+/* Package-manager wrapper: kill default padding */
+body .package-manager {
+  padding: 0 !important;
+}
+
+/* === Progress bars ===
+   Bootstrap defaults: white bg with diagonal stripes, sharp edges, sits flush
+   against surrounding text. Modernize: tall rounded pill, dark track, hub
+   gradient fill, no stripes, breathing room above/below. */
+body .progress {
+  height: 8px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-radius: 999px !important;
+  overflow: hidden !important;
+  margin: 10px 0 !important;
+  box-shadow: none !important;
+}
+body .progress .progress-bar,
+body .progress-bar {
+  background: linear-gradient(
+    90deg,
+    var(--color-hubs, #df73ff) 0%,
+    #ff3b6b 100%
+  ) !important;
+  border-radius: 999px !important;
+  box-shadow: 0 0 10px rgba(223, 115, 255, 0.45) !important;
+  /* Kill the diagonal stripes Bootstrap paints with .progress-bar-striped */
+  background-image: linear-gradient(
+    90deg,
+    var(--color-hubs, #df73ff) 0%,
+    #ff3b6b 100%
+  ) !important;
+  animation: none !important;
+}
+body .progress-bar-striped {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-hubs, #df73ff) 0%,
+    #ff3b6b 100%
+  ) !important;
+}
+body .package-manager .package-manager-toolbar {
+  padding: 0 0 10px 0 !important;
+  margin: 0 !important;
+  gap: 8px;
+}
+
+/* Tasks panel: kill card chrome on job tables + empty-queue indent */
+body .tasks-panel-queue,
+body .job-table,
+body .job-table.card,
+body .job-table ul {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+body .job-table.card {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+body .empty-queue-message {
+  display: block;
+  padding: 0 !important;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Form fields. match the dark theme everywhere. Covers number / text / email /
+   password / search inputs and <select>s in our Settings panels and Stash's
+   .form-control wherever it appears. */
+body input[type="number"],
+body input[type="text"],
+body input[type="email"],
+body input[type="password"],
+body input[type="search"],
+body input[type="url"],
+body input[type="tel"],
+body input.form-control,
+body textarea.form-control,
+body select.form-control,
+body .form-control {
+  background: rgba(255, 255, 255, 0.06) !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: var(--color-text, #c6c6c6) !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  font-size: 14px;
+}
+body input[type="number"] { height: 35px; }
+body input[type="number"]:focus,
+body input[type="text"]:focus,
+body input[type="email"]:focus,
+body input[type="password"]:focus,
+body input[type="search"]:focus,
+body input[type="url"]:focus,
+body input[type="tel"]:focus,
+body input.form-control:focus,
+body textarea.form-control:focus,
+body select.form-control:focus,
+body .form-control:focus {
+  border-color: var(--color-hubs, #df73ff) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-hubs, #df73ff) 25%, transparent) !important;
+  outline: none !important;
+  color: var(--color-white, #fff) !important;
+}
+body input::placeholder,
+body textarea::placeholder,
+body .form-control::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+/* Webkit autofill: kill the white background Chrome injects */
+body input:-webkit-autofill,
+body input:-webkit-autofill:hover,
+body input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text, #c6c6c6) !important;
+  -webkit-box-shadow: 0 0 0px 1000px rgba(20, 20, 22, 0.95) inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+/* Webkit number spinner. keep but match dark theme */
+body input[type="number"]::-webkit-inner-spin-button,
+body input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+  filter: invert(0.85);
+}

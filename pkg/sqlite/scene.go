@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -90,6 +91,7 @@ type sceneRow struct {
 	UpdatedAt    Timestamp `db:"updated_at"`
 	ResumeTime   float64   `db:"resume_time"`
 	PlayDuration float64   `db:"play_duration"`
+	LikeCount    int       `db:"like_count"`
 
 	// not used in resolutions or updates
 	CoverBlob zero.String `db:"cover_blob"`
@@ -109,6 +111,7 @@ func (r *sceneRow) fromScene(o models.Scene) {
 	r.UpdatedAt = Timestamp{Timestamp: o.UpdatedAt}
 	r.ResumeTime = o.ResumeTime
 	r.PlayDuration = o.PlayDuration
+	r.LikeCount = o.LikeCount
 }
 
 type sceneQueryRow struct {
@@ -141,6 +144,7 @@ func (r *sceneQueryRow) resolve() *models.Scene {
 
 		ResumeTime:   r.ResumeTime,
 		PlayDuration: r.PlayDuration,
+		LikeCount:    r.LikeCount,
 	}
 
 	if r.PrimaryFileFolderPath.Valid && r.PrimaryFileBasename.Valid {
@@ -482,6 +486,17 @@ func (qb *SceneStore) Destroy(ctx context.Context, id int) error {
 	// galleries should be handled prior to calling destroy
 
 	return qb.tableMgr.destroyExisting(ctx, []int{id})
+}
+
+// SetLikeCount writes the like_count column for a scene. Negative values are
+// clamped to 0.
+func (qb *SceneStore) SetLikeCount(ctx context.Context, id int, value int) error {
+	if value < 0 {
+		value = 0
+	}
+	stmt := "UPDATE scenes SET like_count = ?, updated_at = ? WHERE id = ?"
+	_, err := dbWrapper.Exec(ctx, stmt, value, time.Now(), id)
+	return err
 }
 
 // returns nil, nil if not found
@@ -1071,6 +1086,7 @@ var sceneSortOptions = sortOptions{
 	"last_played_at",
 	"movie_scene_number",
 	"o_counter",
+	"like_count",
 	"organized",
 	"performer_count",
 	"play_count",
@@ -1192,6 +1208,10 @@ func (qb *SceneStore) setSceneSort(query *queryBuilder, findFilter *models.FindF
 		query.sortAndPagination += fmt.Sprintf(" ORDER BY (SELECT MAX(o_date) FROM %s AS sort WHERE sort.%s = %s.id) %s", scenesODatesTable, sceneIDColumn, sceneTable, getSortDirection(direction))
 	case "o_counter":
 		query.sortAndPagination += getCountSort(sceneTable, scenesODatesTable, sceneIDColumn, direction)
+	case "like_count":
+		// like_count is a real column on the scenes table — bypass the generic
+		// "_count suffix → relation count" heuristic in getSort.
+		query.sortAndPagination += " ORDER BY scenes.like_count " + getSortDirection(direction)
 	default:
 		query.sortAndPagination += getSort(sort, direction, "scenes")
 	}

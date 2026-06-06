@@ -379,6 +379,11 @@ func (r *sceneResolver) PlayCount(ctx context.Context, obj *models.Scene) (*int,
 	return &ret, nil
 }
 
+// LikeCount returns the like_count column read with the scene.
+func (r *sceneResolver) LikeCount(ctx context.Context, obj *models.Scene) (int, error) {
+	return obj.LikeCount, nil
+}
+
 func (r *sceneResolver) PlayHistory(ctx context.Context, obj *models.Scene) ([]*time.Time, error) {
 	ret, err := loaders.From(ctx).ScenePlayHistory.Load(obj.ID)
 	if err != nil {

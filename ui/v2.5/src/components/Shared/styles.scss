@@ -196,7 +196,7 @@ button.collapse-button.btn-primary:not(:disabled):not(.disabled):active {
   background: none;
   border: none;
   box-shadow: none;
-  color: #f5f8fa;
+  color: #fff;
   text-align: left;
 }
 
@@ -340,7 +340,7 @@ button.collapse-button {
 
   &.unset {
     .label {
-      color: #bfccd6;
+      color: #c6c6c6;
       text-decoration: line-through;
     }
   }
@@ -490,7 +490,7 @@ div.react-datepicker {
 
     .react-datepicker__year-option:hover,
     .react-datepicker__month-option:hover {
-      background-color: #8a9ba826;
+      background-color: #c6c6c626;
     }
   }
 }
@@ -610,7 +610,7 @@ button.btn.favorite-button {
 
   &:hover {
     background: rgba(138, 155, 168, 0.15);
-    color: #f5f8fa;
+    color: #fff;
   }
 
   .count-icon {
@@ -627,7 +627,7 @@ button.btn.favorite-button {
   &.increment-only button.count-value {
     &:hover {
       background: none;
-      color: #f5f8fa;
+      color: #fff;
     }
   }
 
@@ -636,7 +636,7 @@ button.btn.favorite-button {
     &:focus {
       border: none;
       box-shadow: none;
-      color: #f5f8fa;
+      color: #fff;
 
       &:not(:hover) {
         background: none;

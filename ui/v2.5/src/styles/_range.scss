@@ -26,7 +26,7 @@ input[type="range"] {
 
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
-    background: #394b59;
+    background: #2f2f2f;
     border: 0 solid #000;
     border-radius: 5px;
     box-shadow: 0 0 0 #000;
@@ -52,7 +52,7 @@ input[type="range"] {
   }
 
   &::-moz-range-thumb {
-    background: #394b59;
+    background: #2f2f2f;
     border: 0 solid #000;
     border-radius: 5px;
     box-shadow: 0 0 0 #000;
@@ -86,7 +86,7 @@ input[type="range"] {
   }
 
   &::-ms-thumb {
-    background: #394b59;
+    background: #2f2f2f;
     border: 0 solid #000;
     border-radius: 5px;
     box-shadow: 0 0 0 #000;

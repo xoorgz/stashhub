@@ -10,6 +10,7 @@ import { SweatDrops } from "../Shared/SweatDrops";
 import { TruncatedText } from "../Shared/TruncatedText";
 import NavUtils from "src/utils/navigation";
 import TextUtils from "src/utils/text";
+import { useDateDisplay } from "src/utils/dateDisplay";
 import { SceneQueue } from "src/models/sceneQueue";
 import { ConfigurationContext } from "src/hooks/Config";
 import { PerformerPopoverButton } from "../Shared/PerformerPopoverButton";
@@ -324,12 +325,22 @@ const SceneCardPopovers = PatchComponent(
   }
 );
 
+const SceneCardDateLabel: React.FC<{ iso: string | null | undefined }> = ({ iso }) => {
+  const { label, tooltip } = useDateDisplay(iso);
+  if (!iso) return null;
+  return (
+    <span className="scene-card__date" title={tooltip}>
+      {label}
+    </span>
+  );
+};
+
 const SceneCardDetails = PatchComponent(
   "SceneCard.Details",
   (props: ISceneCardProps) => {
     return (
       <div className="scene-card__details">
-        <span className="scene-card__date">{props.scene.date}</span>
+        <SceneCardDateLabel iso={props.scene.date} />
         <span className="file-path extra-scene-info">
           {objectPath(props.scene)}
         </span>

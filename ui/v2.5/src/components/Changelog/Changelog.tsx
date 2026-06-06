@@ -33,6 +33,7 @@ import V0250 from "src/docs/en/Changelog/v0250.md";
 import V0260 from "src/docs/en/Changelog/v0260.md";
 import V0270 from "src/docs/en/Changelog/v0270.md";
 import V0280 from "src/docs/en/Changelog/v0280.md";
+import VStashhub from "src/docs/en/Changelog/stashhub.md";
 import { MarkdownPage } from "../Shared/MarkdownPage";
 
 const Changelog: React.FC = () => {
@@ -74,10 +75,15 @@ const Changelog: React.FC = () => {
 
   const releases: IStashRelease[] = [
     {
-      version: currentVersion,
+      version: "stashhub",
+      date: currentDate,
+      page: VStashhub,
+      defaultOpen: true,
+    },
+    {
+      version: `Built on Stash ${currentVersion}`,
       date: currentDate,
       page: currentPage,
-      defaultOpen: true,
     },
     {
       version: "v0.27.2",

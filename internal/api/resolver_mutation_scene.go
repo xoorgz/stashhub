@@ -1013,6 +1013,66 @@ func (r *mutationResolver) SceneResetPlayCount(ctx context.Context, id string) (
 	return ret, nil
 }
 
+// adjustSceneLikeCount applies a delta or sets an explicit value on the
+// scenes.like_count column inside a transaction and returns the new value.
+func adjustSceneLikeCount(ctx context.Context, r *mutationResolver, id string, delta int, setValue *int) (int, error) {
+	sceneID, err := strconv.Atoi(id)
+	if err != nil {
+		return 0, fmt.Errorf("converting id: %w", err)
+	}
+
+	var newCount int
+	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		qb := r.repository.Scene
+		scene, err := qb.Find(ctx, sceneID)
+		if err != nil {
+			return err
+		}
+		if scene == nil {
+			return fmt.Errorf("scene %d not found", sceneID)
+		}
+
+		var next int
+		if setValue != nil {
+			next = *setValue
+		} else {
+			next = scene.LikeCount + delta
+		}
+		if next < 0 {
+			next = 0
+		}
+
+		// Touch updated_at via the standard partial update.
+		if _, err := qb.UpdatePartial(ctx, sceneID, models.ScenePartial{
+			UpdatedAt: models.NewOptionalTime(time.Now()),
+		}); err != nil {
+			return err
+		}
+
+		// Write the like_count column.
+		if err := qb.SetLikeCount(ctx, sceneID, next); err != nil {
+			return err
+		}
+		newCount = next
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+	return newCount, nil
+}
+
+func (r *mutationResolver) SceneIncrementLike(ctx context.Context, id string) (int, error) {
+	return adjustSceneLikeCount(ctx, r, id, 1, nil)
+}
+
+func (r *mutationResolver) SceneDecrementLike(ctx context.Context, id string) (int, error) {
+	return adjustSceneLikeCount(ctx, r, id, -1, nil)
+}
+
+func (r *mutationResolver) SceneSetLikeCount(ctx context.Context, id string, value int) (int, error) {
+	return adjustSceneLikeCount(ctx, r, id, 0, &value)
+}
+
 // deprecated
 func (r *mutationResolver) SceneIncrementO(ctx context.Context, id string) (ret int, err error) {
 	sceneID, err := strconv.Atoi(id)

@@ -303,6 +303,13 @@ type Mutation {
   "Resets the play count for a scene to 0. Returns the new play count value."
   sceneResetPlayCount(id: ID!): Int!
 
+  "Increment the like count for a scene. Returns the new value."
+  sceneIncrementLike(id: ID!): Int!
+  "Decrement the like count for a scene, with a minimum of 0. Returns the new value."
+  sceneDecrementLike(id: ID!): Int!
+  "Set the like count for a scene to an explicit value."
+  sceneSetLikeCount(id: ID!, value: Int!): Int!
+
   "Generates screenshot at specified time in seconds. Leave empty to generate default screenshot"
   sceneGenerateScreenshot(id: ID!, at: Float): String!
 

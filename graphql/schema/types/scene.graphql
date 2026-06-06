@@ -63,6 +63,9 @@ type Scene {
   "The number ot times a scene has been played"
   play_count: Int
 
+  "Number of likes recorded for this scene."
+  like_count: Int!
+
   "Times a scene was played"
   play_history: [Time!]!
   "Times the o counter was incremented"

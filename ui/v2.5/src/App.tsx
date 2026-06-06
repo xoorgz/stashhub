@@ -26,6 +26,8 @@ import Mousetrap from "mousetrap";
 import MousetrapPause from "mousetrap-pause";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { MainNavbar } from "./components/MainNavbar";
+import { SideNav } from "./components/SideNav/SideNav";
+import { TopRightBar } from "./components/TopRightBar/TopRightBar";
 import { PageNotFound } from "./components/PageNotFound";
 import * as GQL from "./core/generated-graphql";
 import { makeTitleProps } from "./hooks/title";
@@ -56,6 +58,7 @@ const Performers = lazyComponent(
 const FrontPage = lazyComponent(
   () => import("./components/FrontPage/FrontPage")
 );
+const Feed = lazyComponent(() => import("./components/Feed/Feed"));
 const Scenes = lazyComponent(() => import("./components/Scenes/Scenes"));
 const Settings = lazyComponent(() => import("./components/Settings/Settings"));
 const Stats = lazyComponent(() => import("./components/Stats"));
@@ -215,7 +218,14 @@ export const App: React.FC = () => {
   function maybeRenderNavbar() {
     // don't render navbar for setup views
     if (!setupMatch) {
-      return <MainNavbar />;
+      // MainNavbar is intentionally NOT rendered — SideNav + TopRightBar fully
+      // replace it across all viewports (avoids double nav / bottom strip).
+      return (
+        <>
+          <SideNav />
+          <TopRightBar />
+        </>
+      );
     }
   }
 
@@ -228,7 +238,8 @@ export const App: React.FC = () => {
       <ErrorBoundary>
         <Suspense fallback={<LoadingIndicator />}>
           <Switch>
-            <Route exact path="/" component={FrontPage} />
+            <Route exact path="/" component={Feed} />
+            <Route exact path="/dashboard" component={FrontPage} />
             <Route path="/scenes" component={Scenes} />
             <Route path="/images" component={Images} />
             <Route path="/galleries" component={Galleries} />

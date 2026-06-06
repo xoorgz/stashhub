@@ -64,9 +64,9 @@
     }
 
     > div:last-child {
-      min-width: 100px;
-      text-align: right;
-
+      /* The historic min-width:100px + text-align:right made simple text rows
+         (About panel especially) push their value to the right with a forced
+         gap. Let the natural flex layout decide width and alignment. */
       .btn {
         margin: 0.25rem;
       }
@@ -163,7 +163,7 @@
 #tasks-panel {
   @media (min-width: 576px) and (min-height: 600px) {
     .tasks-panel-queue {
-      background-color: #202b33;
+      background-color: #151515;
       margin-top: -1rem;
       padding-bottom: 0.25rem;
       padding-top: 1rem;

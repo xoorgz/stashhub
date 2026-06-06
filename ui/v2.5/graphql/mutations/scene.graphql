@@ -123,3 +123,15 @@ mutation SceneMerge($input: SceneMergeInput!) {
     id
   }
 }
+
+mutation SceneIncrementLike($id: ID!) {
+  sceneIncrementLike(id: $id)
+}
+
+mutation SceneDecrementLike($id: ID!) {
+  sceneDecrementLike(id: $id)
+}
+
+mutation SceneSetLikeCount($id: ID!, $value: Int!) {
+  sceneSetLikeCount(id: $id, value: $value)
+}

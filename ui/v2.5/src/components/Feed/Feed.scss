@@ -1,0 +1,512 @@
+/* Feed. TikTok-style vertical snap, native React component */
+
+:root {
+  --feed-hubs: var(--color-hubs, #df73ff);
+}
+
+.feed-root {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 50;
+  overflow: hidden;
+}
+
+.feed-track {
+  position: absolute;
+  inset: 0;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.feed-track::-webkit-scrollbar { display: none; }
+
+.feed-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.feed-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+}
+.feed-empty-msg { opacity: 0.7; }
+.feed-empty-debug {
+  font-family: monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  max-width: 80%;
+  text-align: center;
+  word-break: break-all;
+}
+.feed-empty-retry {
+  background: var(--color-hubs, #df73ff);
+  color: #000;
+  border: 0;
+  padding: 9px 22px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+  &:hover { filter: brightness(1.1); }
+}
+
+.feed-item {
+  position: relative;
+  width: 100%;
+  /* Use 100dvh so the snap target is exactly one viewport tall. browsers
+     (esp. Chrome desktop) sometimes fail to snap mouse-wheel ticks when the
+     snap-target height depends on a chain of percentage parents. */
+  height: 100dvh;
+  scroll-snap-align: start;
+  /* scroll-snap-stop: always forces a stop at every item; removed because it
+     makes wheel scrolls feel laggy and was the prime suspect for missed snaps. */
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* TikTok-style 1rem (16px) breathing room on left & right */
+  padding-inline: 1rem;
+  padding-block: 1rem;      /* matched 1rem vertical breathing */
+  box-sizing: border-box;
+}
+@media (max-width: 640px) {
+  /* Mobile: smaller vertical to maximize video real estate */
+  .feed-item { padding-inline: 1rem !important; padding-block: 4px !important; }
+  .feed-stage { padding: 0 !important; gap: 0 !important; }
+  .feed-video-wrap {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    border-radius: 14px !important;
+    aspect-ratio: auto !important;
+    height: 100% !important;
+    width: 100% !important;
+  }
+  .feed-video { object-fit: cover !important; }
+  /* Stack actions floating over the video bottom-right edge */
+  .feed-actions {
+    position: absolute;
+    right: 8px;
+    bottom: 12px;
+    align-self: auto;
+    z-index: 4;
+  }
+  .feed-action { width: 36px !important; height: 36px !important; }
+  .feed-action .feed-count { font-size: 11px; bottom: -18px; }
+  .feed-avatar { width: 36px !important; height: 36px !important; }
+}
+
+.feed-stage {
+  display: flex;
+  flex-direction: row;
+  /* Center the video vertically (symmetric ~10px top/bottom).
+     Action stack overrides with align-self: flex-end below to stay at the
+     bottom of the stage. */
+  align-items: center;
+  justify-content: center;
+  gap: 17px;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.feed-video-wrap {
+  position: relative;
+  height: 100%;
+  width: auto;             /* derived from JS-set aspect-ratio */
+  max-height: 100%;
+  max-width: calc(100% - 72px);
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 160px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 0.4s ease;
+    opacity: 1;
+  }
+}
+/* Hide the bottom gradient when meta is faded (paired with .feed-item.meta-faded).
+   Hover on the wrap brings both back. */
+.feed-item.meta-faded .feed-video-wrap::after {
+  opacity: 0;
+}
+.feed-video-wrap:hover::after {
+  opacity: 1 !important;
+}
+@media (min-width: 769px) {
+  .feed-video-wrap {
+    max-width: min(72vw, 1080px);
+    /* fills 100% of the stage which is already padded 10px top/bottom */
+    max-height: 100%;
+  }
+}
+
+.feed-video {
+  width: 100%;
+  height: 100%;
+  /* contain on desktop. the wrap matches video aspect (set by JS),
+     so contain renders edge-to-edge with no internal letterbox.
+     mobile uses cover for the immersive TikTok feel. */
+  object-fit: contain;
+  background: #000;
+}
+@media (max-width: 640px) {
+  .feed-video { object-fit: cover; }
+}
+
+.feed-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.feed-meta {
+  padding: 14px 16px 18px;
+  color: #fff;
+  max-width: 100%;
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+/* JS adds .meta-faded to .feed-item after 10s. Hover overrides back to visible. */
+.feed-item.meta-faded .feed-meta { opacity: 0; }
+.feed-video-wrap:hover .feed-meta { opacity: 1 !important; }
+.feed-title {
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.25;
+  margin-bottom: 6px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+.feed-tags {
+  font-size: 12px;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  span {
+    margin-right: 6px;
+    color: var(--feed-hubs);
+  }
+}
+
+/* Progress / seek bar */
+.feed-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 14px;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 6;
+  overflow: visible;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.28);
+    pointer-events: none;
+  }
+}
+.feed-progress-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  width: 0;
+  background: linear-gradient(90deg, #fff, var(--feed-hubs));
+  pointer-events: none;
+  transition: width 0.08s linear;
+  z-index: 7;
+}
+
+/* Action stack */
+.feed-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-bottom: 0;
+  align-self: flex-end;     /* stay at the bottom of the (vertically centered) stage */
+  z-index: 3;
+}
+.feed-action {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(20, 20, 22, 0.65);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s ease, color 0.15s ease;
+
+  svg { display: block; }
+  &:hover {
+    background: rgba(20, 20, 22, 0.85);
+    color: #fff;
+    text-decoration: none;
+  }
+}
+.feed-action.feed-like-btn,
+.feed-action.feed-o-btn,
+.feed-action.feed-play-count {
+  /* +2px (was 14px) so the count badge below the button has more room before
+     the next button starts. Prevents the cramped look on smaller stacks. */
+  margin-bottom: 16px;
+}
+.feed-action.feed-play-count { cursor: default; }
+.feed-action .feed-count {
+  position: absolute;
+  /* +2px (was -18) so the count badge has visible breathing room from the
+     button bottom edge. Tighter looked cramped when the count was 2-3 digits. */
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  line-height: 16px;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* Avatar. borderless with glow on hover */
+.feed-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  &:hover {
+    outline: 2px solid var(--feed-hubs);
+    outline-offset: 2px;
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--feed-hubs) 25%, transparent),
+      0 0 20px color-mix(in srgb, var(--feed-hubs) 55%, transparent),
+      0 8px 28px rgba(0, 0, 0, 0.5);
+    filter: brightness(1.05);
+  }
+}
+
+/* Like / O button pop animation */
+.feed-action.feed-like-btn.liking svg {
+  color: #ff3b6b;
+  animation: feed-like-pop 0.55s cubic-bezier(0.34, 1.85, 0.5, 1);
+}
+.feed-action.feed-o-btn.liking svg {
+  color: var(--feed-hubs);
+  animation: feed-like-pop 0.55s cubic-bezier(0.34, 1.85, 0.5, 1);
+}
+@keyframes feed-like-pop {
+  0%   { transform: scale(1); }
+  15%  { transform: scale(0.7); }
+  35%  { transform: scale(1.55); }
+  55%  { transform: scale(0.9); }
+  75%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* Side nav arrows. pinned to the viewport's right edge, stacked at centre.
+   Two buttons, 44px tall, 12px gap, symmetric about 50vh. No transform; the
+   `top` values are explicit so positioning is identical across browsers and
+   never depends on the button's intrinsic height. */
+.feed-nav-btn {
+  position: fixed !important;
+  right: 16px !important;
+  left: auto !important;
+  width: 44px !important;
+  height: 44px !important;
+  margin: 0 !important;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+  svg { width: 22px; height: 22px; }
+  &:hover {
+    background: var(--feed-hubs);
+    color: #000;
+  }
+}
+.feed-nav-up   { top: calc(50vh - 50px) !important; }
+.feed-nav-down { top: calc(50vh + 6px)  !important; }
+
+/* Belt-and-suspenders: never let custom.css pagination-chevron rules paint
+   a ::before / ::after glyph on top of our own SVG icon. */
+.feed-nav-btn::before,
+.feed-nav-btn::after { content: none !important; display: none !important; }
+
+/* Mobile: hide. swipe is the natural gesture and the screen is too narrow
+   to spare 60px of right-edge space without crowding the action stack. */
+@media (max-width: 640px) {
+  .feed-nav-btn { display: none !important; }
+}
+
+/* Heart particles */
+.feed-heart-particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 99999;
+  filter: blur(0.3px) drop-shadow(0 4px 14px rgba(255, 59, 107, 0.55));
+  animation-name: feed-heart-arc;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: forwards;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+}
+@keyframes feed-heart-arc {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5) rotate(0deg);
+    filter: blur(0px) drop-shadow(0 4px 14px rgba(255, 59, 107, 0.55));
+  }
+  10% {
+    opacity: 0.95;
+    transform: translate(
+      calc(-50% + var(--drift-x, 0px) * 0.08),
+      calc(-50% + var(--rise, -150px) * 0.10)
+    ) scale(1.3) rotate(calc(var(--rot, 0deg) * 0.2));
+  }
+  50% {
+    opacity: 0.85;
+    transform: translate(
+      calc(-50% + var(--drift-x, 0px) * 0.55),
+      calc(-50% + var(--rise, -150px) * 0.55)
+    ) scale(1.1) rotate(calc(var(--rot, 0deg) * 0.55));
+    filter: blur(0.4px) drop-shadow(0 4px 18px rgba(255, 59, 107, 0.45));
+  }
+  85% {
+    opacity: 0.35;
+    transform: translate(
+      calc(-50% + var(--drift-x, 0px) * 0.9),
+      calc(-50% + var(--rise, -150px) * 0.9)
+    ) scale(0.85) rotate(calc(var(--rot, 0deg) * 0.85));
+    filter: blur(1.2px) drop-shadow(0 4px 24px rgba(255, 59, 107, 0.25));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(-50% + var(--drift-x, 0px)),
+      calc(-50% + var(--rise, -150px))
+    ) scale(0.45) rotate(var(--rot, 0deg));
+    filter: blur(2px) drop-shadow(0 4px 30px rgba(255, 59, 107, 0));
+  }
+}
+
+/* TikTok-style play/pause pulse. medium icon, scales up and fades */
+.feed-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  pointer-events: none;
+  z-index: 5;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.5));
+  animation: feed-pulse-pop 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.feed-pulse svg { display: block; }
+
+@keyframes feed-pulse-pop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  25%  { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.25); }
+}
+
+/* TikTok-style play/pause pulse. medium icon, scales up and fades */
+.feed-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  pointer-events: none;
+  z-index: 5;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.5));
+  animation: feed-pulse-pop 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.feed-pulse svg { display: block; }
+
+@keyframes feed-pulse-pop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  25%  { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.25); }
+}

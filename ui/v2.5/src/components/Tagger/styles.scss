@@ -389,12 +389,12 @@ li:not(.active) {
 }
 
 li.active .optional-field.missing .optional-field-content {
-  color: #bfccd6;
+  color: #c6c6c6;
 }
 
 li.active .optional-field.excluded .optional-field-content,
 li.active .optional-field.excluded .scene-link {
-  color: #bfccd6;
+  color: #c6c6c6;
   text-decoration: line-through;
 
   img {

@@ -1,28 +1,65 @@
-/* try to reflect the default css as much as possible */
-* {
-    box-sizing: border-box;
-}
-html {
-    font-size: 14px;
+/* stashhub login — minimal, modern, hub-purple accent.
+   This file ships as-is in the binary alongside login.html. The React bundle
+   CSS isn't loaded on /login, so anything here is the only source of truth. */
+
+:root {
+    --color-bg: #000;
+    --color-card: rgba(20, 20, 22, 0.55);
+    --color-card-border: rgba(255, 255, 255, 0.08);
+    --color-text: #c6c6c6;
+    --color-text-strong: #fff;
+    --color-hubs: #df73ff;
+    --color-error: #ff6b88;
 }
 
+* { box-sizing: border-box; }
+html { font-size: 14px; }
+
 body {
-    background-color: #202b33;
-    color: #f5f8fa;
-    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Inter,
+        "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+        "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     margin: 0;
     padding: 0;
     overflow-y: hidden;
+    height: 100vh;
 }
 
-h6 {
-    font-size: 1rem;
-    margin-top: 0;
-    margin-bottom: .5rem;
-    font-weight: 500;
-    line-height: 1.2;
+/* The full-viewport centring wrapper */
+.dialog {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100vh;
+    padding: 0 16px;
+    margin: 0;
+}
+
+/* The card is just a small centered column — no chrome */
+.card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    width: 100%;
+    max-width: 220px;
+}
+
+/* Labels are hidden — fields use the placeholder text */
+label,
+.form-group label,
+.form-group h6 {
+    display: none;
+}
+
+.form-group {
+    margin-bottom: 10px;
 }
 
 button, input {
@@ -32,101 +69,82 @@ button, input {
     line-height: inherit;
 }
 
-.card {
-    background-color: #30404d;
-    border-radius: 3px;
-    box-shadow: 0 0 0 1px rgba(16,22,26,.4), 0 0 0 rgba(16,22,26,0), 0 0 0 rgba(16,22,26,0);
-    padding: 20px;
-}
-
-.dialog {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    
-    width: 100%;
-    height: 100vh;
-    padding-right: 15px;
-    padding-left: 15px;
-    margin-right: auto;
-    margin-left: auto;
-}
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-control {
+/* Inputs — pill, glassy dark, hub-purple focus ring */
+.form-control,
+.text-input {
     display: block;
     width: 100%;
-    height: calc(1.5em + .75rem + 2px);
-    padding: .375rem .75rem;
-    font-size: 1rem;
+    height: 40px;
+    padding: 8px 14px;
+    font-size: 14px;
     font-weight: 400;
-    line-height: 1.5;
-    color: #495057;
-    background-clip: padding-box;
-    border: 1px solid #ced4da;
-    border-radius: .25rem;
-    -webkit-transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
-    transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+    color: var(--color-text-strong);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    outline: 0;
+    box-shadow: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.form-control::placeholder,
+.text-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+.form-control:focus,
+.text-input:focus {
+    border-color: var(--color-hubs);
+    box-shadow: 0 0 0 3px rgba(223, 115, 255, 0.25);
 }
 
-.text-input {
+/* Submit button — full-width hub-purple pill, black text */
+.btn,
+.btn-primary,
+input[type="submit"].btn,
+input[type="submit"].btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 40px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #000;
+    background-color: var(--color-hubs);
     border: 0;
-    box-shadow: 0 0 0 0 rgba(19,124,189,0), 0 0 0 0 rgba(19,124,189,0), 0 0 0 0 rgba(19,124,189,0), inset 0 0 0 1px rgba(16,22,26,.3), inset 0 1px 1px rgba(16,22,26,.4);
-    color: #f5f8fa;
-}
-
-.text-input, .text-input:focus, .text-input[readonly] {
-    background-color: rgba(16,22,26,.3);
-}
-
-.btn {
-    display: inline-block;
-    font-weight: 400;
-    color: #212529;
-    text-align: center;
-    vertical-align: middle;
+    border-radius: 999px;
+    padding: 0 16px;
     cursor: pointer;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    background-color: initial;
-    border: 1px solid transparent;
-    padding: .375rem .75rem;
-    font-size: 1rem;
-    line-height: 1.5;
-    border-radius: .25rem;
-    -webkit-transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
-    transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+    margin-top: 6px;
+    transition: filter 0.15s ease, transform 0.05s ease;
+}
+.btn:hover,
+.btn-primary:hover,
+input[type="submit"]:hover {
+    filter: brightness(1.08);
+}
+.btn:active,
+.btn-primary:active,
+input[type="submit"]:active {
+    transform: translateY(1px);
 }
 
-.btn-primary {
-    color: #fff;
-    background-color: #137cbd;
-    border-color: #137cbd;
-}
-
+/* Error — collapse cleanly when the template injected an empty string,
+   otherwise show a small red line above the fields. */
 .login-error {
-    color: #db3737;
-    font-size: 80%;
+    color: var(--color-error);
+    font-size: 12px;
     font-weight: 500;
-    padding-bottom: 1rem;
+    line-height: 1.4;
+    padding: 0;
+    margin: 0 0 8px 0;
+    min-height: 0;
+}
+.login-error:empty {
+    display: none;
 }
 
+/* Mobile */
 @media (max-width: 576px) {
-    .card {
-        width: 100%;
-    }
-
-    .dialog {
-        height: auto;
-        margin-top: 50%;
-    }
-
-    .btn-primary {
-        width: 100%;
-    }
+    .card { max-width: 100%; }
+    .dialog { padding: 24px; align-items: flex-start; padding-top: 25vh; }
 }

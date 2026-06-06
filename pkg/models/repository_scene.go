@@ -135,6 +135,9 @@ type SceneWriter interface {
 	ViewHistoryWriter
 	SaveActivity(ctx context.Context, sceneID int, resumeTime *float64, playDuration *float64) (bool, error)
 	ResetActivity(ctx context.Context, sceneID int, resetResume bool, resetDuration bool) (bool, error)
+
+	// SetLikeCount writes the like_count column for a scene.
+	SetLikeCount(ctx context.Context, id int, value int) error
 }
 
 // SceneReaderWriter provides all scene methods.

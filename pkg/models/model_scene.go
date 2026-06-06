@@ -37,6 +37,9 @@ type Scene struct {
 	ResumeTime   float64 `json:"resume_time"`
 	PlayDuration float64 `json:"play_duration"`
 
+	// Number of likes recorded for this scene.
+	LikeCount int `json:"like_count"`
+
 	URLs         RelatedStrings  `json:"urls"`
 	GalleryIDs   RelatedIDs      `json:"gallery_ids"`
 	TagIDs       RelatedIDs      `json:"tag_ids"`

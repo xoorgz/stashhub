@@ -1,4 +1,5 @@
 @import "styles/theme";
+@import "styles/fonts";
 @import "styles/range";
 @import "styles/scrollbars";
 @import "src/components/Changelog/styles.scss";
@@ -28,6 +29,10 @@
 @import "src/components/Dialogs/IdentifyDialog/styles.scss";
 @import "src/components/Dialogs/styles.scss";
 @import "flag-icons/css/flag-icons.min.css";
+
+/* Theme overrides imported LAST so we win against every component stylesheet
+   and Bootstrap defaults — same cascade position the old custom.css had. */
+@import "styles/theme-overrides";
 
 /* stylelint-disable */
 #root {
@@ -97,14 +102,14 @@ dd {
     a.performer-name,
     a.studio-name,
     a.tag-name {
-      color: #f5f8fa;
+      color: #fff;
       cursor: pointer;
       font-weight: 800;
     }
 
     a,
     span {
-      color: #d7d9db;
+      color: #c6c6c6;
       font-weight: 600;
       padding-right: 0.5rem;
     }
@@ -128,12 +133,12 @@ dd {
     background-color: rgba(138, 155, 168, 0.15);
     border-color: rgba(138, 155, 168, 0.15);
     box-shadow: unset;
-    color: #f5f8fa;
+    color: #fff;
   }
 }
 
 .detail-header {
-  background-color: #192127;
+  background-color: #000;
   min-height: 15rem;
   overflow: hidden;
   padding: 1rem;
@@ -175,7 +180,7 @@ dd {
     z-index: 20;
 
     .detail-item-value.age {
-      border-bottom: 1px dotted #f5f8fa;
+      border-bottom: 1px dotted #fff;
       margin-right: auto;
     }
 
@@ -251,7 +256,7 @@ dd {
 
   nav {
     align-content: center;
-    border-bottom: solid 2px #192127;
+    border-bottom: solid 2px #000;
     display: flex;
     justify-content: center;
     margin: 0;
@@ -260,7 +265,7 @@ dd {
 
   .item-list-header {
     align-content: center;
-    // border-bottom: solid 2px #192127;
+    // border-bottom: solid 2px #000;
     display: flex;
     justify-content: center;
     margin: 0;
@@ -630,7 +635,7 @@ div.dropdown-menu {
   .react-select__option--is-focused,
   .dropdown-item:focus,
   .dropdown-item:hover {
-    background-color: #8a9ba826;
+    background-color: #c6c6c626;
     cursor: pointer;
   }
 }
