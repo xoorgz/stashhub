@@ -1,10 +1,10 @@
 # stashhub
 
-![Go](https://img.shields.io/badge/Go-df73ff?style=for-the-badge&logo=go&logoColor=white)
-![React](https://img.shields.io/badge/React-df73ff?style=for-the-badge&logo=react&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-df73ff?style=for-the-badge&logo=typescript&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-df73ff?style=for-the-badge&logo=sqlite&logoColor=white)
-![GraphQL](https://img.shields.io/badge/GraphQL-df73ff?style=for-the-badge&logo=graphql&logoColor=white)
+![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)
+![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![GraphQL](https://img.shields.io/badge/GraphQL-E10098?style=for-the-badge&logo=graphql&logoColor=white)
 
 A fork of [Stash](https://github.com/stashapp/stash) that adds a TikTok-style
 vertical feed, a configurable recommendation algorithm, per-scene likes in
