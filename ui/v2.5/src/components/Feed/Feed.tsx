@@ -129,16 +129,34 @@ async function registerScenePlay(id: string): Promise<number | null> {
 async function incrementSceneO(id: string): Promise<number | null> {
   try {
     const result = await client.mutate<
-      GQL.SceneIncrementOMutation,
-      GQL.SceneIncrementOMutationVariables
+      GQL.SceneAddOMutation,
+      GQL.SceneAddOMutationVariables
     >({
-      mutation: GQL.SceneIncrementODocument,
+      mutation: GQL.SceneAddODocument,
       variables: { id },
     });
-    return result.data?.sceneIncrementO ?? null;
+    return result.data?.sceneAddO?.count ?? null;
   } catch (e) {
-    console.warn("[feed] sceneIncrementO failed", e);
+    console.warn("[feed] sceneAddO failed", e);
     return null;
+  }
+}
+
+const O_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour per scene
+const O_LAST_KEY = (id: string) => `feed.o.last.${id}`;
+function getLastOAt(id: string): number {
+  try {
+    const v = localStorage.getItem(O_LAST_KEY(id));
+    return v ? parseInt(v, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+function setLastOAt(id: string, ts: number) {
+  try {
+    localStorage.setItem(O_LAST_KEY(id), String(ts));
+  } catch {
+    /* ignore */
   }
 }
 
@@ -204,6 +222,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const [oing, setOing] = useState(false);
   const [pulse, setPulse] = useState<"play" | "pause" | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [bufferedPct, setBufferedPct] = useState(0);
 
   const previewSrc = useMemo(
     () => relativize(scene.paths.stream || scene.paths.preview),
@@ -310,6 +330,139 @@ const FeedItem: React.FC<FeedItemProps> = ({
     if (videoRef.current) videoRef.current.muted = muted;
   }, [muted]);
 
+  // Robust load/play + buffering UI: handle slow initial buffering and "stuck"
+  // states. The IO handler calls play() the moment a tile crosses the
+  // visibility threshold, but if src was only just assigned the play() promise
+  // rejects and the tile sits on its poster. Re-trigger play() on every canplay,
+  // and surface a centered loader + buffered % so the user sees progress.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    let stuckTimer: number | null = null;
+    let loaderTimer: number | null = null;
+    let waitingSince = 0;
+    let lastTime = 0;
+    let lastTimeAt = 0;
+    const showLoader = () => {
+      if (loaderTimer != null) return;
+      // Defer 250ms so a quick load doesn't flash a loader frame. At the
+      // deadline, only commit to "loading" if the video is genuinely stuck:
+      // either paused, or its readyState is below HAVE_FUTURE_DATA (3) — i.e.
+      // the browser doesn't have enough buffered to keep playing forward.
+      // Brief mid-playback network hiccups stop firing waiting/stalled by then
+      // and we leave the UI alone.
+      loaderTimer = window.setTimeout(() => {
+        if (v.paused || v.readyState < 3) setLoading(true);
+        loaderTimer = null;
+      }, 250);
+    };
+    const hideLoader = () => {
+      if (loaderTimer != null) {
+        window.clearTimeout(loaderTimer);
+        loaderTimer = null;
+      }
+      setLoading(false);
+    };
+    const tryPlay = () => {
+      if (!v.paused) return;
+      const rect = v.getBoundingClientRect();
+      const inView = rect.top < window.innerHeight && rect.bottom > 0;
+      if (!inView) return;
+      v.play().catch(() => {});
+    };
+    const onCanPlay = () => {
+      hideLoader();
+      tryPlay();
+    };
+    const onWaiting = () => {
+      waitingSince = performance.now();
+      showLoader();
+      if (stuckTimer != null) window.clearTimeout(stuckTimer);
+      stuckTimer = window.setTimeout(() => {
+        if (v.readyState < 3 && performance.now() - waitingSince >= 2900) {
+          try { v.load(); } catch { /* ignore */ }
+          tryPlay();
+        }
+      }, 3000);
+    };
+    const onPlaying = () => {
+      waitingSince = 0;
+      hideLoader();
+      if (stuckTimer != null) {
+        window.clearTimeout(stuckTimer);
+        stuckTimer = null;
+      }
+    };
+    const onError = () => {
+      showLoader();
+      try { v.load(); } catch { /* ignore */ }
+      window.setTimeout(tryPlay, 500);
+    };
+    const onTimeUpdate = () => {
+      if (v.currentTime !== lastTime) {
+        lastTime = v.currentTime;
+        lastTimeAt = performance.now();
+      }
+    };
+    const onProgressEv = () => {
+      if (!v.buffered.length || !isFinite(v.duration) || v.duration <= 0) return;
+      const end = v.buffered.end(v.buffered.length - 1);
+      const pct = Math.min(100, Math.max(0, Math.round((end / v.duration) * 100)));
+      setBufferedPct(pct);
+    };
+    const onLoadStart = () => {
+      setBufferedPct(0);
+      // Only spin the loader for a fresh load if we're not already mid-playback
+      // (load() can be called by the watchdog while the video is actually
+      // playing; in that case the next progress event flips us back).
+      if (v.paused && v.readyState < 3) showLoader();
+    };
+    // Hard guarantee: any time the element transitions out of paused into
+    // playing, the loader is off. This covers cases where `waiting` fires
+    // alongside `playing` (Chrome occasionally emits waiting on segment
+    // boundaries for transcoded streams).
+    const onPlay = () => hideLoader();
+    // Watchdog: if the active tile claims to be playing but currentTime hasn't
+    // advanced for 4 s, force a load() + play().
+    const watchdog = window.setInterval(() => {
+      if (v.paused || v.ended) return;
+      if (!lastTimeAt) {
+        lastTimeAt = performance.now();
+        return;
+      }
+      if (performance.now() - lastTimeAt > 4000 && v.readyState < 3) {
+        try { v.load(); } catch { /* ignore */ }
+        tryPlay();
+        lastTimeAt = performance.now();
+      }
+    }, 2000);
+    v.addEventListener("canplay", onCanPlay);
+    v.addEventListener("loadeddata", onCanPlay);
+    v.addEventListener("waiting", onWaiting);
+    v.addEventListener("stalled", onWaiting);
+    v.addEventListener("playing", onPlaying);
+    v.addEventListener("error", onError);
+    v.addEventListener("timeupdate", onTimeUpdate);
+    v.addEventListener("progress", onProgressEv);
+    v.addEventListener("loadstart", onLoadStart);
+    v.addEventListener("play", onPlay);
+    return () => {
+      v.removeEventListener("canplay", onCanPlay);
+      v.removeEventListener("loadeddata", onCanPlay);
+      v.removeEventListener("waiting", onWaiting);
+      v.removeEventListener("stalled", onWaiting);
+      v.removeEventListener("playing", onPlaying);
+      v.removeEventListener("error", onError);
+      v.removeEventListener("timeupdate", onTimeUpdate);
+      v.removeEventListener("progress", onProgressEv);
+      v.removeEventListener("loadstart", onLoadStart);
+      v.removeEventListener("play", onPlay);
+      if (stuckTimer != null) window.clearTimeout(stuckTimer);
+      if (loaderTimer != null) window.clearTimeout(loaderTimer);
+      window.clearInterval(watchdog);
+    };
+  }, [scene.id]);
+
   // Register a play with Stash after 3s of continuous playback
   const playTimerRef = useRef<number | null>(null);
   const playRegisteredRef = useRef(false);
@@ -380,12 +533,19 @@ const FeedItem: React.FC<FeedItemProps> = ({
     [scene.id, onSpawnHearts]
   );
 
+  const [oCooldownUntil, setOCooldownUntil] = useState<number>(() =>
+    getLastOAt(scene.id) + O_COOLDOWN_MS
+  );
   const handleO = useCallback(
     async (e: React.MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
+      const now = Date.now();
+      if (now < oCooldownUntil) return; // 1-hour rate-limit per scene
       setOing(true);
       window.setTimeout(() => setOing(false), 600);
       setOCount((c) => c + 1);
+      setLastOAt(scene.id, now);
+      setOCooldownUntil(now + O_COOLDOWN_MS);
       const newCount = await incrementSceneO(scene.id);
       if (typeof newCount === "number") setOCount(newCount);
     },
@@ -416,7 +576,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
   return (
     <div className="feed-item" ref={itemRef} data-scene-id={scene.id}>
       <div className="feed-stage">
-        <div className="feed-video-wrap" ref={wrapRef}>
+        <div
+          className={`feed-video-wrap${loading ? " is-loading" : ""}`}
+          ref={wrapRef}
+        >
           <video
             className="feed-video"
             ref={videoRef}
@@ -431,6 +594,22 @@ const FeedItem: React.FC<FeedItemProps> = ({
           <div className="feed-progress" ref={progressRef}>
             <div className="feed-progress-bar" ref={barRef} />
           </div>
+          {loading && (
+            <div className="feed-loader" aria-hidden="true">
+              <svg className="feed-loader-ring" viewBox="0 0 50 50">
+                <circle className="track" cx="25" cy="25" r="20" />
+                <circle
+                  className="fill"
+                  cx="25"
+                  cy="25"
+                  r="20"
+                  strokeDasharray={`${(bufferedPct / 100) * 125.66} 125.66`}
+                />
+                <circle className="spin" cx="25" cy="25" r="20" />
+              </svg>
+              <div className="feed-loader-pct">{bufferedPct}%</div>
+            </div>
+          )}
           {pulse && (
             <div className={`feed-pulse feed-pulse-${pulse}`} aria-hidden="true">
               {pulse === "play" ? (
@@ -482,8 +661,15 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
           <button
             type="button"
-            className={`feed-action feed-o-btn${oing ? " liking" : ""}`}
-            title="O (+1)"
+            className={`feed-action feed-o-btn${oing ? " liking" : ""}${
+              Date.now() < oCooldownUntil ? " cooldown" : ""
+            }`}
+            title={
+              Date.now() < oCooldownUntil
+                ? "Cooldown (1 per hour)"
+                : "O (+1)"
+            }
+            disabled={Date.now() < oCooldownUntil}
             onClick={handleO}
           >
             <DropIcon />
@@ -662,19 +848,21 @@ export const Feed: React.FC = () => {
     }
 
     function ensureNeighborSrcs(activeItem: HTMLDivElement) {
-      // Preload src for the two neighbours on either side. The immediate
-      // neighbour uses preload="auto" so a swipe to it has no buffer pause.
-      // The further neighbour stays at "metadata" to limit bandwidth.
+      // Prime: active + 2 ahead use preload="auto" so a swipe-down has no
+      // buffer pause. 1 back + 3 ahead get src set but preload="metadata".
+      // The further-back items stay untouched to limit bandwidth.
       const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
       const idx = items.indexOf(activeItem);
       if (idx === -1) return;
-      const window = 2;
-      for (let i = Math.max(0, idx - window); i <= Math.min(items.length - 1, idx + window); i++) {
+      const start = Math.max(0, idx - 1);
+      const end = Math.min(items.length - 1, idx + 3);
+      for (let i = start; i <= end; i++) {
         const it = items[i];
         const v = it.querySelector<HTMLVideoElement>("video.feed-video");
         if (!v) continue;
-        const isImmediate = Math.abs(i - idx) <= 1;
-        const desiredPreload = isImmediate ? "auto" : "metadata";
+        // Active + the next 2 get aggressive preload; everything else metadata.
+        const aggressive = i >= idx && i <= idx + 2;
+        const desiredPreload = aggressive ? "auto" : "metadata";
         if (v.preload !== desiredPreload) v.preload = desiredPreload;
         const src = v.dataset.src;
         if (src && !v.src) {

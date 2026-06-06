@@ -33,6 +33,8 @@ type SceneFilterType struct {
 	Organized *bool `json:"organized"`
 	// Filter by o-counter
 	OCounter *IntCriterionInput `json:"o_counter"`
+	// Filter by like_count (stashhub)
+	LikeCount *IntCriterionInput `json:"like_count"`
 	// Filter Scenes that have an exact phash match available
 	Duplicated *PHashDuplicationCriterionInput `json:"duplicated"`
 	// Filter by resolution

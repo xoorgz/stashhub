@@ -34,13 +34,14 @@ is untouched.
 
 ### Algorithm buckets
 
-| Bucket    | Selection rule                                           |
-|-----------|----------------------------------------------------------|
-| Hottest   | Scenes tagged with a configurable tag                    |
-| Liked     | Scenes with `like_count > 0`, ordered by likes desc      |
-| Top rated | Scenes with `rating100` at or above a threshold          |
-| Stale     | Scenes whose `last_played_at` is older than N days       |
-| Random    | Unfiltered random fallback                               |
+| Bucket      | Selection rule                                                |
+|-------------|---------------------------------------------------------------|
+| Hottest     | Scenes tagged with a configurable tag                         |
+| Liked       | Scenes with `like_count > 0`, ordered by likes desc           |
+| Top O-Count | Scenes with `o_counter` at or above a threshold, desc         |
+| Top rated   | Scenes with `rating100` at or above a threshold               |
+| Stale       | Scenes whose `last_played_at` is older than N days            |
+| Random      | Unfiltered random fallback                                    |
 
 Already-viewed scene ids are excluded from the queue. All weights, thresholds, and the hottest-bucket tag live under Settings → Algorithm.
 

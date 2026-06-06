@@ -1166,6 +1166,7 @@
   "sort_name": "Sort Name",
   "new": "New",
   "none": "None",
+  "like_count": "Like Count",
   "o_count": "O Count",
   "o_counter": "O-Counter",
   "o_history": "O History",
@@ -1207,6 +1208,7 @@
   "pagination": {
     "current_total": "{current} of {total}",
     "first": "First",
+    "jump": "Jump halfway",
     "last": "Last",
     "next": "Next",
     "previous": "Previous"

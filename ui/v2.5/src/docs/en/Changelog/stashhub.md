@@ -1,4 +1,36 @@
-### stashhub
+### stashhub v0.2.0
+
+* Feed algorithm renamed to "Feed Algorithm" in Settings.
+* New "Top O-Count" bucket: scenes with `o_counter` at or above a configurable
+  threshold, ordered by `o_counter` desc.
+* Bucket order standardised: Hottest, Liked, Top O-Count, Top rated, Stale,
+  Random.
+* New "Skip recently played" toggle in the feed algorithm settings. When on,
+  scenes with `last_played_at` inside the configured N-day window are excluded
+  from every bucket. Default 7 days.
+* Feed video robustness: tiles preload aggressively for the active item and the
+  two ahead. `canplay`, `waiting`, `stalled`, `error`, and `progress` events
+  are wired to retry `load()` and `play()` so a fresh src-swap no longer leaves
+  the tile sitting on its poster.
+* Buffering loader: when a tile is paused or genuinely stuck buffering, a
+  centred ring shows the buffered % with a soft white spinner. The poster
+  underneath pulse-fades. The loader is hidden the moment playback resumes,
+  and never shows while the video is playing.
+* On mobile, the hashtag row clips to one line with a fade-out at the right
+  edge instead of stacking up the screen.
+* `like_count` is now a filterable and sortable column. Build custom Scenes
+  filters by likes (`like_count > 0`, `like_count between 5 and 100`, etc.).
+* Pagination redesigned. Direct-click numbered pages with `1 … 5 6 [7] 8 9 … 99`
+  layout. The ellipsis is clickable and jumps halfway into the gap. Old
+  current-of-total dropdown removed.
+* Edit Filter modal restyled. Criterion rows flat with hub-purple hover, no
+  Bootstrap card chrome, applied-filter chips repainted hub-purple.
+* Feed O button now persists to the database via the `sceneAddO` mutation
+  (previous build called the deprecated/non-existent `sceneIncrementO`).
+* Feed O button is rate-limited to one press per scene per hour, persisted in
+  `localStorage`. Reloads and tab switches do not reset the cooldown.
+
+### stashhub v0.1.0
 
 * Vertical-feed view at `/`. Weighted recommendation algorithm, configurable
   buckets, reshuffled per session.

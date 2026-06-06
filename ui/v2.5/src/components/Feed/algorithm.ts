@@ -8,19 +8,13 @@ import {
 const client = getClient();
 
 /**
- * Feed queue builder.
- *
- * Fetches scene IDs from independent buckets and draws from them in proportion
- * to per-bucket weights configured in Settings, Algorithm. Each bucket is
- * sorted randomly per call. Excluded IDs (already viewed) are filtered before
- * the draw. If every bucket is empty, an unfiltered random query is used.
- *
- * Buckets:
- *   hottest    scenes tagged with the configured tag
- *   liked      scenes with like_count > 0, ordered by like_count desc
- *   topRated   scenes with rating100 >= threshold
- *   stale      scenes with last_played_at older than the configured window
- *   random     unfiltered random
+ * Buckets, draw order:
+ *   hottest     scenes tagged with the configured tag
+ *   liked       scenes with like_count > 0, ordered by like_count desc
+ *   topOCount   scenes with o_counter >= threshold, ordered by o_counter desc
+ *   topRated    scenes with rating100 >= threshold
+ *   stale       scenes with last_played_at older than the configured window
+ *   random      unfiltered random
  */
 
 export interface BuildQueueOpts {
@@ -108,11 +102,43 @@ interface BucketSpec {
 
 export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   const targetCount = opts.targetCount ?? 30;
-  const exclude = opts.exclude ?? new Set<string>();
+  const exclude = new Set(opts.exclude ?? []);
   const settings = loadAlgorithmSettings();
 
   const seed = `random_${Math.floor(Math.random() * 1e9)}`;
   const over = 3; // over-fetch so post-exclude there's still material
+
+  // Recently-played exclude: fetch IDs of scenes whose last_played_at is
+  // within the configured window and add them to the exclude set. Done as a
+  // separate query rather than per-bucket filters because GQL Int/Time filters
+  // don't compose with OR and we want to keep never-played scenes (NULL).
+  if (
+    settings.excludeRecentlyPlayed &&
+    settings.excludeRecentlyPlayedDays > 0
+  ) {
+    const cutoff = new Date(
+      Date.now() - settings.excludeRecentlyPlayedDays * 86400_000
+    )
+      .toISOString()
+      .slice(0, 10);
+    const recent = await fetchBucket({
+      filter: { per_page: 1000, page: 1 },
+      sceneFilter: {
+        last_played_at: {
+          value: cutoff,
+          modifier: GQL.CriterionModifier.GreaterThan,
+        },
+      },
+    });
+    for (const id of recent) exclude.add(id);
+    console.info(
+      "[feed] excluding",
+      recent.length,
+      "recently played (last",
+      settings.excludeRecentlyPlayedDays,
+      "d)"
+    );
+  }
 
   const fetches: Array<Promise<BucketSpec | null>> = [];
 
@@ -160,6 +186,36 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
           [ids[i], ids[j]] = [ids[j], ids[i]];
         }
         return { name: "liked", weight: settings.likedWeight, ids };
+      })()
+    );
+  }
+
+  // Top O-Count. Fetch top N by o_counter desc among scenes that meet the
+  // minimum, then shuffle.
+  if (settings.topOCountEnabled && settings.topOCountWeight > 0) {
+    fetches.push(
+      (async () => {
+        const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
+        const ids = await fetchBucket({
+          filter: {
+            per_page: perPage,
+            page: 1,
+            sort: "o_counter",
+            direction: GQL.SortDirectionEnum.Desc,
+          },
+          sceneFilter: {
+            o_counter: {
+              value: settings.topOCountMin,
+              value2: 99999,
+              modifier: GQL.CriterionModifier.Between,
+            },
+          },
+        });
+        for (let i = ids.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [ids[i], ids[j]] = [ids[j], ids[i]];
+        }
+        return { name: "topOCount", weight: settings.topOCountWeight, ids };
       })()
     );
   }

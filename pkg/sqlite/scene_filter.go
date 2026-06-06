@@ -94,6 +94,7 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 
 		intCriterionHandler(sceneFilter.Rating100, "scenes.rating", nil),
 		qb.oCountCriterionHandler(sceneFilter.OCounter),
+		intCriterionHandler(sceneFilter.LikeCount, "scenes.like_count", nil),
 		boolCriterionHandler(sceneFilter.Organized, "scenes.organized", nil),
 
 		floatIntCriterionHandler(sceneFilter.Duration, "video_files.duration", qb.addVideoFilesTable),

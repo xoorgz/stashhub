@@ -72,7 +72,7 @@ const SettingTabs: React.FC<{ tab: TabKey }> = ({ tab }) => {
             </Nav.Item>
             <Nav.Item>
               <LinkContainer to="/settings?tab=algorithm">
-                <Nav.Link eventKey="algorithm">Algorithm</Nav.Link>
+                <Nav.Link eventKey="algorithm">Feed Algorithm</Nav.Link>
               </LinkContainer>
             </Nav.Item>
             <Nav.Item>

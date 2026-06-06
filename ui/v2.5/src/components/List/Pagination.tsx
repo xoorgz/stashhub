@@ -1,136 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Button,
-  ButtonGroup,
-  Dropdown,
-  Form,
-  InputGroup,
-  Overlay,
-  Popover,
-} from "react-bootstrap";
-import { FormattedMessage, FormattedNumber, useIntl } from "react-intl";
-import useFocus from "src/utils/focus";
-import { Icon } from "../Shared/Icon";
-import { faCheck, faChevronDown } from "@fortawesome/free-solid-svg-icons";
-import { useStopWheelScroll } from "src/utils/form";
-
-const PageCount: React.FC<{
-  totalPages: number;
-  currentPage: number;
-  onChangePage: (page: number) => void;
-}> = ({ totalPages, currentPage, onChangePage }) => {
-  const intl = useIntl();
-  const currentPageCtrl = useRef(null);
-  const [pageInput, pageFocus] = useFocus();
-  const [showSelectPage, setShowSelectPage] = useState(false);
-
-  useEffect(() => {
-    if (showSelectPage) {
-      // delaying the focus to the next execution loop so that rendering takes place first and stops the page from resetting.
-      setTimeout(() => {
-        pageFocus();
-      }, 0);
-    }
-  }, [showSelectPage, pageFocus]);
-
-  useStopWheelScroll(pageInput);
-
-  const pageOptions = useMemo(() => {
-    const maxPagesToShow = 10;
-    const min = Math.max(1, currentPage - maxPagesToShow / 2);
-    const max = Math.min(min + maxPagesToShow, totalPages);
-    const pages = [];
-    for (let i = min; i <= max; i++) {
-      pages.push(i);
-    }
-    return pages;
-  }, [totalPages, currentPage]);
-
-  function onCustomChangePage() {
-    const newPage = Number.parseInt(pageInput.current?.value ?? "0");
-    if (newPage) {
-      onChangePage(newPage);
-    }
-    setShowSelectPage(false);
-  }
-
-  return (
-    <div className="page-count-container">
-      <ButtonGroup>
-        <Button
-          variant="secondary"
-          className="page-count"
-          ref={currentPageCtrl}
-          onClick={() => {
-            setShowSelectPage(true);
-            pageFocus();
-          }}
-        >
-          <FormattedMessage
-            id="pagination.current_total"
-            values={{
-              current: intl.formatNumber(currentPage),
-              total: intl.formatNumber(totalPages),
-            }}
-          />
-        </Button>
-        <Dropdown>
-          <Dropdown.Toggle variant="secondary" className="page-count-dropdown">
-            <Icon size="xs" icon={faChevronDown} />
-          </Dropdown.Toggle>
-          <Dropdown.Menu>
-            {pageOptions.map((s) => (
-              <Dropdown.Item
-                key={s}
-                active={s === currentPage}
-                onClick={() => onChangePage(s)}
-              >
-                {s}
-              </Dropdown.Item>
-            ))}
-          </Dropdown.Menu>
-        </Dropdown>
-      </ButtonGroup>
-      <Overlay
-        target={currentPageCtrl.current}
-        show={showSelectPage}
-        placement="bottom"
-        rootClose
-        onHide={() => setShowSelectPage(false)}
-      >
-        <Popover id="select_page_popover">
-          <Form inline>
-            <InputGroup>
-              {/* can't use NumberField because of the ref */}
-              <Form.Control
-                type="number"
-                min={1}
-                max={totalPages}
-                className="text-input"
-                ref={pageInput}
-                defaultValue={currentPage}
-                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                  if (e.key === "Enter") {
-                    onCustomChangePage();
-                    e.preventDefault();
-                  }
-                }}
-                onFocus={(e: React.FocusEvent<HTMLInputElement>) =>
-                  e.target.select()
-                }
-              />
-              <InputGroup.Append>
-                <Button variant="primary" onClick={() => onCustomChangePage()}>
-                  <Icon icon={faCheck} />
-                </Button>
-              </InputGroup.Append>
-            </InputGroup>
-          </Form>
-        </Popover>
-      </Overlay>
-    </div>
-  );
-};
+import React, { useMemo } from "react";
+import { Button, ButtonGroup } from "react-bootstrap";
+import { FormattedNumber, useIntl } from "react-intl";
 
 interface IPaginationProps {
   itemsPerPage: number;
@@ -147,7 +17,26 @@ interface IPaginationIndexProps {
   metadataByline?: React.ReactNode;
 }
 
-const minPagesForCompact = 4;
+function buildPageRange(current: number, total: number): (number | "…")[] {
+  // Always show first + last; show current ± 2; collapse the rest into "…".
+  // The "…" is clickable in the render layer (jumps halfway into the gap).
+  const window = 2;
+  const pages = new Set<number>();
+  pages.add(1);
+  pages.add(total);
+  for (let i = current - window; i <= current + window; i++) {
+    if (i >= 1 && i <= total) pages.add(i);
+  }
+  const sorted = Array.from(pages).sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    out.push(sorted[i]);
+    if (i + 1 < sorted.length && sorted[i + 1] - sorted[i] > 1) {
+      out.push("…");
+    }
+  }
+  return out;
+}
 
 export const Pagination: React.FC<IPaginationProps> = ({
   itemsPerPage,
@@ -162,28 +51,50 @@ export const Pagination: React.FC<IPaginationProps> = ({
   );
 
   const pageButtons = useMemo(() => {
-    if (totalPages >= minPagesForCompact)
+    const range = buildPageRange(currentPage, totalPages);
+    let gapIndex = 0;
+    return range.map((entry) => {
+      if (entry === "…") {
+        // Each ellipsis "halves" the surrounding gap on click so the user can
+        // walk forward / backward through long lists without typing.
+        gapIndex++;
+        return (
+          <Button
+            variant="secondary"
+            key={`gap-${gapIndex}`}
+            className="page-ellipsis"
+            title={intl.formatMessage({ id: "pagination.jump" })}
+            onClick={() => {
+              // Find the surrounding numeric pages and jump to the midpoint.
+              const idx = range.indexOf(entry);
+              const prev = range
+                .slice(0, idx)
+                .reverse()
+                .find((x): x is number => typeof x === "number");
+              const next = range
+                .slice(idx + 1)
+                .find((x): x is number => typeof x === "number");
+              if (prev != null && next != null) {
+                onChangePage(Math.floor((prev + next) / 2));
+              }
+            }}
+          >
+            …
+          </Button>
+        );
+      }
       return (
-        <PageCount
-          totalPages={totalPages}
-          currentPage={currentPage}
-          onChangePage={onChangePage}
-        />
+        <Button
+          variant="secondary"
+          key={entry}
+          active={currentPage === entry}
+          onClick={() => onChangePage(entry)}
+        >
+          <FormattedNumber value={entry} />
+        </Button>
       );
-
-    const pages = [...Array(totalPages).keys()].map((i) => i + 1);
-
-    return pages.map((page: number) => (
-      <Button
-        variant="secondary"
-        key={page}
-        active={currentPage === page}
-        onClick={() => onChangePage(page)}
-      >
-        <FormattedNumber value={page} />
-      </Button>
-    ));
-  }, [totalPages, currentPage, onChangePage]);
+    });
+  }, [totalPages, currentPage, onChangePage, intl]);
 
   if (totalPages <= 1) return <div />;
 

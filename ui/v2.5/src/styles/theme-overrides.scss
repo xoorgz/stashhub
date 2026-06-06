@@ -1793,6 +1793,48 @@ body input[type="number"]::-webkit-outer-spin-button {
   filter: invert(0.85);
 }
 
+/* Numbered pagination: compact pill buttons, hub-purple for the active page,
+   ellipsis renders as a clickable "..." that jumps halfway into the gap. */
+body .pagination .btn,
+body .pagination-footer .pagination .btn {
+  height: 34px !important;
+  min-width: 34px !important;
+  padding: 0 10px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  border-radius: 999px !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: var(--color-text, #c6c6c6) !important;
+  margin: 0 2px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+body .pagination .btn:hover,
+body .pagination-footer .pagination .btn:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: var(--color-white, #fff) !important;
+}
+body .pagination .btn.active,
+body .pagination-footer .pagination .btn.active {
+  background: var(--color-hubs, #df73ff) !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+}
+body .pagination .btn.page-ellipsis,
+body .pagination-footer .pagination .btn.page-ellipsis {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  cursor: pointer;
+  padding: 0 6px !important;
+  min-width: 24px !important;
+}
+body .pagination .btn.page-ellipsis:hover,
+body .pagination-footer .pagination .btn.page-ellipsis:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--color-white, #fff) !important;
+}
+
 /* Bootstrap's $info cyan (#17a2b8) leaks through several utility classes.
    Repaint every "info" surface with the hub-purple accent. */
 body .badge-info,
@@ -1822,3 +1864,106 @@ body .alert-info {
 }
 body .border-info { border-color: var(--color-hubs, #df73ff) !important; }
 body .link-info { color: var(--color-hubs, #df73ff) !important; }
+
+/* === Edit Filter modal ===
+   Stash wraps every criterion in a Bootstrap .card (grey bg, border, radius).
+   Strip all chrome so the list reads as a flat column of rows, hub-purple
+   hover, monospace-free icon buttons inline on the right. */
+body .modal-content .criterion-list,
+body .modal-content .criterion-list.accordion {
+  display: flex;
+  flex-direction: column;
+  background: transparent !important;
+}
+body .modal-content .criterion-list .card,
+body .modal-content .criterion-list > .card {
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+body .modal-content .criterion-list .card:last-child {
+  border-bottom: 0 !important;
+}
+body .modal-content .criterion-list .filter-item-header {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  color: var(--color-text, #c6c6c6) !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding: 8px 10px !important;
+  text-align: left !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+body .modal-content .criterion-list .filter-item-header:hover,
+body .modal-content .criterion-list .filter-item-header:focus {
+  background: rgba(223, 115, 255, 0.08) !important;
+  color: var(--color-white, #fff) !important;
+}
+body .modal-content .criterion-list .filter-item-header .collapse-icon {
+  margin-right: 8px !important;
+  transition: transform 0.18s ease;
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+body .modal-content .criterion-list .card:not(.collapsed) > .filter-item-header .collapse-icon,
+body .modal-content .criterion-list .filter-item-header[aria-expanded="true"] .collapse-icon {
+  transform: rotate(90deg);
+  color: var(--color-hubs, #df73ff) !important;
+}
+body .modal-content .criterion-list .pin-criterion-button,
+body .modal-content .criterion-list .remove-criterion-button {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 4px 6px !important;
+  margin-left: 4px !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  border-radius: 6px !important;
+}
+body .modal-content .criterion-list .pin-criterion-button:hover,
+body .modal-content .criterion-list .remove-criterion-button:hover {
+  color: var(--color-hubs, #df73ff) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+body .modal-content .criterion-list .pin-criterion-button .fa-thumbtack.tilted {
+  transform: rotate(-25deg);
+}
+body .modal-content .criterion-list .card-body {
+  padding: 6px 10px 14px 32px !important;
+  background: transparent !important;
+}
+/* Applied-criterion chips at the bottom of the modal: hub purple pill,
+   matching the rest of the theme. */
+body .modal-content .filter-tags .tag-item.badge-secondary {
+  background: var(--color-hubs, #df73ff) !important;
+  color: #000 !important;
+  border-radius: 999px !important;
+  padding: 4px 10px !important;
+  gap: 6px;
+}
+body .modal-content .filter-tags .tag-item.badge-secondary button.btn-secondary {
+  background: transparent !important;
+  border: 0 !important;
+  color: #000 !important;
+  padding: 0 !important;
+  margin: 0 0 0 4px !important;
+}
+/* Header search input inherits the toolbar pill styling we set elsewhere,
+   but force it here too so it doesn't fall back to grey. */
+body .modal-content .modal-header .search-input.form-control {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: var(--color-text, #c6c6c6) !important;
+  border-radius: 999px !important;
+  height: 32px;
+  padding: 4px 14px !important;
+  max-width: 240px;
+}

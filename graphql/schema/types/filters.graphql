@@ -246,6 +246,8 @@ input SceneFilterType {
   organized: Boolean
   "Filter by o-counter"
   o_counter: IntCriterionInput
+  "Filter by like_count (stashhub)"
+  like_count: IntCriterionInput
   "Filter Scenes that have an exact phash match available"
   duplicated: PHashDuplicationCriterionInput
   "Filter by resolution"

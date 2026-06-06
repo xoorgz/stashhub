@@ -121,6 +121,7 @@ export type CriterionType =
   | "rating100"
   | "organized"
   | "o_counter"
+  | "like_count"
   | "resolution"
   | "average_resolution"
   | "framerate"

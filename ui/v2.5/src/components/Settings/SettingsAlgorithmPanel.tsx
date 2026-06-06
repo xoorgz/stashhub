@@ -12,17 +12,20 @@ export interface AlgorithmSettings {
   hottestWeight: number;
   likedEnabled: boolean;
   likedWeight: number;
+  topOCountEnabled: boolean;
+  topOCountWeight: number;
+  topOCountMin: number;
   topRatedEnabled: boolean;
   topRatedWeight: number;
   staleEnabled: boolean;
   staleWeight: number;
   staleMinDays: number;
   randomWeight: number;
-  /** Legacy: free-text tag name. Still honoured if hottestTagId is unset. */
   hottestTagName: string;
-  /** Preferred: pick a tag from the TagSelect dropdown. */
   hottestTagId?: string;
   topRatingMin: number;
+  excludeRecentlyPlayed: boolean;
+  excludeRecentlyPlayedDays: number;
 }
 
 export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
@@ -30,6 +33,9 @@ export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
   hottestWeight: 5,
   likedEnabled: true,
   likedWeight: 4,
+  topOCountEnabled: true,
+  topOCountWeight: 3,
+  topOCountMin: 1,
   topRatedEnabled: true,
   topRatedWeight: 2,
   staleEnabled: true,
@@ -38,6 +44,8 @@ export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
   randomWeight: 1,
   hottestTagName: "hottest",
   topRatingMin: 80,
+  excludeRecentlyPlayed: true,
+  excludeRecentlyPlayedDays: 7,
 };
 
 export function loadAlgorithmSettings(): AlgorithmSettings {
@@ -148,6 +156,15 @@ export const SettingsAlgorithmPanel: React.FC = () => {
         />
 
         <Row
+          title="Top O-Count"
+          description={`Scenes with o_counter at or above ${s.topOCountMin}, ordered by o_counter desc.`}
+          enabled={s.topOCountEnabled}
+          onToggle={(v) => update("topOCountEnabled", v)}
+          weight={s.topOCountWeight}
+          onWeight={(v) => update("topOCountWeight", v)}
+        />
+
+        <Row
           title="Top rated"
           description={`Scenes with rating100 at or above ${s.topRatingMin}.`}
           enabled={s.topRatedEnabled}
@@ -173,6 +190,41 @@ export const SettingsAlgorithmPanel: React.FC = () => {
           weight={s.randomWeight}
           onWeight={(v) => update("randomWeight", v)}
         />
+
+        <div className="setting">
+          <div>
+            <h3>Skip recently played</h3>
+            <div className="value">
+              Hide scenes played in the last {s.excludeRecentlyPlayedDays} days
+              from every bucket.
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Form.Switch
+              id="algo-skip-recent-on"
+              checked={s.excludeRecentlyPlayed}
+              onChange={(e) =>
+                update("excludeRecentlyPlayed", e.target.checked)
+              }
+              label=""
+            />
+            <Form.Control
+              type="number"
+              min={1}
+              max={365}
+              step={1}
+              value={s.excludeRecentlyPlayedDays}
+              disabled={!s.excludeRecentlyPlayed}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 1 && n <= 365)
+                  update("excludeRecentlyPlayedDays", n);
+              }}
+              style={{ width: 80 }}
+              title="Days"
+            />
+          </div>
+        </div>
       </SettingSection>
 
       <SettingSection heading="Advanced">
@@ -196,6 +248,28 @@ export const SettingsAlgorithmPanel: React.FC = () => {
                   hottestTagName: first?.name ?? prev.hottestTagName,
                 }));
               }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Top O-Count minimum</h3>
+            <div className="value">
+              Minimum o_counter value used by the Top O-Count bucket.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={1}
+              max={1000}
+              step={1}
+              value={s.topOCountMin}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 1 && n <= 1000) update("topOCountMin", n);
+              }}
+              style={{ width: 100 }}
             />
           </div>
         </div>
