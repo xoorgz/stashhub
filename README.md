@@ -13,6 +13,18 @@ viewing mode and a few quality-of-life changes on top.
 
 ![Feed](docs/img/feed.png)
 
+## Features at a glance
+
+- 📱 **TikTok-style vertical feed.** Snap-scroll through your library at `/`. Hearts persist to the DB, tap to toggle play, double-tap for fullscreen, arrow keys scroll and seek.
+- 🎛️ **Configurable recommendation algorithm.** Five toggleable buckets (hottest, liked, top-rated, stale, random) with per-bucket weights and thresholds. Reshuffles on every Feed open.
+- ❤️ **First-class likes.** New `scenes.like_count` column with GraphQL mutations. The heart button on both the Feed and the scene detail page persists to the database; cache updates in place without a refetch.
+- 🔔 **Live notification bell.** Top-right counts for new scenes, unorganized scenes, and performers without an image. Refreshes on focus, visibility change, route change, and every 30 s.
+- 🧭 **Sidebar replaces the top nav.** Persistent left sidebar with library tabs, logout pinned to the bottom, and a top-right bar for the bell + Scenes / Feed shortcuts.
+- 🎨 **Modern dark theme baked into the binary.** Hub-purple accent (`#df73ff`) replaces blueprint blue across cards, scrubber, sliders, dot indicators, and progress strips. No `custom.css` required.
+- 🗓️ **Smart date display.** Relative dates ("3 days ago") with the absolute date on hover. Format strings are configurable.
+- 🔕 **Toast notice toggles.** The websocket-status toast that fires on every brief network blip is off by default and switchable per type.
+- 🔐 **No phone-home.** Update check is unwired, no telemetry, no donate button.
+
 ## What it adds
 
 ### Feed at `/`
