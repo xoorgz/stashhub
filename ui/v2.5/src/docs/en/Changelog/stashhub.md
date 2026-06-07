@@ -1,3 +1,11 @@
+### stashhub v1.0.0
+
+* Version bumped to v1.0.0 — well above any upstream Stash release, so the
+  built-in version checker no longer reports stashhub as out of date against
+  upstream's own release line.
+* No functional changes from v0.2.0 in this version. All v0.2.0 features are
+  included.
+
 ### stashhub v0.2.0
 
 * Feed algorithm renamed to "Feed Algorithm" in Settings.
