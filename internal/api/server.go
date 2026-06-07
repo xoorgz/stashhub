@@ -288,7 +288,10 @@ func Initialize() (*Server, error) {
 	})
 
 	logger.Infof("stash version: %s", build.VersionString())
-	go printLatestVersion(context.TODO())
+	// stashhub: don't phone home to upstream's release feed. We track our own
+	// version, and upstream's "latest" is always older than stashhub's bumped
+	// version anyway.
+	_ = printLatestVersion
 
 	return server, nil
 }
