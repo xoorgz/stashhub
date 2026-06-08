@@ -1793,6 +1793,18 @@ body input[type="number"]::-webkit-outer-spin-button {
   filter: invert(0.85);
 }
 
+/* Scene-detail toolbar: the row of stat buttons (view, O, like, watched, organized)
+   used to fit fine; adding the watched-duration display pushed past viewport
+   width and produced a horizontal scrollbar. Wrap instead. */
+body .scene-toolbar,
+body .scene-toolbar .scene-toolbar-group {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px 10px;
+  max-width: 100%;
+}
+body .scene-toolbar > * { min-width: 0; }
+
 /* Numbered pagination: compact pill buttons, hub-purple for the active page,
    ellipsis renders as a clickable "..." that jumps halfway into the gap. */
 body .pagination .btn,

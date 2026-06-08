@@ -12,9 +12,18 @@ export interface AlgorithmSettings {
   hottestWeight: number;
   likedEnabled: boolean;
   likedWeight: number;
+  topWatchedEnabled: boolean;
+  topWatchedWeight: number;
+  topWatchedMinSec: number;
   topOCountEnabled: boolean;
   topOCountWeight: number;
   topOCountMin: number;
+  watchedTagsEnabled: boolean;
+  watchedTagsWeight: number;
+  watchedTagsLookback: number;
+  favoredTagsEnabled: boolean;
+  favoredTagsWeight: number;
+  favoredTagIds: string[];
   topRatedEnabled: boolean;
   topRatedWeight: number;
   staleEnabled: boolean;
@@ -33,9 +42,18 @@ export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
   hottestWeight: 5,
   likedEnabled: true,
   likedWeight: 4,
+  topWatchedEnabled: true,
+  topWatchedWeight: 6,
+  topWatchedMinSec: 60,
   topOCountEnabled: true,
   topOCountWeight: 3,
   topOCountMin: 1,
+  watchedTagsEnabled: true,
+  watchedTagsWeight: 4,
+  watchedTagsLookback: 50,
+  favoredTagsEnabled: false,
+  favoredTagsWeight: 5,
+  favoredTagIds: [],
   topRatedEnabled: true,
   topRatedWeight: 2,
   staleEnabled: true,
@@ -156,12 +174,39 @@ export const SettingsAlgorithmPanel: React.FC = () => {
         />
 
         <Row
+          title="Top Watched"
+          description={`Scenes with play_duration at or above ${s.topWatchedMinSec}s, ordered by play_duration desc.`}
+          enabled={s.topWatchedEnabled}
+          onToggle={(v) => update("topWatchedEnabled", v)}
+          weight={s.topWatchedWeight}
+          onWeight={(v) => update("topWatchedWeight", v)}
+        />
+
+        <Row
           title="Top O-Count"
           description={`Scenes with o_counter at or above ${s.topOCountMin}, ordered by o_counter desc.`}
           enabled={s.topOCountEnabled}
           onToggle={(v) => update("topOCountEnabled", v)}
           weight={s.topOCountWeight}
           onWeight={(v) => update("topOCountWeight", v)}
+        />
+
+        <Row
+          title="Watched Tags"
+          description={`Random scenes from the top-time-spent tags (top ${s.watchedTagsLookback} most-watched scenes feed the tag ranking).`}
+          enabled={s.watchedTagsEnabled}
+          onToggle={(v) => update("watchedTagsEnabled", v)}
+          weight={s.watchedTagsWeight}
+          onWeight={(v) => update("watchedTagsWeight", v)}
+        />
+
+        <Row
+          title="Favored Tags"
+          description="Random scenes tagged with any tag in the Favored Tags list (Advanced). Empty list = bucket inactive."
+          enabled={s.favoredTagsEnabled}
+          onToggle={(v) => update("favoredTagsEnabled", v)}
+          weight={s.favoredTagsWeight}
+          onWeight={(v) => update("favoredTagsWeight", v)}
         />
 
         <Row
@@ -248,6 +293,76 @@ export const SettingsAlgorithmPanel: React.FC = () => {
                   hottestTagName: first?.name ?? prev.hottestTagName,
                 }));
               }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Favored Tags</h3>
+            <div className="value">
+              Tags the Favored Tags bucket pulls scenes from. Add the ones you
+              always want more of. Bucket is inactive if the list is empty.
+            </div>
+          </div>
+          <div style={{ minWidth: 260, width: "100%", maxWidth: 440 }}>
+            <TagSelect
+              isMulti
+              isClearable
+              ids={s.favoredTagIds}
+              onSelect={(items) => {
+                const ids = (items ?? [])
+                  .map((it) => (it as { id?: string }).id)
+                  .filter((id): id is string => !!id);
+                update("favoredTagIds", ids);
+              }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Top Watched minimum seconds</h3>
+            <div className="value">
+              Minimum play_duration (in seconds) for a scene to qualify for the
+              Top Watched bucket. Filters out brief plays.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={0}
+              max={36000}
+              step={5}
+              value={s.topWatchedMinSec}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 0 && n <= 36000)
+                  update("topWatchedMinSec", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Watched Tags lookback</h3>
+            <div className="value">
+              Number of most-watched scenes (by play_duration) used to compute
+              the tag ranking for the Watched Tags bucket.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={5}
+              max={500}
+              step={5}
+              value={s.watchedTagsLookback}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 5 && n <= 500)
+                  update("watchedTagsLookback", n);
+              }}
+              style={{ width: 100 }}
             />
           </div>
         </div>

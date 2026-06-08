@@ -47,6 +47,7 @@ import {
   LikeCountButton,
   OCounterButton,
   ViewCountButton,
+  WatchedDurationDisplay,
 } from "src/components/Shared/CountButton";
 import { useHeartBurst } from "src/hooks/HeartBurst";
 import { useRatingKeybinds } from "src/hooks/keybinds";
@@ -664,6 +665,9 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
                   value={(scene as { like_count?: number }).like_count ?? 0}
                   onIncrement={(e) => incrementLikeCount(e)}
                 />
+              </span>
+              <span>
+                <WatchedDurationDisplay seconds={scene.play_duration ?? 0} />
               </span>
               <span>
                 <OrganizedButton

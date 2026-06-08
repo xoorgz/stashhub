@@ -190,6 +190,126 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
+  // Top Watched. Scenes whose accumulated play_duration is highest. The user
+  // spending real time on a scene is the strongest implicit "I like this"
+  // signal we have. Filtered by min seconds so 2-second mis-taps don't poison
+  // the ranking.
+  if (settings.topWatchedEnabled && settings.topWatchedWeight > 0) {
+    fetches.push(
+      (async () => {
+        const perPage = Math.max(5, Math.ceil(targetCount * 0.5 * over));
+        const ids = await fetchBucket({
+          filter: {
+            per_page: perPage,
+            page: 1,
+            sort: "play_duration",
+            direction: GQL.SortDirectionEnum.Desc,
+          },
+          sceneFilter: {
+            play_duration: {
+              value: settings.topWatchedMinSec,
+              value2: 999999,
+              modifier: GQL.CriterionModifier.Between,
+            },
+          },
+        });
+        for (let i = ids.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [ids[i], ids[j]] = [ids[j], ids[i]];
+        }
+        return { name: "topWatched", weight: settings.topWatchedWeight, ids };
+      })()
+    );
+  }
+
+  // Watched Tags. Look at the user's top-watched scenes, aggregate
+  // play_duration by tag, pick the top tags, then pull random scenes that have
+  // any of those tags. The "what categories do you actually spend time on"
+  // signal, uses your real behaviour rather than what you tagged as Favored.
+  if (settings.watchedTagsEnabled && settings.watchedTagsWeight > 0) {
+    fetches.push(
+      (async () => {
+        const lookback = Math.max(5, settings.watchedTagsLookback);
+        const sampleScenes = await client
+          .query<GQL.FindScenesQuery, GQL.FindScenesQueryVariables>({
+            query: GQL.FindScenesDocument,
+            variables: {
+              filter: {
+                per_page: lookback,
+                page: 1,
+                sort: "play_duration",
+                direction: GQL.SortDirectionEnum.Desc,
+              },
+              scene_filter: {
+                play_duration: {
+                  value: 1,
+                  value2: 999999,
+                  modifier: GQL.CriterionModifier.Between,
+                },
+              },
+            },
+          })
+          .then((r) => r.data.findScenes.scenes)
+          .catch(() => [] as GQL.SlimSceneDataFragment[]);
+
+        // Sum play_duration by tag id. Tag's score is the weighted sum.
+        const tagScore = new Map<string, number>();
+        for (const sc of sampleScenes) {
+          const dur = sc.play_duration ?? 0;
+          if (!dur) continue;
+          for (const t of sc.tags ?? []) {
+            tagScore.set(t.id, (tagScore.get(t.id) ?? 0) + dur);
+          }
+        }
+        if (tagScore.size === 0) {
+          return { name: "watchedTags", weight: settings.watchedTagsWeight, ids: [] };
+        }
+        const topTagIds = Array.from(tagScore.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([id]) => id);
+
+        const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
+        const ids = await fetchBucket({
+          filter: { per_page: perPage, page: 1, sort: seed },
+          sceneFilter: {
+            tags: {
+              value: topTagIds,
+              modifier: GQL.CriterionModifier.Includes,
+            },
+          },
+        });
+        return { name: "watchedTags", weight: settings.watchedTagsWeight, ids };
+      })()
+    );
+  }
+
+  // Favored Tags. Random scenes that have any tag in the user-curated
+  // favoredTagIds list. Configured under Settings → Feed Algorithm → Advanced
+  // → Favored Tags. List intentionally empty by default so nothing kink- or
+  // taste-specific ships in the repo.
+  if (
+    settings.favoredTagsEnabled &&
+    settings.favoredTagsWeight > 0 &&
+    settings.favoredTagIds.length > 0
+  ) {
+    fetches.push(
+      (async () => {
+        const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
+        const ids = await fetchBucket({
+          filter: { per_page: perPage, page: 1, sort: seed },
+          sceneFilter: {
+            tags: {
+              value: settings.favoredTagIds,
+              modifier: GQL.CriterionModifier.Includes,
+            },
+          },
+        });
+        return { name: "favoredTags", weight: settings.favoredTagsWeight, ids };
+      })()
+    );
+  }
+
   // Top O-Count. Fetch top N by o_counter desc among scenes that meet the
   // minimum, then shuffle.
   if (settings.topOCountEnabled && settings.topOCountWeight > 0) {

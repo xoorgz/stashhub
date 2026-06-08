@@ -1,3 +1,30 @@
+### stashhub v1.1.0
+
+* Three new feed algorithm buckets driven by real watch behaviour:
+  * **Top Watched** (highest default weight). Scenes whose accumulated
+    `play_duration` is highest, filtered by a configurable minimum-seconds
+    threshold so brief mis-taps don't poison the ranking.
+  * **Watched Tags.** Aggregates `play_duration` per tag across your N
+    most-watched scenes, then pulls random scenes from the top-scoring tags.
+    The "what categories do you actually spend time on" signal.
+  * **Favored Tags.** Random scenes from a user-curated tag list. Disabled by
+    default; configure under Settings, Feed Algorithm, Advanced, Favored Tags.
+* Real `play_duration` tracking in the Feed. Watched seconds are flushed via
+  `sceneSaveActivity` every 10 s during play and immediately on pause, end,
+  unmount, tab hide, or page unload, with a per-event slice cap of 1.5 s so
+  seeking doesn't get counted as watched time.
+* Scene detail page now shows total time watched after the like button as a
+  stopwatch chip, formatted progressively as `23s`, `5m 23s`, `2h 14m`.
+* O button in the feed now triggers a screen-wide drop splash: an 18-drop
+  radial burst from the button, plus secondary bursts around the viewport
+  centre, with downward-biased trajectories.
+* Feed fullscreen button now requests browser/page fullscreen (whole UI goes
+  immersive). Double-clicking the video still requests video-element
+  fullscreen for the "just the video" mode.
+* Scene detail toolbar (the view / O / like / watched / organized chip row)
+  now wraps to multiple lines instead of producing a horizontal scrollbar
+  when it exceeds viewport width.
+
 ### stashhub v1.0.0
 
 * Version bumped to v1.0.0 — well above any upstream Stash release, so the

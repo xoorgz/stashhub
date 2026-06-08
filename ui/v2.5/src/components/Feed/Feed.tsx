@@ -42,6 +42,27 @@ interface HeartParticle {
   dur: number;
 }
 
+interface DropParticle {
+  id: number;
+  x: number;       // start
+  y: number;
+  dx: number;      // travel offset
+  dy: number;
+  rot: number;
+  size: number;
+  color: string;
+  dur: number;
+}
+
+const DROP_COLORS = [
+  "#ffffff",
+  "#fdfdfd",
+  "#f6f6f6",
+  "#f0ece4",
+  "#fffaf0",
+  "#f8f8f8",
+];
+
 // ───────── helpers ─────────
 function relativize(u: string | null | undefined): string {
   if (!u) return "";
@@ -126,6 +147,28 @@ async function registerScenePlay(id: string): Promise<number | null> {
   }
 }
 
+// sceneSaveActivity is Stash's existing mutation for persisting play_duration
+// (and resume_time). We call it periodically with the additional seconds the
+// user watched since the last call, the server adds the increment.
+async function saveSceneActivity(
+  id: string,
+  resumeTime: number,
+  durationDelta: number
+): Promise<void> {
+  if (durationDelta <= 0) return;
+  try {
+    await client.mutate<
+      GQL.SceneSaveActivityMutation,
+      GQL.SceneSaveActivityMutationVariables
+    >({
+      mutation: GQL.SceneSaveActivityDocument,
+      variables: { id, resume_time: resumeTime, playDuration: durationDelta },
+    });
+  } catch (e) {
+    console.warn("[feed] sceneSaveActivity failed", e);
+  }
+}
+
 async function incrementSceneO(id: string): Promise<number | null> {
   try {
     const result = await client.mutate<
@@ -197,6 +240,7 @@ interface FeedItemProps {
   onToggleMute: () => void;
   onSkip: () => void;
   onSpawnHearts: (x: number, y: number, count: number) => void;
+  onSpawnDrops: (x: number, y: number, count: number) => void;
 }
 
 const FeedItem: React.FC<FeedItemProps> = ({
@@ -205,6 +249,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   onToggleMute,
   onSkip,
   onSpawnHearts,
+  onSpawnDrops,
 }) => {
   const itemRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -347,7 +392,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
       if (loaderTimer != null) return;
       // Defer 250ms so a quick load doesn't flash a loader frame. At the
       // deadline, only commit to "loading" if the video is genuinely stuck:
-      // either paused, or its readyState is below HAVE_FUTURE_DATA (3) — i.e.
+      // either paused, or its readyState is below HAVE_FUTURE_DATA (3), i.e.
       // the browser doesn't have enough buffered to keep playing forward.
       // Brief mid-playback network hiccups stop firing waiting/stalled by then
       // and we leave the UI alone.
@@ -463,13 +508,27 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [scene.id]);
 
-  // Register a play with Stash after 3s of continuous playback
+  // Register a play with Stash after 3s of continuous playback + track real
+  // watched seconds and flush to sceneSaveActivity every 10s (and on
+  // pause/end/unmount). This is what the Top Watched + Watched Tags buckets
+  // feed on, without it, Stash never learns how much time you actually spent.
   const playTimerRef = useRef<number | null>(null);
   const playRegisteredRef = useRef(false);
+  const watchedSinceLastFlushRef = useRef(0);
+  const lastTickAtRef = useRef<number | null>(null);
+  const flushTimerRef = useRef<number | null>(null);
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    const FLUSH_INTERVAL_MS = 10_000;
+    const flush = () => {
+      const delta = Math.round(watchedSinceLastFlushRef.current);
+      if (delta <= 0) return;
+      watchedSinceLastFlushRef.current = 0;
+      saveSceneActivity(scene.id, v.currentTime || 0, delta);
+    };
     function startTracking() {
+      lastTickAtRef.current = performance.now();
       if (playRegisteredRef.current) return;
       if (playTimerRef.current != null) {
         window.clearTimeout(playTimerRef.current);
@@ -477,7 +536,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
       playTimerRef.current = window.setTimeout(async () => {
         if (!playRegisteredRef.current) {
           playRegisteredRef.current = true;
-          // Optimistic update: bump UI immediately
           setPlayCount((c) => c + 1);
           const serverCount = await registerScenePlay(scene.id);
           if (typeof serverCount === "number") {
@@ -485,20 +543,56 @@ const FeedItem: React.FC<FeedItemProps> = ({
           }
         }
       }, 3000);
+      if (flushTimerRef.current == null) {
+        flushTimerRef.current = window.setInterval(flush, FLUSH_INTERVAL_MS);
+      }
     }
     function stopTracking() {
       if (playTimerRef.current != null) {
         window.clearTimeout(playTimerRef.current);
         playTimerRef.current = null;
       }
+      // Tally the partial slice between the last tick and the pause.
+      if (lastTickAtRef.current != null) {
+        const slice = (performance.now() - lastTickAtRef.current) / 1000;
+        if (slice > 0 && slice < 60) watchedSinceLastFlushRef.current += slice;
+        lastTickAtRef.current = null;
+      }
+      flush();
+      if (flushTimerRef.current != null) {
+        window.clearInterval(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
     }
+    // While playing, every timeupdate event adds the elapsed wall-clock since
+    // the last event (capped at 1s per tick so big seeks don't get counted as
+    // watched seconds).
+    function onTimeUpdateForActivity() {
+      if (!v || v.paused || lastTickAtRef.current == null) return;
+      const now = performance.now();
+      const slice = (now - lastTickAtRef.current) / 1000;
+      lastTickAtRef.current = now;
+      if (slice > 0 && slice <= 1.5) watchedSinceLastFlushRef.current += slice;
+    }
+    // Belt-and-suspenders: also flush when the page is hidden or about to
+    // unload. Catches the "user closed the tab without scrolling away"
+    // case where component unmount may not have time to fire a mutation.
+    const onPageHidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
     v.addEventListener("play", startTracking);
     v.addEventListener("pause", stopTracking);
     v.addEventListener("ended", stopTracking);
+    v.addEventListener("timeupdate", onTimeUpdateForActivity);
+    document.addEventListener("visibilitychange", onPageHidden);
+    window.addEventListener("pagehide", flush);
     return () => {
       v.removeEventListener("play", startTracking);
       v.removeEventListener("pause", stopTracking);
       v.removeEventListener("ended", stopTracking);
+      v.removeEventListener("timeupdate", onTimeUpdateForActivity);
+      document.removeEventListener("visibilitychange", onPageHidden);
+      window.removeEventListener("pagehide", flush);
       stopTracking();
     };
   }, [scene.id]);
@@ -546,10 +640,28 @@ const FeedItem: React.FC<FeedItemProps> = ({
       setOCount((c) => c + 1);
       setLastOAt(scene.id, now);
       setOCooldownUntil(now + O_COOLDOWN_MS);
+      // Splash on a wide area, burst from the button, plus secondary bursts
+      // around the viewport centre so it feels like the whole screen reacts.
+      const rect = e.currentTarget.getBoundingClientRect();
+      const bx = rect.left + rect.width / 2;
+      const by = rect.top + rect.height / 2;
+      onSpawnDrops(bx, by, 18);
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      onSpawnDrops(cx, cy, 16);
+      // A couple of delayed sub-bursts for the wave-after-wave feel
+      window.setTimeout(
+        () => onSpawnDrops(cx + (Math.random() - 0.5) * 200, cy + (Math.random() - 0.5) * 200, 12),
+        90
+      );
+      window.setTimeout(
+        () => onSpawnDrops(cx + (Math.random() - 0.5) * 300, cy + (Math.random() - 0.5) * 300, 10),
+        180
+      );
       const newCount = await incrementSceneO(scene.id);
       if (typeof newCount === "number") setOCount(newCount);
     },
-    [scene.id]
+    [scene.id, oCooldownUntil, onSpawnDrops]
   );
 
   const handleVideoClick = useCallback((e: React.MouseEvent<HTMLVideoElement>) => {
@@ -704,10 +816,42 @@ const FeedItem: React.FC<FeedItemProps> = ({
           <button
             type="button"
             className="feed-action feed-fs-btn"
-            title="Fullscreen"
+            title="Fullscreen (double-click video for video-only fullscreen)"
             onClick={(e) => {
               e.preventDefault();
-              toggleFullscreen(videoRef.current);
+              // Try document-fullscreen first (desktop, modern Android).
+              // iOS Safari rejects requestFullscreen on non-video elements, so
+              // fall back to the video's webkitEnterFullscreen, which is the
+              // only fullscreen path iOS actually exposes.
+              const docEl = document.documentElement as HTMLElement & {
+                webkitRequestFullscreen?: () => Promise<void> | void;
+                mozRequestFullScreen?: () => Promise<void> | void;
+                msRequestFullscreen?: () => Promise<void> | void;
+              };
+              const doc = document as Document & {
+                fullscreenElement?: Element | null;
+                webkitFullscreenElement?: Element | null;
+                exitFullscreen?: () => Promise<void>;
+                webkitExitFullscreen?: () => Promise<void>;
+              };
+              if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+                (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc);
+                return;
+              }
+              const req =
+                docEl.requestFullscreen ||
+                docEl.webkitRequestFullscreen ||
+                docEl.mozRequestFullScreen ||
+                docEl.msRequestFullscreen;
+              if (req) {
+                Promise.resolve(req.call(docEl)).catch(() => {
+                  // iOS Safari throws here. Fall back to video element.
+                  toggleFullscreen(videoRef.current);
+                });
+              } else {
+                // No document-fullscreen support at all (older iOS Safari).
+                toggleFullscreen(videoRef.current);
+              }
             }}
           >
             <FullscreenIcon />
@@ -746,6 +890,8 @@ export const Feed: React.FC = () => {
     () => sessionStorage.getItem(MUTED_KEY) !== "0"
   );
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
+  const [drops, setDrops] = useState<DropParticle[]>([]);
+  const dropIdRef = useRef(0);
 
   // Persist mute per tab
   useEffect(() => {
@@ -952,6 +1098,36 @@ export const Feed: React.FC = () => {
   const handleSkip = useCallback(() => scrollBy(1), [scrollBy]);
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
 
+  // Drop splash spawner, burst outward in a radial pattern, with a downward
+  // bias and rotation for a "wet" feel. Travels far so the whole viewport sees
+  // it, not just a small area near the button.
+  const spawnDrops = useCallback((x: number, y: number, count: number) => {
+    const fresh: DropParticle[] = [];
+    for (let i = 0; i < count; i++) {
+      const id = dropIdRef.current++;
+      const baseAngle = (i / count) * Math.PI * 2;
+      const angle = baseAngle + (Math.random() - 0.5) * 0.6;
+      const distance = 220 + Math.random() * 420;
+      fresh.push({
+        id,
+        x: x + (Math.random() - 0.5) * 40,
+        y: y + (Math.random() - 0.5) * 40,
+        dx: Math.cos(angle) * distance,
+        dy: Math.sin(angle) * distance + 120, // downward bias = gravity
+        rot: (Math.random() - 0.5) * 540,
+        size: 28 + Math.random() * 32,
+        color: DROP_COLORS[Math.floor(Math.random() * DROP_COLORS.length)],
+        dur: 800 + Math.random() * 700,
+      });
+    }
+    setDrops((prev) => [...prev, ...fresh]);
+    fresh.forEach((p) => {
+      window.setTimeout(() => {
+        setDrops((prev) => prev.filter((d) => d.id !== p.id));
+      }, p.dur + 60);
+    });
+  }, []);
+
   // Heart particle spawner
   const heartIdRef = useRef(0);
   const spawnHearts = useCallback((x: number, y: number, count: number) => {
@@ -989,6 +1165,7 @@ export const Feed: React.FC = () => {
             onToggleMute={toggleMute}
             onSkip={handleSkip}
             onSpawnHearts={spawnHearts}
+            onSpawnDrops={spawnDrops}
           />
         ))}
         {scenes.length === 0 && feedState === "loading" && (
@@ -1050,6 +1227,28 @@ export const Feed: React.FC = () => {
           }
         >
           <HeartIcon filled />
+        </span>
+      ))}
+
+      {drops.map((d) => (
+        <span
+          key={d.id}
+          className="feed-drop-particle"
+          style={
+            {
+              left: d.x,
+              top: d.y,
+              width: d.size,
+              height: d.size,
+              color: d.color,
+              animationDuration: `${d.dur}ms`,
+              ["--dx" as any]: `${d.dx}px`,
+              ["--dy" as any]: `${d.dy}px`,
+              ["--rot" as any]: `${d.rot}deg`,
+            } as React.CSSProperties
+          }
+        >
+          <DropIcon />
         </span>
       ))}
     </div>

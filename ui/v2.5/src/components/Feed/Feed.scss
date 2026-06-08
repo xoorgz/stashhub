@@ -427,6 +427,61 @@
   .feed-nav-btn { display: none !important; }
 }
 
+/* Drop particles, O button splash. Burst outward in a radial pattern with
+   downward bias (gravity) + rotation for a "wet" feel. */
+.feed-drop-particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 99999;
+  filter: blur(0.4px) drop-shadow(0 4px 16px rgba(255, 255, 255, 0.7));
+  animation-name: feed-drop-splash;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: forwards;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+}
+@keyframes feed-drop-splash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(
+      calc(-50% + var(--dx, 0px) * 0.12),
+      calc(-50% + var(--dy, 0px) * 0.06)
+    ) scale(1.6) rotate(calc(var(--rot, 0deg) * 0.2));
+  }
+  55% {
+    opacity: 0.95;
+    transform: translate(
+      calc(-50% + var(--dx, 0px) * 0.6),
+      calc(-50% + var(--dy, 0px) * 0.55)
+    ) scale(1.15) rotate(calc(var(--rot, 0deg) * 0.6));
+    filter: blur(0.5px) drop-shadow(0 6px 22px rgba(255, 255, 255, 0.5));
+  }
+  90% {
+    opacity: 0.35;
+    transform: translate(
+      calc(-50% + var(--dx, 0px) * 0.92),
+      calc(-50% + var(--dy, 0px) * 0.92)
+    ) scale(0.8) rotate(calc(var(--rot, 0deg) * 0.9));
+    filter: blur(1.4px) drop-shadow(0 4px 28px rgba(255, 255, 255, 0.2));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(-50% + var(--dx, 0px)),
+      calc(-50% + var(--dy, 0px))
+    ) scale(0.45) rotate(var(--rot, 0deg));
+    filter: blur(2px) drop-shadow(0 4px 30px rgba(255, 255, 255, 0));
+  }
+}
+
 /* Heart particles */
 .feed-heart-particle {
   position: fixed;
