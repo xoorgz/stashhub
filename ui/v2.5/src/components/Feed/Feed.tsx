@@ -623,9 +623,38 @@ const FeedItem: React.FC<FeedItemProps> = ({
     // boundaries for transcoded streams).
     const onPlay = () => hideLoader();
     // Watchdog: if the active tile claims to be playing but currentTime hasn't
-    // advanced for 4 s, force a load() + play().
+    // advanced for 4 s, force a load() + play(). Also covers a separate
+    // failure mode where the tile is paused, currentTime is 0, and no
+    // canplay/error/waiting ever fires; force the load chain to retry so
+    // the user isn't stuck looking at a black frame.
+    let stuckBlackSince = 0;
     const watchdog = window.setInterval(() => {
-      if (v.paused || v.ended) return;
+      if (v.ended) return;
+      if (v.paused) {
+        // Active tile paused with no progress = potential black-stuck case.
+        // Restrict the recovery to scenes that the user is currently
+        // viewing; pause is also normal on background tiles.
+        const isCurrent = currentVisibleRef.current?.contains(v);
+        if (!isCurrent) {
+          stuckBlackSince = 0;
+          return;
+        }
+        if (v.currentTime > 0 || v.readyState >= 3) {
+          stuckBlackSince = 0;
+          return;
+        }
+        if (!stuckBlackSince) {
+          stuckBlackSince = performance.now();
+          return;
+        }
+        if (performance.now() - stuckBlackSince > 3000) {
+          try { v.load(); } catch { /* ignore */ }
+          tryPlay();
+          stuckBlackSince = performance.now();
+        }
+        return;
+      }
+      stuckBlackSince = 0;
       if (!lastTimeAt) {
         lastTimeAt = performance.now();
         return;
@@ -1265,48 +1294,14 @@ export const Feed: React.FC = () => {
       fadeTimers.set(item, t);
     }
 
-    // Live-transcode pre-warm. Stash builds the streaming MP4 on demand:
-    // CIFS open + ffmpeg startup + first GOP encoded before any bytes
-    // reach the browser. Issuing a Range request for the first ~512 KB
-    // ahead of time kicks that whole chain off, so by the time the user
-    // scrolls onto the tile the transcode is already running and bytes
-    // are already in the kernel buffer. Dedupe in-flight by URL, abort
-    // when we slide past so we don't keep transcoding scenes the user
-    // already left behind.
-    const warmedUrls: Map<string, AbortController> = (window as any).__feedWarmedUrls
-      ?? new Map<string, AbortController>();
-    (window as any).__feedWarmedUrls = warmedUrls;
-    function warmStreamUrl(url: string) {
-      if (warmedUrls.has(url)) return;
-      const ac = new AbortController();
-      warmedUrls.set(url, ac);
-      // GET with a small Range. The fetch is deliberately not awaited;
-      // we just want the request on the wire. Errors are silent: any
-      // failure mode (offline, 403 expired token) is better handled by
-      // the actual video element when it gets its turn.
-      fetch(url, {
-        method: "GET",
-        headers: { Range: "bytes=0-524287" },
-        cache: "no-store",
-        signal: ac.signal,
-        credentials: "same-origin",
-      })
-        .then((r) => r.arrayBuffer().catch(() => null))
-        .catch(() => null);
-    }
-    function abortFarWarms(keepUrls: Set<string>) {
-      for (const [url, ac] of Array.from(warmedUrls.entries())) {
-        if (!keepUrls.has(url)) {
-          try { ac.abort(); } catch { /* ignore */ }
-          warmedUrls.delete(url);
-        }
-      }
-    }
-
     function ensureNeighborSrcs(activeItem: HTMLDivElement) {
-      // Prime: active + N ahead use preload="auto" so a swipe-down has no
+      // Prime active + N ahead with preload="auto" so a swipe-down has no
       // buffer pause. N is bumped on desktop because we can spare the
-      // bandwidth there; on mobile we stay conservative.
+      // bandwidth there; on mobile we stay conservative. v1.3.0's extra
+      // fetch()-based Range pre-warm is gone: it raced Stash's live
+      // transcoder for the same scene and occasionally left tiles stuck
+      // on a black frame when the abort cancelled an in-flight session
+      // before the <video> element had taken over.
       const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
       const idx = items.indexOf(activeItem);
       if (idx === -1) return;
@@ -1316,7 +1311,6 @@ export const Feed: React.FC = () => {
       const aheadSrcOnly = aheadAggressive + 1;
       const start = Math.max(0, idx - 1);
       const end = Math.min(items.length - 1, idx + aheadSrcOnly);
-      const keepWarm = new Set<string>();
       for (let i = start; i <= end; i++) {
         const it = items[i];
         const v = it.querySelector<HTMLVideoElement>("video.feed-video");
@@ -1329,14 +1323,7 @@ export const Feed: React.FC = () => {
           v.src = src;
           try { v.load(); } catch { /* ignore */ }
         }
-        // Pre-warm the stream URL for the active item and the next ones.
-        // Skip the already-active tile (its <video> is already pulling).
-        if (src && i > idx && i <= idx + aheadAggressive) {
-          keepWarm.add(src);
-          warmStreamUrl(src);
-        }
       }
-      abortFarWarms(keepWarm);
     }
 
     const io = new IntersectionObserver(

@@ -1,3 +1,22 @@
+### stashhub v1.3.6
+
+* Mobile feed: removed the 1 rem horizontal padding around the active
+  tile. The video now fills viewport width edge-to-edge. Border radius
+  also drops to 0 on mobile so corners hug the edges cleanly.
+* Removed the `fetch()`-based stream pre-warm that v1.3.0 added.
+  Issuing a parallel Range request to Stash's `/scene/{id}/stream`
+  while the `<video>` element was preparing to load the same URL
+  occasionally raced Stash's live-transcode session, and aborting the
+  pre-warm on scroll-past sometimes cancelled an ffmpeg session the
+  `<video>` element was about to depend on. The result: tiles
+  occasionally stuck on a black frame. Browser-native
+  `preload="auto"` on active + N ahead is doing the job on its own.
+* Added a stuck-black recovery branch to the active-video watchdog.
+  If the tile the user is looking at is paused with `currentTime = 0`
+  and `readyState < 3` for over 3 s, the watchdog forces a `load()`
+  and `play()`, so a transient transcode hiccup doesn't permanently
+  black out the screen.
+
 ### stashhub v1.3.5
 
 * Settings, Feed Algorithm: passive "Saved" pill flashes in the top
