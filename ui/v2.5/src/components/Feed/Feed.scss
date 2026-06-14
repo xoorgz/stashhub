@@ -425,6 +425,10 @@
    to spare 60px of right-edge space without crowding the action stack. */
 @media (max-width: 640px) {
   .feed-nav-btn { display: none !important; }
+  /* Push the daily wrap card below the topright island row so they don't
+     overlap horizontally on narrow phones. The island is ~40px tall +
+     8px top inset, so 60px clears it. */
+  .feed-wrap-card { top: 60px; }
 }
 
 /* Drop particles, O button splash. Burst outward in a radial pattern with
@@ -582,7 +586,9 @@
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 80;
+  /* Must sit above the topright island row (z-index 200). It was
+     getting hidden behind the bell pill on mobile because of overlap. */
+  z-index: 240;
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;

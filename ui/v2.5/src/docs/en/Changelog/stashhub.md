@@ -1,3 +1,26 @@
+### stashhub v1.3.4
+
+* Filter chips are now **single-select**. Tapping a chip makes it the
+  sole active filter; tapping a different chip switches; tapping the
+  active chip clears the filter. The old multi-chip-at-once behaviour
+  was confusing.
+* Active chips now always behave **strictly**: the feed reroles to only
+  scenes carrying any of the chip's tag IDs. The boost vs strict mode
+  distinction is gone from the UI (and from the runtime path) since the
+  user-facing mental model is "show me this". The chip definition's
+  `mode` field defaults to `strict`.
+* Reroll on chip toggle preserves the currently visible scene at the
+  front of the new queue, so the swap looks seamless instead of clearing
+  the feed.
+* Settings, Feed Algorithm panel: fixed the broken mobile layout where
+  the row title (Hottest, Liked, etc.) was squished to one character
+  wide because the chip editor pushed the panel beyond viewport width.
+  On viewports under 720 px every setting row now stacks vertically and
+  the chip editor's controls flow into one column.
+* Daily wrap card now sits above the topright island row (z-index 240
+  vs 200) and on viewports under 640 px is pushed down to 60 px from the
+  top so it doesn't overlap the bell pill horizontally.
+
 ### stashhub v1.3.3
 
 * Filter chip icon set replaced with tightened white-fill SVGs (tongue,

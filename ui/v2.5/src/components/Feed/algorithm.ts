@@ -108,42 +108,30 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   const seed = `random_${Math.floor(Math.random() * 1e9)}`;
   const over = 3; // over-fetch so post-exclude there's still material
 
-  // Filter chips: read which configured chips are toggled on right now from
-  // localStorage, partition by mode. Strict chips wrap every bucket's
-  // sceneFilter in AND { tags: includes union }. Boost chips contribute a
-  // dedicated weighted bucket pulling scenes carrying any of their tags.
-  // If any strict chip is active, boost chips are silently ignored: a
-  // restrict-and-widen-at-once mix has no sensible semantics.
+  // Filter chips: an active chip restricts the queue to scenes carrying
+  // any of its tag IDs. The user's mental model is "show me tongue stuff"
+  // — boost-weighted mode where unrelated scenes still appeared was
+  // confusing. So active chips always behave strictly: every bucket's
+  // findScenes call gets wrapped in AND { tags: includes union }. With
+  // single-select in the UI there's at most one active chip's tag list.
   let strictTagIds: string[] = [];
-  let boostTagIds: string[] = [];
-  let boostWeight = 0;
   try {
     const rawActive = localStorage.getItem("feed.filterChips.active");
     const active: number[] = rawActive ? JSON.parse(rawActive) : [];
     if (Array.isArray(active) && active.length > 0) {
-      const strictUnion = new Set<string>();
-      const boostUnion = new Set<string>();
+      const union = new Set<string>();
       for (const idx of active) {
         const chip = settings.filterChips?.[idx];
         if (!chip || !chip.tagIds || chip.tagIds.length === 0) continue;
-        if (chip.mode === "strict") {
-          for (const id of chip.tagIds) strictUnion.add(id);
-        } else {
-          for (const id of chip.tagIds) boostUnion.add(id);
-          if (chip.weight > boostWeight) boostWeight = chip.weight;
-        }
+        for (const id of chip.tagIds) union.add(id);
       }
-      strictTagIds = Array.from(strictUnion);
-      boostTagIds = Array.from(boostUnion);
-      if (strictTagIds.length > 0) {
-        // Strict trumps boost; ignore boost union.
-        boostTagIds = [];
-        boostWeight = 0;
-      }
+      strictTagIds = Array.from(union);
     }
   } catch {
     /* ignore */
   }
+  const boostTagIds: string[] = [];
+  const boostWeight = 0;
 
   // Wrap a bucket's sceneFilter in the strict-chip tag constraint, if any.
   // Uses AND so the bucket's own tag filter (hottest, watched, favored)

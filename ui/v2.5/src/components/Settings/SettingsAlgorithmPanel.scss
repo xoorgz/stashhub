@@ -1,0 +1,78 @@
+/* Filter chip rows in Settings, Feed Algorithm, Advanced. The chip
+   editor is wider than the typical Switch+number-input row, so we override
+   the global .setting flex behaviour here: stack the controls vertically
+   inside one column instead of fighting the title on the right. */
+.filter-chip-row {
+  align-items: flex-start;
+  flex-wrap: wrap;
+
+  .filter-chip-row-inner {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .filter-chip-row-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+  }
+  .filter-chip-row-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .filter-chip-icon-select {
+    width: 130px;
+    flex-shrink: 0;
+  }
+  .filter-chip-icon-preview {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .filter-chip-label-input {
+    width: 160px;
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+  .filter-chip-tag-select {
+    width: 100%;
+    max-width: 440px;
+    min-width: 0;
+  }
+}
+
+/* Algorithm panel: on small viewports, let every setting row stack so a
+   wide right-side control (TagSelect, the chip editor, even the existing
+   Switch + number) doesn't push the title into a 1-character-wide column.
+   This rule scopes to the algorithm panel so other settings tabs are
+   untouched. */
+@media (max-width: 720px) {
+  .settings-algorithm-panel .setting {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+
+    & > div:first-child,
+    & > div:last-child {
+      width: 100%;
+      min-width: 0;
+    }
+  }
+  .settings-algorithm-panel .filter-chip-icon-select,
+  .settings-algorithm-panel .filter-chip-label-input {
+    width: auto;
+    flex: 1 1 100px;
+  }
+}

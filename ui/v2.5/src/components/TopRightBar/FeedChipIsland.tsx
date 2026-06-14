@@ -60,10 +60,11 @@ export const FeedChipIsland: React.FC = () => {
   }, []);
 
   const toggle = useCallback((idx: number) => {
+    // Single-select: tapping a chip makes it the sole active one, tapping
+    // the already-active chip turns the filter off entirely. Picking
+    // multiple at once was confusing — the user expects "show me this".
     setActive((prev) => {
-      const next = prev.includes(idx)
-        ? prev.filter((i) => i !== idx)
-        : [...prev, idx];
+      const next = prev.length === 1 && prev[0] === idx ? [] : [idx];
       writeActive(next);
       return next;
     });

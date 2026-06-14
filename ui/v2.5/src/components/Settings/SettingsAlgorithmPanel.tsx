@@ -8,6 +8,7 @@ import {
   FILTER_CHIP_ICONS,
   FilterChipIcon,
 } from "../Feed/feedIcons";
+import "./SettingsAlgorithmPanel.scss";
 
 export const ALGORITHM_SETTINGS_KEY = "algorithm.settings";
 export const ALGORITHM_SETTINGS_EVENT = "stashhub:algorithm-settings-changed";
@@ -87,9 +88,9 @@ export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
   excludeRecentlyPlayed: true,
   excludeRecentlyPlayedDays: 7,
   filterChips: [
-    { label: "", iconName: "", tagIds: [], weight: 3, mode: "boost" },
-    { label: "", iconName: "", tagIds: [], weight: 3, mode: "boost" },
-    { label: "", iconName: "", tagIds: [], weight: 3, mode: "boost" },
+    { label: "", iconName: "", tagIds: [], weight: 3, mode: "strict" },
+    { label: "", iconName: "", tagIds: [], weight: 3, mode: "strict" },
+    { label: "", iconName: "", tagIds: [], weight: 3, mode: "strict" },
   ],
 };
 
@@ -276,7 +277,7 @@ export const SettingsAlgorithmPanel: React.FC = () => {
   const reset = useCallback(() => setS(DEFAULT_ALGORITHM_SETTINGS), []);
 
   return (
-    <>
+    <div className="settings-algorithm-panel">
       <SettingSection heading="Feed algorithm">
         <div className="setting">
           <div>
@@ -569,20 +570,21 @@ export const SettingsAlgorithmPanel: React.FC = () => {
           <div>
             <h3>Filter chips</h3>
             <div className="value">
-              Three configurable quick filters shown above the feed action
-              stack. Each chip combines tag IDs of your choice. Tap a chip in
-              the feed to activate it. Empty slots are hidden. Boost adds the
-              chip's tags as an extra weighted bucket. Strict restricts every
-              bucket to scenes carrying any of the chip's tags.
+              Three configurable quick filters shown as small icon pills in
+              the top-right island, left of the notification bell. Each chip
+              combines tag IDs of your choice. Tap one in the island and the
+              feed reroles to only scenes carrying any of those tags. Tap
+              the active chip again to clear the filter. Tap a different
+              chip to switch (single-select).
             </div>
           </div>
         </div>
         {s.filterChips.map((chip, idx) => (
-          <div className="setting" key={`chip-${idx}`}>
-            <div>
+          <div className="setting filter-chip-row" key={`chip-${idx}`}>
+            <div className="filter-chip-row-inner">
               <h3>Chip {idx + 1}</h3>
-              <div className="value">
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <div className="filter-chip-row-controls">
+                <div className="filter-chip-row-top">
                   <Form.Control
                     as="select"
                     value={chip.iconName}
@@ -591,7 +593,7 @@ export const SettingsAlgorithmPanel: React.FC = () => {
                       next[idx] = { ...next[idx], iconName: e.target.value };
                       update("filterChips", next);
                     }}
-                    style={{ width: 130 }}
+                    className="filter-chip-icon-select"
                     title="Chip icon"
                   >
                     <option value="">(no icon)</option>
@@ -602,19 +604,7 @@ export const SettingsAlgorithmPanel: React.FC = () => {
                     ))}
                   </Form.Control>
                   {chip.iconName && (
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        width: 28,
-                        height: 28,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: 6,
-                        background: "rgba(255,255,255,0.06)",
-                        color: "#fff",
-                      }}
-                      title="Preview"
-                    >
+                    <span className="filter-chip-icon-preview" title="Preview">
                       <FilterChipIcon name={chip.iconName} size={18} />
                     </span>
                   )}
@@ -628,43 +618,10 @@ export const SettingsAlgorithmPanel: React.FC = () => {
                       next[idx] = { ...next[idx], label: e.target.value };
                       update("filterChips", next);
                     }}
-                    style={{ width: 160 }}
-                  />
-                  <Form.Control
-                    as="select"
-                    value={chip.mode}
-                    onChange={(e) => {
-                      const next = [...s.filterChips];
-                      next[idx] = {
-                        ...next[idx],
-                        mode: (e.target.value === "strict" ? "strict" : "boost"),
-                      };
-                      update("filterChips", next);
-                    }}
-                    style={{ width: 110 }}
-                  >
-                    <option value="boost">Boost</option>
-                    <option value="strict">Strict</option>
-                  </Form.Control>
-                  <Form.Control
-                    type="number"
-                    min={1}
-                    max={10}
-                    step={1}
-                    value={chip.weight}
-                    onChange={(e) => {
-                      const n = parseInt(e.target.value, 10);
-                      if (Number.isFinite(n) && n >= 1 && n <= 10) {
-                        const next = [...s.filterChips];
-                        next[idx] = { ...next[idx], weight: n };
-                        update("filterChips", next);
-                      }
-                    }}
-                    style={{ width: 70 }}
-                    title="Boost weight (ignored in strict mode)"
+                    className="filter-chip-label-input"
                   />
                 </div>
-                <div style={{ marginTop: 8, minWidth: 260, maxWidth: 440 }}>
+                <div className="filter-chip-tag-select">
                   <TagSelect
                     isMulti
                     isClearable
@@ -702,7 +659,7 @@ export const SettingsAlgorithmPanel: React.FC = () => {
           </div>
         </div>
       </SettingSection>
-    </>
+    </div>
   );
 };
 
