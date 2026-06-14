@@ -548,8 +548,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     let stuckTimer: number | null = null;
     let loaderTimer: number | null = null;
     let waitingSince = 0;
-    let lastTime = 0;
-    let lastTimeAt = 0;
     const showLoader = () => {
       if (loaderTimer != null) return;
       // Defer 250ms so a quick load doesn't flash a loader frame. At the
@@ -619,16 +617,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
       try { v.load(); } catch { /* ignore */ }
       window.setTimeout(tryPlay, 500);
     };
-    const onTimeUpdate = () => {
-      if (v.currentTime !== lastTime) {
-        lastTime = v.currentTime;
-        lastTimeAt = performance.now();
-      }
-    };
     const onLoadStart = () => {
-      // Only spin the loader for a fresh load if we're not already mid-playback
-      // (load() can be called by the watchdog while the video is actually
-      // playing; in that case the next progress event flips us back).
       if (v.paused && v.readyState < 3) showLoader();
     };
     // Hard guarantee: any time the element transitions out of paused into
@@ -636,31 +625,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
     // alongside `playing` (Chrome occasionally emits waiting on segment
     // boundaries for transcoded streams).
     const onPlay = () => hideLoader();
-    // Watchdog: if the active tile claims to be playing but currentTime hasn't
-    // advanced for 4 s, force a load() + play(). The v1.3.6 black-stuck
-    // branch (which forced load() on paused tiles every 3 s) was reverted
-    // here in v1.3.7; it kept thrashing transcoder sessions on long
-    // videos and produced a poster-black-poster flicker. The capped
-    // onWaiting retry above is the only retry path now.
-    const watchdog = window.setInterval(() => {
-      if (v.paused || v.ended) return;
-      if (!lastTimeAt) {
-        lastTimeAt = performance.now();
-        return;
-      }
-      if (performance.now() - lastTimeAt > 4000 && v.readyState < 3) {
-        try { v.load(); } catch { /* ignore */ }
-        tryPlay();
-        lastTimeAt = performance.now();
-      }
-    }, 2000);
     v.addEventListener("canplay", onCanPlay);
     v.addEventListener("loadeddata", onCanPlay);
     v.addEventListener("waiting", onWaiting);
     v.addEventListener("stalled", onWaiting);
     v.addEventListener("playing", onPlaying);
     v.addEventListener("error", onError);
-    v.addEventListener("timeupdate", onTimeUpdate);
     v.addEventListener("loadstart", onLoadStart);
     v.addEventListener("play", onPlay);
     return () => {
@@ -670,12 +640,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
       v.removeEventListener("stalled", onWaiting);
       v.removeEventListener("playing", onPlaying);
       v.removeEventListener("error", onError);
-      v.removeEventListener("timeupdate", onTimeUpdate);
       v.removeEventListener("loadstart", onLoadStart);
       v.removeEventListener("play", onPlay);
       if (stuckTimer != null) window.clearTimeout(stuckTimer);
       if (loaderTimer != null) window.clearTimeout(loaderTimer);
-      window.clearInterval(watchdog);
     };
   }, [scene.id]);
 

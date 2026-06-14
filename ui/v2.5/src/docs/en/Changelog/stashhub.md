@@ -1,17 +1,10 @@
+### stashhub v1.3.8
+
+* Removed all polling-based video recovery. `onWaiting` retries capped at 3 then waits for native events.
+
 ### stashhub v1.3.7
 
-* Reverted the v1.3.6 black-stuck recovery branch on the active-video
-  watchdog. It was the *cause* of the new poster-to-black-to-poster
-  flicker on long / HEVC videos: every 3 s the watchdog called
-  `v.load()`, which resets the video element back to the poster and
-  triggers a fresh transcode session, and a 5-10 s ffmpeg startup
-  kept missing each 3 s deadline so it looped indefinitely.
-* Capped the surviving `onWaiting` load() retry at 3 attempts per
-  tile. After ~9 s of total retries the loader pulse just sits and
-  waits for `canplay` / `playing` to fire on its own. The retry
-  counter resets when the video actually starts playing. For very
-  long / cold transcodes, the patient pulse is much better UX than
-  thrashing ffmpeg every few seconds.
+* Reverted v1.3.6 stuck-black branch causing poster-black-poster flicker on long videos.
 
 ### stashhub v1.3.6
 
