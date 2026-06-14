@@ -80,10 +80,6 @@ $glass-shadow:
     outline: 0;
     transform: translateY(-1px);
   }
-  &.is-strict {
-    border-style: dashed;
-    border-color: rgba(255, 255, 255, 0.3);
-  }
   &.is-active {
     color: #fff;
     background:

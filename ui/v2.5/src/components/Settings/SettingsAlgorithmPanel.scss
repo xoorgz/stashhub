@@ -1,3 +1,45 @@
+/* "Saved" flash pill in the top-right of the algorithm panel. Fades in
+   when a setting auto-saves, dwells ~1s, then fades out. Pointer-events
+   none so it never blocks clicks on settings underneath. */
+.settings-algorithm-panel { position: relative; }
+.algorithm-save-flash {
+  position: sticky;
+  top: 8px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(20, 20, 24, 0.7);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+  z-index: 20;
+  float: right;
+  &::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #6ee07a;
+    box-shadow: 0 0 8px rgba(110, 224, 122, 0.7);
+  }
+  &.is-on {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Filter chip rows in Settings, Feed Algorithm, Advanced. The chip
    editor is wider than the typical Switch+number-input row, so we override
    the global .setting flex behaviour here: stack the controls vertically

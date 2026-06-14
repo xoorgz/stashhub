@@ -8,6 +8,7 @@ import {
   FILTER_CHIP_ICONS,
   FilterChipIcon,
 } from "../Feed/feedIcons";
+import { useToast } from "src/hooks/Toast";
 import "./SettingsAlgorithmPanel.scss";
 
 export const ALGORITHM_SETTINGS_KEY = "algorithm.settings";
@@ -255,9 +256,27 @@ export const SettingsAlgorithmPanel: React.FC = () => {
     };
   }, []);
 
+  // "Saved" flash pill. Settings auto-save on every edit; this gives the
+  // user passive confirmation that the change landed. Suppressed until
+  // chipHydrated.current flips true so the initial server-load doesn't
+  // pop the pill on first paint.
+  const [savedFlash, setSavedFlash] = useState(false);
+  const flashTimerRef = useRef<number | null>(null);
+  const flashSaved = useCallback(() => {
+    setSavedFlash(true);
+    if (flashTimerRef.current != null) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setSavedFlash(false), 1400);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current != null) window.clearTimeout(flashTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     save(s);
-  }, [s]);
+    if (chipHydrated.current) flashSaved();
+  }, [s, flashSaved]);
 
   // Persist chip changes to the DB. Gated until the initial server hydrate
   // completes so we don't immediately overwrite the server's copy with the
@@ -276,8 +295,28 @@ export const SettingsAlgorithmPanel: React.FC = () => {
 
   const reset = useCallback(() => setS(DEFAULT_ALGORITHM_SETTINGS), []);
 
+  // Explicit Save button: settings are already persisted on every change,
+  // but a user-driven action is still worth supporting both because some
+  // people expect a button and because it gives us a place to push the
+  // server-side configureUISetting call again synchronously if anything
+  // got stuck. Toast for explicit confirmation, flash pill for passive.
+  const Toast = useToast();
+  const onSaveClick = useCallback(() => {
+    save(s);
+    saveFilterChipsToServer(s.filterChips);
+    flashSaved();
+    Toast.success("Algorithm settings saved");
+  }, [s, flashSaved, Toast]);
+
   return (
     <div className="settings-algorithm-panel">
+      <div
+        className={`algorithm-save-flash${savedFlash ? " is-on" : ""}`}
+        aria-live="polite"
+        aria-hidden={!savedFlash}
+      >
+        Saved
+      </div>
       <SettingSection heading="Feed algorithm">
         <div className="setting">
           <div>
@@ -640,6 +679,26 @@ export const SettingsAlgorithmPanel: React.FC = () => {
             </div>
           </div>
         ))}
+
+        <div className="setting">
+          <div>
+            <h3>Save</h3>
+            <div className="value">
+              Algorithm settings auto-save as you edit. Click to confirm
+              the current state, the chip defs also get pushed to the
+              server-side UI config.
+            </div>
+          </div>
+          <div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onSaveClick}
+            >
+              Save
+            </button>
+          </div>
+        </div>
 
         <div className="setting">
           <div>

@@ -1,3 +1,19 @@
+### stashhub v1.3.5
+
+* Settings, Feed Algorithm: passive "Saved" pill flashes in the top
+  right of the panel each time a setting auto-saves. It's a sticky
+  bubble with a green dot and a 1.4 s dwell, just enough to confirm the
+  edit landed without dragging attention.
+* Added an explicit Save button at the bottom of the panel. Settings
+  still auto-save on edit; clicking the button re-pushes everything
+  (including the chip defs to `configureUISetting`) and triggers a
+  Stash toast for active confirmation.
+* Dropped the dashed border on chip island buttons. It used to mark
+  strict-mode chips back when boost mode also existed; now that every
+  active chip is strict, the dashed style was meaningless and visually
+  noisy. All chip buttons share the same glass style; the only state
+  change is the hub-purple ring + glow when active.
+
 ### stashhub v1.3.4
 
 * Filter chips are now **single-select**. Tapping a chip makes it the

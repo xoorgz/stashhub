@@ -84,16 +84,12 @@ export const FeedChipIsland: React.FC = () => {
     >
       {visible.map(({ c, idx }) => {
         const isActive = active.includes(idx);
-        const title = `${c.label || `Chip ${idx + 1}`}${
-          c.mode === "strict" ? " (strict)" : ""
-        }`;
+        const title = c.label || `Chip ${idx + 1}`;
         return (
           <button
             key={idx}
             type="button"
-            className={`feed-chip-island-btn${isActive ? " is-active" : ""}${
-              c.mode === "strict" ? " is-strict" : ""
-            }`}
+            className={`feed-chip-island-btn${isActive ? " is-active" : ""}`}
             title={title}
             aria-label={title}
             aria-pressed={isActive}
