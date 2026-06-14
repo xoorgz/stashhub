@@ -1,3 +1,12 @@
+### stashhub v1.2.1
+
+* New **edge-tap seek** in the feed. Tapping the left 10% of the active
+  video rewinds 10 seconds, tapping the right 10% advances 10 seconds.
+  The middle 80% keeps the existing play/pause toggle. The feedback chip
+  uses the same `.feed-pulse` style and central anchor as play/pause, just
+  with new back / fwd icons (double-triangle pointing left or right) so
+  the four gesture variants feel like one family.
+
 ### stashhub v1.2.0
 
 * New **Skip-learning** in the Feed algorithm. Scenes you scroll away from

@@ -463,7 +463,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const [playCount, setPlayCount] = useState<number>(scene.play_count ?? 0);
   const [liking, setLiking] = useState(false);
   const [oing, setOing] = useState(false);
-  const [pulse, setPulse] = useState<"play" | "pause" | null>(null);
+  const [pulse, setPulse] = useState<"play" | "pause" | "back" | "fwd" | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -913,7 +913,23 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const v = videoRef.current;
     if (!v) return;
     e.preventDefault();
-    if (v.paused) {
+    // Edge-tap seek: left 10% rewinds 10s, right 10% advances 10s. Middle
+    // 80% keeps the original play/pause toggle. Resolves from the video
+    // element's own bounding rect so the hit zones scale with the tile.
+    const rect = v.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const ratio = rect.width > 0 ? x / rect.width : 0.5;
+    if (ratio < 0.1) {
+      if (Number.isFinite(v.duration)) {
+        v.currentTime = Math.max(0, v.currentTime - 10);
+      }
+      setPulse("back");
+    } else if (ratio > 0.9) {
+      if (Number.isFinite(v.duration)) {
+        v.currentTime = Math.min(v.duration - 0.1, v.currentTime + 10);
+      }
+      setPulse("fwd");
+    } else if (v.paused) {
       v.play().catch(() => {});
       setPulse("play");
     } else {
@@ -953,14 +969,27 @@ const FeedItem: React.FC<FeedItemProps> = ({
           </div>
           {pulse && (
             <div className={`feed-pulse feed-pulse-${pulse}`} aria-hidden="true">
-              {pulse === "play" ? (
+              {pulse === "play" && (
                 <svg viewBox="0 0 24 24" width="64" height="64" fill="currentColor">
                   <polygon points="6 4 20 12 6 20 6 4" />
                 </svg>
-              ) : (
+              )}
+              {pulse === "pause" && (
                 <svg viewBox="0 0 24 24" width="64" height="64" fill="currentColor">
                   <rect x="6" y="4" width="4" height="16" rx="1" />
                   <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+              )}
+              {pulse === "fwd" && (
+                <svg viewBox="0 0 24 24" width="64" height="64" fill="currentColor">
+                  <polygon points="3 4 13 12 3 20 3 4" />
+                  <polygon points="13 4 22 12 13 20 13 4" />
+                </svg>
+              )}
+              {pulse === "back" && (
+                <svg viewBox="0 0 24 24" width="64" height="64" fill="currentColor">
+                  <polygon points="21 4 11 12 21 20 21 4" />
+                  <polygon points="11 4 2 12 11 20 11 4" />
                 </svg>
               )}
             </div>
