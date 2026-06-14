@@ -4,10 +4,20 @@
   --topright-hubs: var(--color-hubs, #df73ff);
 }
 
-.topright-bar {
+/* Row wrapper. Holds the FeedChipIsland (left) and TopRightBar (right) as
+   two visually distinct floating pills next to each other in the top-right
+   corner. Both pills keep their own glass-pill background. */
+.topright-island-row {
   position: fixed;
   top: 16px;
   right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 200;
+}
+
+.topright-bar {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -18,7 +28,58 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
-  z-index: 200;
+}
+
+/* Filter chips island. Its own pill, sits left of the bell. Each chip is a
+   small round white-icon button. Active state lights up in hub-purple. */
+.feed-chip-island {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(10, 10, 12, 0.6);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+.feed-chip-island-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(255, 255, 255, 0.85);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
+
+  svg { display: block; }
+  &:hover, &:focus {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    outline: 0;
+  }
+  &.is-strict {
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+  &.is-active {
+    color: #fff;
+    background: color-mix(in srgb, var(--color-hubs, #df73ff) 28%, transparent);
+    border-color: var(--color-hubs, #df73ff);
+    box-shadow:
+      inset 0 0 0 1px var(--color-hubs, #df73ff),
+      0 0 14px 1px color-mix(in srgb, var(--color-hubs, #df73ff) 50%, transparent);
+  }
+}
+.feed-chip-island-emoji {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .topright-action {
@@ -171,7 +232,11 @@
 
 /* Mobile: smaller everything but keep both items */
 @media (max-width: 640px) {
-  .topright-bar { top: 8px; right: 8px; gap: 3px; padding: 4px; }
+  .topright-island-row { top: 8px; right: 8px; gap: 4px; }
+  .topright-bar { gap: 3px; padding: 4px; }
+  .feed-chip-island { padding: 3px; gap: 2px; }
+  .feed-chip-island-btn { width: 28px; height: 28px; }
+  .feed-chip-island-btn svg { width: 16px; height: 16px; }
   .topright-label { display: none; }
   .topright-action {
     padding: 5px 8px;

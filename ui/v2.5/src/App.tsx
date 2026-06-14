@@ -28,6 +28,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { MainNavbar } from "./components/MainNavbar";
 import { SideNav } from "./components/SideNav/SideNav";
 import { TopRightBar } from "./components/TopRightBar/TopRightBar";
+import { FeedChipIsland } from "./components/TopRightBar/FeedChipIsland";
 import { PageNotFound } from "./components/PageNotFound";
 import * as GQL from "./core/generated-graphql";
 import { makeTitleProps } from "./hooks/title";
@@ -223,7 +224,10 @@ export const App: React.FC = () => {
       return (
         <>
           <SideNav />
-          <TopRightBar />
+          <div className="topright-island-row">
+            <FeedChipIsland />
+            <TopRightBar />
+          </div>
         </>
       );
     }

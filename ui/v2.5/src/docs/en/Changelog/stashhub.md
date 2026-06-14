@@ -1,3 +1,20 @@
+### stashhub v1.3.2
+
+* Filter chips are now a separate floating "island" pill in the top-right,
+  positioned to the left of the notification bell. They're no longer
+  rendered on top of the video in the feed action stack.
+* Chips render built-in white SVG icons instead of free-text emojis. The
+  icon set ships with the build (tongue, lips, breast, peach, drop,
+  flame, heart, star, sparkle, eye, bolt, thrust). The Settings panel's
+  emoji input is replaced with an icon-name dropdown plus a live preview.
+  The `emoji` field on existing chips is still read for backwards
+  compatibility but new chips use `iconName`.
+* Toggling a chip in the island weights the feed toward that chip's
+  tags. The feed listens for `stashhub:feed-chip-active-changed` and
+  rebuilds the queue when the active set changes. Boost mode adds the
+  union as a weighted bucket, strict mode wraps every bucket in an
+  AND filter, same semantics as v1.3.0.
+
 ### stashhub v1.3.1
 
 * Filter chip *defs* (label, emoji, tag IDs, weight, mode) now persist in

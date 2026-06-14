@@ -4,6 +4,10 @@ import { SettingSection } from "./SettingSection";
 import { TagSelect } from "../Shared/Select";
 import * as GQL from "src/core/generated-graphql";
 import { getClient } from "src/core/StashService";
+import {
+  FILTER_CHIP_ICONS,
+  FilterChipIcon,
+} from "../Feed/feedIcons";
 
 export const ALGORITHM_SETTINGS_KEY = "algorithm.settings";
 export const ALGORITHM_SETTINGS_EVENT = "stashhub:algorithm-settings-changed";
@@ -15,7 +19,10 @@ const FILTER_CHIPS_UI_PATH = ["stashhub", "filterChips"] as const;
 
 export interface FilterChip {
   label: string;
-  emoji: string;
+  iconName: string;
+  // Pre-v1.3.2 chips used an emoji string. Keep the field so old DB blobs
+  // load cleanly until they're re-saved through the new icon picker.
+  emoji?: string;
   tagIds: string[];
   weight: number;
   mode: "boost" | "strict";
@@ -80,9 +87,9 @@ export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
   excludeRecentlyPlayed: true,
   excludeRecentlyPlayedDays: 7,
   filterChips: [
-    { label: "", emoji: "", tagIds: [], weight: 3, mode: "boost" },
-    { label: "", emoji: "", tagIds: [], weight: 3, mode: "boost" },
-    { label: "", emoji: "", tagIds: [], weight: 3, mode: "boost" },
+    { label: "", iconName: "", tagIds: [], weight: 3, mode: "boost" },
+    { label: "", iconName: "", tagIds: [], weight: 3, mode: "boost" },
+    { label: "", iconName: "", tagIds: [], weight: 3, mode: "boost" },
   ],
 };
 
@@ -114,7 +121,8 @@ function sanitizeChips(input: unknown): FilterChip[] | null {
     const r = raw as Record<string, unknown>;
     out.push({
       label: typeof r.label === "string" ? r.label : "",
-      emoji: typeof r.emoji === "string" ? r.emoji : "",
+      iconName: typeof r.iconName === "string" ? r.iconName : "",
+      emoji: typeof r.emoji === "string" ? r.emoji : undefined,
       tagIds: Array.isArray(r.tagIds)
         ? (r.tagIds as unknown[]).filter((x): x is string => typeof x === "string")
         : [],
@@ -126,7 +134,7 @@ function sanitizeChips(input: unknown): FilterChip[] | null {
     });
   }
   while (out.length < 3) {
-    out.push({ label: "", emoji: "", tagIds: [], weight: 3, mode: "boost" });
+    out.push({ label: "", iconName: "", tagIds: [], weight: 3, mode: "boost" });
   }
   return out.slice(0, 3);
 }
@@ -576,17 +584,40 @@ export const SettingsAlgorithmPanel: React.FC = () => {
               <div className="value">
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <Form.Control
-                    type="text"
-                    placeholder="Emoji"
-                    value={chip.emoji}
-                    maxLength={4}
+                    as="select"
+                    value={chip.iconName}
                     onChange={(e) => {
                       const next = [...s.filterChips];
-                      next[idx] = { ...next[idx], emoji: e.target.value };
+                      next[idx] = { ...next[idx], iconName: e.target.value };
                       update("filterChips", next);
                     }}
-                    style={{ width: 70 }}
-                  />
+                    style={{ width: 130 }}
+                    title="Chip icon"
+                  >
+                    <option value="">(no icon)</option>
+                    {FILTER_CHIP_ICONS.map((i) => (
+                      <option key={i.name} value={i.name}>
+                        {i.label}
+                      </option>
+                    ))}
+                  </Form.Control>
+                  {chip.iconName && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        width: 28,
+                        height: 28,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 6,
+                        background: "rgba(255,255,255,0.06)",
+                        color: "#fff",
+                      }}
+                      title="Preview"
+                    >
+                      <FilterChipIcon name={chip.iconName} size={18} />
+                    </span>
+                  )}
                   <Form.Control
                     type="text"
                     placeholder="Label"

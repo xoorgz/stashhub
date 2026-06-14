@@ -5,7 +5,6 @@ import { getClient } from "src/core/StashService";
 const client = getClient();
 import { buildQueue, fetchSceneDetails } from "./algorithm";
 import {
-  loadAlgorithmSettings,
   loadFilterChipsFromServer,
   ALGORITHM_SETTINGS_EVENT,
   FilterChip,
@@ -377,9 +376,6 @@ interface FeedItemProps {
   onSkip: () => void;
   onSpawnHearts: (x: number, y: number, count: number) => void;
   onSpawnDrops: (x: number, y: number, count: number) => void;
-  chips: FilterChip[];
-  activeChips: number[];
-  onToggleChip: (idx: number) => void;
 }
 
 const FeedItem: React.FC<FeedItemProps> = ({
@@ -389,9 +385,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
   onSkip,
   onSpawnHearts,
   onSpawnDrops,
-  chips,
-  activeChips,
-  onToggleChip,
 }) => {
   const itemRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -945,32 +938,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
         </div>
 
         <div className="feed-actions">
-          {chips.some((c) => c.tagIds.length > 0) && (
-            <div className="feed-chips">
-              {chips.map((c, idx) => {
-                if (c.tagIds.length === 0) return null;
-                const active = activeChips.includes(idx);
-                const label = c.emoji || c.label || `#${idx + 1}`;
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    className={`feed-chip${active ? " is-active" : ""}${
-                      c.mode === "strict" ? " is-strict" : ""
-                    }`}
-                    title={`${c.label || `Chip ${idx + 1}`} (${c.mode})`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onToggleChip(idx);
-                    }}
-                  >
-                    <span className="feed-chip-emoji">{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
           {performerImage && performer && (
             <Link
               className="feed-avatar"
@@ -1114,32 +1081,14 @@ export const Feed: React.FC = () => {
   const dropIdRef = useRef(0);
   const [dailyWrap, setDailyWrap] = useState<DailyWrap | null>(null);
 
-  // Filter chips. Chip *defs* (label, emoji, tag IDs, weight, mode) live in
-  // Stash's server-side UI config so they persist across cache clears and
-  // follow the user account. Active state (which chips are toggled on right
-  // now) stays per-device in localStorage, treating it as runtime UI state
-  // rather than a preference.
-  const [chips, setChips] = useState<FilterChip[]>(
-    () => loadAlgorithmSettings().filterChips ?? []
-  );
-  const [activeChips, setActiveChips] = useState<number[]>(() => {
-    try {
-      const raw = localStorage.getItem("feed.filterChips.active");
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed.filter((n) => Number.isInteger(n)) : [];
-    } catch {
-      return [];
-    }
-  });
-
+  // Filter chips. Chip defs live in Stash's server-side UI config and the
+  // UI for choosing/toggling them lives in the FeedChipIsland (top-right).
+  // Here we only need to (a) keep the algorithm.settings localStorage blob
+  // in sync from the server so buildQueue picks up the latest chip set, and
+  // (b) rebuild the queue any time the chip-active state changes.
   useEffect(() => {
     let cancelled = false;
-    function applyServerChips(server: FilterChip[]) {
-      if (cancelled) return;
-      setChips(server);
-      // Mirror into the algorithm.settings localStorage blob so the
-      // synchronous buildQueue reader (algorithm.ts) sees the same chips
-      // on the next queue rebuild without needing an Apollo cache read.
+    function mirrorServerChips(server: FilterChip[]) {
       try {
         const cur = JSON.parse(
           localStorage.getItem("algorithm.settings") || "{}"
@@ -1153,36 +1102,36 @@ export const Feed: React.FC = () => {
       }
     }
     loadFilterChipsFromServer().then((server) => {
-      if (server) applyServerChips(server);
+      if (cancelled || !server) return;
+      mirrorServerChips(server);
+      setReloadKey((k) => k + 1);
     });
-    function onChange() {
-      setChips(loadAlgorithmSettings().filterChips ?? []);
+    function onSettingsChange() {
       loadFilterChipsFromServer().then((server) => {
-        if (server) applyServerChips(server);
+        if (cancelled || !server) return;
+        mirrorServerChips(server);
+        setReloadKey((k) => k + 1);
       });
     }
-    window.addEventListener(ALGORITHM_SETTINGS_EVENT, onChange);
+    function onActiveChange() {
+      // The chip island already wrote the new active list to localStorage.
+      // Just rebuild the queue, the algorithm reads chips and active from
+      // localStorage at the top of buildQueue.
+      setReloadKey((k) => k + 1);
+    }
+    window.addEventListener(ALGORITHM_SETTINGS_EVENT, onSettingsChange);
+    window.addEventListener(
+      "stashhub:feed-chip-active-changed",
+      onActiveChange as EventListener
+    );
     return () => {
       cancelled = true;
-      window.removeEventListener(ALGORITHM_SETTINGS_EVENT, onChange);
+      window.removeEventListener(ALGORITHM_SETTINGS_EVENT, onSettingsChange);
+      window.removeEventListener(
+        "stashhub:feed-chip-active-changed",
+        onActiveChange as EventListener
+      );
     };
-  }, []);
-
-  const toggleChip = useCallback((idx: number) => {
-    setActiveChips((prev) => {
-      const next = prev.includes(idx)
-        ? prev.filter((i) => i !== idx)
-        : [...prev, idx];
-      try {
-        localStorage.setItem("feed.filterChips.active", JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-      // Rebuild the queue: the boost/strict filters change which scenes
-      // qualify. ReloadKey is the existing handle for "tear down and refetch".
-      setReloadKey((k) => k + 1);
-      return next;
-    });
   }, []);
 
   // Persist mute per tab
@@ -1550,9 +1499,6 @@ export const Feed: React.FC = () => {
             onSkip={handleSkip}
             onSpawnHearts={spawnHearts}
             onSpawnDrops={spawnDrops}
-            chips={chips}
-            activeChips={activeChips}
-            onToggleChip={toggleChip}
           />
         ))}
         {scenes.length === 0 && feedState === "loading" && (

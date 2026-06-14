@@ -338,56 +338,6 @@
   pointer-events: none;
 }
 
-/* Filter chips. Small emoji pills above the avatar in the action stack,
-   user-configurable in Settings, Feed Algorithm, Filter chips. Empty
-   (unconfigured) slots render nothing. Active state uses hub-purple,
-   strict mode uses a dashed border to telegraph "this restricts the
-   queue" vs the default boost. */
-.feed-chips {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.feed-chip {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(20, 20, 22, 0.65);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-  transition: background 0.15s ease, border-color 0.25s ease,
-    box-shadow 0.25s ease, transform 0.12s ease;
-  padding: 0;
-
-  &:hover {
-    background: rgba(20, 20, 22, 0.85);
-    transform: scale(1.05);
-  }
-  &.is-strict {
-    border-style: dashed;
-  }
-  &.is-active {
-    border: 2px solid var(--color-hubs, #df73ff);
-    box-shadow:
-      0 4px 14px rgba(0, 0, 0, 0.35),
-      0 0 18px 2px color-mix(in srgb, var(--color-hubs, #df73ff) 55%, transparent);
-    color: #fff;
-  }
-}
-.feed-chip-emoji {
-  font-size: 18px;
-  line-height: 1;
-  pointer-events: none;
-}
-
 /* Avatar. borderless with glow on hover */
 .feed-avatar {
   width: 40px;
