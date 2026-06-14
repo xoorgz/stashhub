@@ -1,3 +1,17 @@
+### stashhub v1.3.1
+
+* Filter chip *defs* (label, emoji, tag IDs, weight, mode) now persist in
+  Stash's server-side `ui` config under `stashhub.filterChips` via the
+  `configureUISetting` mutation, instead of `localStorage`. They survive
+  cache clears and follow the account across browsers and devices. Active
+  chip state (which chips are toggled on right now) stays per-device in
+  `localStorage feed.filterChips.active`, treating "which lens am I using
+  this minute" as runtime UI state rather than a saved preference.
+* `SettingsAlgorithmPanel` reads the server copy on mount, merges it into
+  local state, then mirrors any chip edit back to the server. The
+  algorithm's synchronous read path still goes through
+  `localStorage algorithm.settings`, kept in sync from the server response.
+
 ### stashhub v1.3.0
 
 * New **filter chips** in the feed. Three configurable quick filters,

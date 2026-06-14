@@ -1,11 +1,17 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Form } from "react-bootstrap";
 import { SettingSection } from "./SettingSection";
 import { TagSelect } from "../Shared/Select";
 import * as GQL from "src/core/generated-graphql";
+import { getClient } from "src/core/StashService";
 
 export const ALGORITHM_SETTINGS_KEY = "algorithm.settings";
 export const ALGORITHM_SETTINGS_EVENT = "stashhub:algorithm-settings-changed";
+// Stash auto-nests dotted UI config keys: writing key "stashhub.filterChips"
+// produces ui.stashhub.filterChips on the server. We write with the dotted
+// key (Stash interprets it) and read by walking the nested path.
+export const FILTER_CHIPS_UI_KEY = "stashhub.filterChips";
+const FILTER_CHIPS_UI_PATH = ["stashhub", "filterChips"] as const;
 
 export interface FilterChip {
   label: string;
@@ -100,6 +106,84 @@ function save(s: AlgorithmSettings) {
   }
 }
 
+function sanitizeChips(input: unknown): FilterChip[] | null {
+  if (!Array.isArray(input)) return null;
+  const out: FilterChip[] = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== "object") continue;
+    const r = raw as Record<string, unknown>;
+    out.push({
+      label: typeof r.label === "string" ? r.label : "",
+      emoji: typeof r.emoji === "string" ? r.emoji : "",
+      tagIds: Array.isArray(r.tagIds)
+        ? (r.tagIds as unknown[]).filter((x): x is string => typeof x === "string")
+        : [],
+      weight:
+        typeof r.weight === "number" && r.weight >= 1 && r.weight <= 10
+          ? Math.round(r.weight)
+          : 3,
+      mode: r.mode === "strict" ? "strict" : "boost",
+    });
+  }
+  while (out.length < 3) {
+    out.push({ label: "", emoji: "", tagIds: [], weight: 3, mode: "boost" });
+  }
+  return out.slice(0, 3);
+}
+
+/** Read filterChips from Stash's server-side UI config (DB). Falls back to
+ *  null on any error, leaving the caller to keep whatever it already had.
+ *  Note we use the Apollo client directly so this works outside React. */
+export async function loadFilterChipsFromServer(): Promise<FilterChip[] | null> {
+  try {
+    const r = await getClient().query<GQL.ConfigurationQuery>({
+      query: GQL.ConfigurationDocument,
+      fetchPolicy: "cache-first",
+    });
+    let node: unknown = r.data?.configuration?.ui ?? {};
+    for (const part of FILTER_CHIPS_UI_PATH) {
+      if (!node || typeof node !== "object") return null;
+      node = (node as Record<string, unknown>)[part];
+    }
+    return sanitizeChips(node);
+  } catch {
+    return null;
+  }
+}
+
+/** Persist filterChips to the DB via configureUISetting. Side-effect: also
+ *  writes the value back into the cached Configuration.ui blob so other
+ *  consumers reading from the cache pick up the change immediately. */
+export async function saveFilterChipsToServer(chips: FilterChip[]): Promise<void> {
+  try {
+    await getClient().mutate<GQL.ConfigureUiSettingMutation>({
+      mutation: GQL.ConfigureUiSettingDocument,
+      variables: { key: FILTER_CHIPS_UI_KEY, value: chips },
+      update: (cache, result) => {
+        const next = result.data?.configureUISetting;
+        if (!next) return;
+        try {
+          cache.writeQuery({
+            query: GQL.ConfigurationDocument,
+            data: {
+              configuration: {
+                ...(cache.readQuery<GQL.ConfigurationQuery>({
+                  query: GQL.ConfigurationDocument,
+                })?.configuration ?? {}),
+                ui: next,
+              },
+            },
+          });
+        } catch {
+          /* ignore cache write failures */
+        }
+      },
+    });
+  } catch {
+    /* leave the local copy in place, server is just out of sync */
+  }
+}
+
 const Row: React.FC<{
   title: string;
   description: string;
@@ -143,9 +227,36 @@ const Row: React.FC<{
 export const SettingsAlgorithmPanel: React.FC = () => {
   const [s, setS] = useState<AlgorithmSettings>(() => loadAlgorithmSettings());
 
+  // Chip defs are DB-backed; on mount, pull whatever's stored server-side
+  // and merge into local state. Other algorithm settings stay in
+  // localStorage (per-device tuning rather than per-account preference).
+  const chipHydrated = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    loadFilterChipsFromServer().then((chips) => {
+      if (cancelled || !chips) {
+        chipHydrated.current = true;
+        return;
+      }
+      setS((prev) => ({ ...prev, filterChips: chips }));
+      chipHydrated.current = true;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     save(s);
   }, [s]);
+
+  // Persist chip changes to the DB. Gated until the initial server hydrate
+  // completes so we don't immediately overwrite the server's copy with the
+  // local default if it lost the race to update state.
+  useEffect(() => {
+    if (!chipHydrated.current) return;
+    saveFilterChipsToServer(s.filterChips);
+  }, [s.filterChips]);
 
   const update = useCallback(
     <K extends keyof AlgorithmSettings>(k: K, v: AlgorithmSettings[K]) => {

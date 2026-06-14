@@ -6,6 +6,7 @@ const client = getClient();
 import { buildQueue, fetchSceneDetails } from "./algorithm";
 import {
   loadAlgorithmSettings,
+  loadFilterChipsFromServer,
   ALGORITHM_SETTINGS_EVENT,
   FilterChip,
 } from "../Settings/SettingsAlgorithmPanel";
@@ -1113,10 +1114,11 @@ export const Feed: React.FC = () => {
   const dropIdRef = useRef(0);
   const [dailyWrap, setDailyWrap] = useState<DailyWrap | null>(null);
 
-  // Filter chips: chip config comes from algorithm settings, active state is
-  // a separate localStorage entry so it survives a settings reload but isn't
-  // exported with the algorithm blob (which is shared across sessions/devices
-  // if the user moves their config).
+  // Filter chips. Chip *defs* (label, emoji, tag IDs, weight, mode) live in
+  // Stash's server-side UI config so they persist across cache clears and
+  // follow the user account. Active state (which chips are toggled on right
+  // now) stays per-device in localStorage, treating it as runtime UI state
+  // rather than a preference.
   const [chips, setChips] = useState<FilterChip[]>(
     () => loadAlgorithmSettings().filterChips ?? []
   );
@@ -1131,11 +1133,39 @@ export const Feed: React.FC = () => {
   });
 
   useEffect(() => {
+    let cancelled = false;
+    function applyServerChips(server: FilterChip[]) {
+      if (cancelled) return;
+      setChips(server);
+      // Mirror into the algorithm.settings localStorage blob so the
+      // synchronous buildQueue reader (algorithm.ts) sees the same chips
+      // on the next queue rebuild without needing an Apollo cache read.
+      try {
+        const cur = JSON.parse(
+          localStorage.getItem("algorithm.settings") || "{}"
+        );
+        localStorage.setItem(
+          "algorithm.settings",
+          JSON.stringify({ ...cur, filterChips: server })
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+    loadFilterChipsFromServer().then((server) => {
+      if (server) applyServerChips(server);
+    });
     function onChange() {
       setChips(loadAlgorithmSettings().filterChips ?? []);
+      loadFilterChipsFromServer().then((server) => {
+        if (server) applyServerChips(server);
+      });
     }
     window.addEventListener(ALGORITHM_SETTINGS_EVENT, onChange);
-    return () => window.removeEventListener(ALGORITHM_SETTINGS_EVENT, onChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(ALGORITHM_SETTINGS_EVENT, onChange);
+    };
   }, []);
 
   const toggleChip = useCallback((idx: number) => {
