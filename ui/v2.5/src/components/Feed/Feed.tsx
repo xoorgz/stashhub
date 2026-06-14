@@ -581,12 +581,25 @@ const FeedItem: React.FC<FeedItemProps> = ({
       hideLoader();
       tryPlay();
     };
+    // Cap how aggressively we retry load() while stuck on a transcoded
+    // stream. Each retry calls v.load(), which resets the element back
+    // to the poster and triggers a fresh transcode session; doing it
+    // every 3 s indefinitely thrashes ffmpeg on long / HEVC sources
+    // where startup naturally takes 5-10 s, producing the "poster to
+    // black to poster" flicker the user reported in v1.3.6. After
+    // MAX_LOAD_ATTEMPTS retries we leave the poster pulsing and wait
+    // patiently for `canplay` / `playing` to fire on its own.
+    const MAX_LOAD_ATTEMPTS = 3;
+    let loadAttempts = 0;
     const onWaiting = () => {
       waitingSince = performance.now();
       showLoader();
       if (stuckTimer != null) window.clearTimeout(stuckTimer);
+      if (loadAttempts >= MAX_LOAD_ATTEMPTS) return;
       stuckTimer = window.setTimeout(() => {
         if (v.readyState < 3 && performance.now() - waitingSince >= 2900) {
+          if (loadAttempts >= MAX_LOAD_ATTEMPTS) return;
+          loadAttempts++;
           try { v.load(); } catch { /* ignore */ }
           tryPlay();
         }
@@ -594,6 +607,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
     const onPlaying = () => {
       waitingSince = 0;
+      loadAttempts = 0;
       hideLoader();
       if (stuckTimer != null) {
         window.clearTimeout(stuckTimer);
@@ -623,38 +637,13 @@ const FeedItem: React.FC<FeedItemProps> = ({
     // boundaries for transcoded streams).
     const onPlay = () => hideLoader();
     // Watchdog: if the active tile claims to be playing but currentTime hasn't
-    // advanced for 4 s, force a load() + play(). Also covers a separate
-    // failure mode where the tile is paused, currentTime is 0, and no
-    // canplay/error/waiting ever fires; force the load chain to retry so
-    // the user isn't stuck looking at a black frame.
-    let stuckBlackSince = 0;
+    // advanced for 4 s, force a load() + play(). The v1.3.6 black-stuck
+    // branch (which forced load() on paused tiles every 3 s) was reverted
+    // here in v1.3.7; it kept thrashing transcoder sessions on long
+    // videos and produced a poster-black-poster flicker. The capped
+    // onWaiting retry above is the only retry path now.
     const watchdog = window.setInterval(() => {
-      if (v.ended) return;
-      if (v.paused) {
-        // Active tile paused with no progress = potential black-stuck case.
-        // Restrict the recovery to scenes that the user is currently
-        // viewing; pause is also normal on background tiles.
-        const isCurrent = currentVisibleRef.current?.contains(v);
-        if (!isCurrent) {
-          stuckBlackSince = 0;
-          return;
-        }
-        if (v.currentTime > 0 || v.readyState >= 3) {
-          stuckBlackSince = 0;
-          return;
-        }
-        if (!stuckBlackSince) {
-          stuckBlackSince = performance.now();
-          return;
-        }
-        if (performance.now() - stuckBlackSince > 3000) {
-          try { v.load(); } catch { /* ignore */ }
-          tryPlay();
-          stuckBlackSince = performance.now();
-        }
-        return;
-      }
-      stuckBlackSince = 0;
+      if (v.paused || v.ended) return;
       if (!lastTimeAt) {
         lastTimeAt = performance.now();
         return;
