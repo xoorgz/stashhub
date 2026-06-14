@@ -23,6 +23,10 @@ const LIKES_KEY = "feed.likes";
 const LIKE_THRESHOLD = 5;
 const MUTED_KEY = "feed.muted";
 const CURRENT_KEY = "feed.currentSceneId";
+const SKIPPED_TAGS_KEY = "feed.skips.tags";
+const SKIP_THRESHOLD_SEC = 5;
+const SKIPPED_TAGS_DECAY_DAYS = 30;
+const SKIPPED_TAG_DECAY_MS = SKIPPED_TAGS_DECAY_DAYS * 24 * 60 * 60 * 1000;
 const QUEUE_TARGET = 30;
 const REFILL_AT = 5;
 
@@ -84,6 +88,200 @@ function markViewed(id: string) {
       while (arr.length > VIEWED_LIMIT) arr.shift();
       localStorage.setItem(VIEWED_KEY, JSON.stringify(arr));
     }
+  } catch {
+    /* ignore */
+  }
+}
+
+const WRAP_LAST_SHOWN_KEY = "feed.wrap.lastShownDay";
+const WRAP_DISMISS_MS = 9000;
+
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+interface DailyWrap {
+  scenesCount: number;
+  topTagName: string | null;
+}
+
+/** Fetch yesterday's wrap stats: scenes whose last_played_at falls within
+ *  yesterday, and the tag with the highest play_duration across them. */
+async function fetchYesterdayWrap(): Promise<DailyWrap | null> {
+  const now = new Date();
+  const yEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yStart = new Date(yEnd.getTime() - 86400_000);
+  const startStr = yStart.toISOString().slice(0, 10);
+  const endStr = yEnd.toISOString().slice(0, 10);
+  try {
+    const r = await client.query<
+      GQL.FindScenesQuery,
+      GQL.FindScenesQueryVariables
+    >({
+      query: GQL.FindScenesDocument,
+      variables: {
+        filter: { per_page: 100, page: 1 },
+        scene_filter: {
+          last_played_at: {
+            value: startStr,
+            value2: endStr,
+            modifier: GQL.CriterionModifier.Between,
+          },
+        },
+      },
+    });
+    const scenes = r.data.findScenes.scenes;
+    if (!scenes.length) return null;
+    const tagScore = new Map<string, { name: string; score: number }>();
+    for (const s of scenes) {
+      const dur = s.play_duration ?? 0;
+      for (const t of s.tags ?? []) {
+        const prev = tagScore.get(t.id) ?? { name: t.name, score: 0 };
+        prev.score += dur;
+        tagScore.set(t.id, prev);
+      }
+    }
+    let topTagName: string | null = null;
+    let topScore = 0;
+    for (const v of tagScore.values()) {
+      if (v.score > topScore) {
+        topScore = v.score;
+        topTagName = v.name;
+      }
+    }
+    return { scenesCount: scenes.length, topTagName };
+  } catch {
+    return null;
+  }
+}
+
+const DailyWrapCard: React.FC<{ data: DailyWrap; onDismiss: () => void }> = ({
+  data,
+  onDismiss,
+}) => (
+  <div className="feed-wrap-card" role="status">
+    <button
+      type="button"
+      className="feed-wrap-close"
+      aria-label="Dismiss"
+      onClick={onDismiss}
+    >
+      ×
+    </button>
+    <div className="feed-wrap-title">Yesterday</div>
+    <div className="feed-wrap-body">
+      <strong>{data.scenesCount}</strong>
+      <span> scene{data.scenesCount === 1 ? "" : "s"}</span>
+      {data.topTagName ? (
+        <>
+          <span className="feed-wrap-sep">•</span>
+          <span className="feed-wrap-tag">#{data.topTagName}</span>
+        </>
+      ) : null}
+    </div>
+  </div>
+);
+
+/** Module-level cache: poster URL -> dominant rgb() string.
+ *  Posters are content-addressed by Stash (hashed filenames), so the same
+ *  scene returns the same colour across mounts without re-sampling. */
+const posterAccentCache = new Map<string, string>();
+
+/** Downscale the poster to a 16x16 grid, average pixels that aren't
+ *  near-black or near-white, boost saturation a touch so the accent is
+ *  vivid against the dark UI. Returns an rgb() string or null on failure
+ *  (canvas tainting, zero usable pixels). */
+function sampleDominantColor(img: HTMLImageElement): string | null {
+  const W = 16;
+  const H = 16;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0, W, H);
+  const data = ctx.getImageData(0, 0, W, H).data;
+  let r = 0,
+    g = 0,
+    b = 0,
+    n = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const pr = data[i];
+    const pg = data[i + 1];
+    const pb = data[i + 2];
+    const luma = 0.2126 * pr + 0.7152 * pg + 0.0722 * pb;
+    // Drop letterbox black and washed-out highlights, keep mid-tones.
+    if (luma < 24 || luma > 240) continue;
+    r += pr;
+    g += pg;
+    b += pb;
+    n++;
+  }
+  if (n === 0) return null;
+  r = Math.round(r / n);
+  g = Math.round(g / n);
+  b = Math.round(b / n);
+  // Boost saturation in HSL space so dimly-coloured posters still glow.
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return `rgb(${r}, ${g}, ${b})`;
+  const d = max - min;
+  let h = 0;
+  const s = l > 127 ? d / (510 - max - min) : d / (max + min);
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  const sBoosted = Math.min(1, s * 1.45);
+  const lClamped = Math.min(0.7, Math.max(0.35, l / 255));
+  const c = (1 - Math.abs(2 * lClamped - 1)) * sBoosted;
+  const hh = h * 6;
+  const x = c * (1 - Math.abs((hh % 2) - 1));
+  let rOut = 0,
+    gOut = 0,
+    bOut = 0;
+  if (hh < 1) [rOut, gOut, bOut] = [c, x, 0];
+  else if (hh < 2) [rOut, gOut, bOut] = [x, c, 0];
+  else if (hh < 3) [rOut, gOut, bOut] = [0, c, x];
+  else if (hh < 4) [rOut, gOut, bOut] = [0, x, c];
+  else if (hh < 5) [rOut, gOut, bOut] = [x, 0, c];
+  else [rOut, gOut, bOut] = [c, 0, x];
+  const m = lClamped - c / 2;
+  return `rgb(${Math.round((rOut + m) * 255)}, ${Math.round((gOut + m) * 255)}, ${Math.round((bOut + m) * 255)})`;
+}
+
+/** localStorage map of tagId -> {count, lastAt}. Entries decay after
+ *  SKIPPED_TAGS_DECAY_DAYS; reads strip stale entries on the fly. */
+type SkippedTagEntry = { count: number; lastAt: number };
+type SkippedTagMap = Record<string, SkippedTagEntry>;
+function loadSkippedTags(): SkippedTagMap {
+  try {
+    const raw = localStorage.getItem(SKIPPED_TAGS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as SkippedTagMap;
+    const cutoff = Date.now() - SKIPPED_TAG_DECAY_MS;
+    const out: SkippedTagMap = {};
+    for (const [tid, entry] of Object.entries(parsed)) {
+      if (entry && typeof entry.count === "number" && entry.lastAt >= cutoff) {
+        out[tid] = entry;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+function recordTagSkips(tagIds: string[]) {
+  if (!tagIds.length) return;
+  try {
+    const map = loadSkippedTags();
+    const now = Date.now();
+    for (const id of tagIds) {
+      const prev = map[id] ?? { count: 0, lastAt: 0 };
+      map[id] = { count: prev.count + 1, lastAt: now };
+    }
+    localStorage.setItem(SKIPPED_TAGS_KEY, JSON.stringify(map));
   } catch {
     /* ignore */
   }
@@ -268,13 +466,48 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const [pulse, setPulse] = useState<"play" | "pause" | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [bufferedPct, setBufferedPct] = useState(0);
 
   const previewSrc = useMemo(
     () => relativize(scene.paths.stream || scene.paths.preview),
     [scene.paths.stream, scene.paths.preview]
   );
   const posterSrc = useMemo(() => relativize(scene.paths.screenshot), [scene.paths.screenshot]);
+
+  // Adaptive accent: sample the dominant non-black colour from the poster
+  // and write it onto the .feed-item as --feed-scene-accent. Used by the
+  // action stack's rim glow to subtly tie UI chrome to the current scene's
+  // palette. Sampling runs once per scene (memoised in module-level cache
+  // since posters are content-addressed, same URL across mounts).
+  useEffect(() => {
+    if (!posterSrc) return;
+    const item = itemRef.current;
+    if (!item) return;
+    const cached = posterAccentCache.get(posterSrc);
+    if (cached) {
+      item.style.setProperty("--feed-scene-accent", cached);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.decoding = "async";
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const accent = sampleDominantColor(img);
+        if (accent) {
+          posterAccentCache.set(posterSrc, accent);
+          item.style.setProperty("--feed-scene-accent", accent);
+        }
+      } catch {
+        /* canvas tainting or memory error; leave the CSS var unset */
+      }
+    };
+    img.src = posterSrc;
+    return () => {
+      cancelled = true;
+    };
+  }, [posterSrc]);
 
   // Set the wrap aspect-ratio from the video's intrinsic dimensions so the
   // CSS height: 100% rule scales it to viewport height regardless of source
@@ -449,14 +682,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         lastTimeAt = performance.now();
       }
     };
-    const onProgressEv = () => {
-      if (!v.buffered.length || !isFinite(v.duration) || v.duration <= 0) return;
-      const end = v.buffered.end(v.buffered.length - 1);
-      const pct = Math.min(100, Math.max(0, Math.round((end / v.duration) * 100)));
-      setBufferedPct(pct);
-    };
     const onLoadStart = () => {
-      setBufferedPct(0);
       // Only spin the loader for a fresh load if we're not already mid-playback
       // (load() can be called by the watchdog while the video is actually
       // playing; in that case the next progress event flips us back).
@@ -488,7 +714,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     v.addEventListener("playing", onPlaying);
     v.addEventListener("error", onError);
     v.addEventListener("timeupdate", onTimeUpdate);
-    v.addEventListener("progress", onProgressEv);
     v.addEventListener("loadstart", onLoadStart);
     v.addEventListener("play", onPlay);
     return () => {
@@ -499,7 +724,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
       v.removeEventListener("playing", onPlaying);
       v.removeEventListener("error", onError);
       v.removeEventListener("timeupdate", onTimeUpdate);
-      v.removeEventListener("progress", onProgressEv);
       v.removeEventListener("loadstart", onLoadStart);
       v.removeEventListener("play", onPlay);
       if (stuckTimer != null) window.clearTimeout(stuckTimer);
@@ -515,6 +739,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const playTimerRef = useRef<number | null>(null);
   const playRegisteredRef = useRef(false);
   const watchedSinceLastFlushRef = useRef(0);
+  // Cumulative seconds the user spent viewing THIS scene this mount. Not
+  // reset by flush(), used by skip-learning on unmount to decide whether
+  // the user genuinely watched (>= SKIP_THRESHOLD_SEC) or just skipped past.
+  const sceneViewedTotalRef = useRef(0);
   const lastTickAtRef = useRef<number | null>(null);
   const flushTimerRef = useRef<number | null>(null);
   useEffect(() => {
@@ -555,7 +783,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
       // Tally the partial slice between the last tick and the pause.
       if (lastTickAtRef.current != null) {
         const slice = (performance.now() - lastTickAtRef.current) / 1000;
-        if (slice > 0 && slice < 60) watchedSinceLastFlushRef.current += slice;
+        if (slice > 0 && slice < 60) {
+          watchedSinceLastFlushRef.current += slice;
+          sceneViewedTotalRef.current += slice;
+        }
         lastTickAtRef.current = null;
       }
       flush();
@@ -572,7 +803,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
       const now = performance.now();
       const slice = (now - lastTickAtRef.current) / 1000;
       lastTickAtRef.current = now;
-      if (slice > 0 && slice <= 1.5) watchedSinceLastFlushRef.current += slice;
+      if (slice > 0 && slice <= 1.5) {
+        watchedSinceLastFlushRef.current += slice;
+        sceneViewedTotalRef.current += slice;
+      }
     }
     // Belt-and-suspenders: also flush when the page is hidden or about to
     // unload. Catches the "user closed the tab without scrolling away"
@@ -594,8 +828,19 @@ const FeedItem: React.FC<FeedItemProps> = ({
       document.removeEventListener("visibilitychange", onPageHidden);
       window.removeEventListener("pagehide", flush);
       stopTracking();
+      // Skip-learning: when this tile leaves (user scrolled away or
+      // navigated off the feed), if they spent less than the threshold on
+      // it, treat it as a skip and bump every tag's skip count. Top buckets
+      // exclude scenes whose tags accumulate too many skips.
+      if (
+        sceneViewedTotalRef.current < SKIP_THRESHOLD_SEC &&
+        scene.tags &&
+        scene.tags.length > 0
+      ) {
+        recordTagSkips(scene.tags.map((t) => t.id));
+      }
     };
-  }, [scene.id]);
+  }, [scene.id, scene.tags]);
 
   const handleLike = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -706,22 +951,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
           <div className="feed-progress" ref={progressRef}>
             <div className="feed-progress-bar" ref={barRef} />
           </div>
-          {loading && (
-            <div className="feed-loader" aria-hidden="true">
-              <svg className="feed-loader-ring" viewBox="0 0 50 50">
-                <circle className="track" cx="25" cy="25" r="20" />
-                <circle
-                  className="fill"
-                  cx="25"
-                  cy="25"
-                  r="20"
-                  strokeDasharray={`${(bufferedPct / 100) * 125.66} 125.66`}
-                />
-                <circle className="spin" cx="25" cy="25" r="20" />
-              </svg>
-              <div className="feed-loader-pct">{bufferedPct}%</div>
-            </div>
-          )}
           {pulse && (
             <div className={`feed-pulse feed-pulse-${pulse}`} aria-hidden="true">
               {pulse === "play" ? (
@@ -892,11 +1121,43 @@ export const Feed: React.FC = () => {
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
   const [drops, setDrops] = useState<DropParticle[]>([]);
   const dropIdRef = useRef(0);
+  const [dailyWrap, setDailyWrap] = useState<DailyWrap | null>(null);
 
   // Persist mute per tab
   useEffect(() => {
     sessionStorage.setItem(MUTED_KEY, muted ? "1" : "0");
   }, [muted]);
+
+  // Daily wrap: once per local-calendar-day, fetch yesterday's stats and
+  // show a small card. Mark today as shown so it doesn't reappear until
+  // the next day. Auto-dismiss after WRAP_DISMISS_MS or on first swipe.
+  useEffect(() => {
+    const today = todayKey();
+    if (localStorage.getItem(WRAP_LAST_SHOWN_KEY) === today) return;
+    let cancelled = false;
+    fetchYesterdayWrap().then((wrap) => {
+      if (cancelled || !wrap) return;
+      setDailyWrap(wrap);
+      try {
+        localStorage.setItem(WRAP_LAST_SHOWN_KEY, today);
+      } catch {
+        /* ignore */
+      }
+      window.setTimeout(() => setDailyWrap(null), WRAP_DISMISS_MS);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  // Dismiss the card on first scroll within the feed.
+  useEffect(() => {
+    if (!dailyWrap) return;
+    const t = trackRef.current;
+    if (!t) return;
+    const onScroll = () => setDailyWrap(null);
+    t.addEventListener("scroll", onScroll, { once: true, passive: true });
+    return () => t.removeEventListener("scroll", onScroll);
+  }, [dailyWrap]);
 
   // Initial load. Resumes the saved scene if one is present.
   useEffect(() => {
@@ -1156,6 +1417,9 @@ export const Feed: React.FC = () => {
 
   return (
     <div className="feed-root">
+      {dailyWrap && (
+        <DailyWrapCard data={dailyWrap} onDismiss={() => setDailyWrap(null)} />
+      )}
       <div className="feed-track" ref={trackRef}>
         {scenes.map((s) => (
           <FeedItem

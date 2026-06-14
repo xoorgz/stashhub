@@ -1,3 +1,33 @@
+### stashhub v1.2.0
+
+* New **Skip-learning** in the Feed algorithm. Scenes you scroll away from
+  with under 5 seconds of playback are now treated as skips: each of their
+  tag IDs gets a +1 in `localStorage feed.skips.tags` with a 30-day decay
+  on `lastAt`. Before building the queue, `buildQueue()` takes the top 10
+  tags by count (minimum 3 skips so a single mis-swipe doesn't ban a tag),
+  fetches scenes carrying any of those tags, and adds them to the exclude
+  set passed to every bucket fetch. Net effect: the feed quietly stops
+  showing tags you keep swiping past.
+* New **Adaptive accent**. On every active scene, the poster is downscaled
+  to a 16x16 canvas, non-extreme pixels are averaged, and the result is
+  boosted in HSL space (saturation x1.45, lightness clamped to 0.35-0.7).
+  That colour is written onto the `.feed-item` as `--feed-scene-accent`.
+  The action buttons' border picks it up at rest, and on hover the button
+  gets a 16 px-radius glow blending 40% of the accent into transparent via
+  `color-mix`. Falls back to hub-purple when sampling fails. Cached at the
+  module level per poster URL.
+* New **Daily wrap card**. Top-of-feed chip shown once per local calendar
+  day, summarising yesterday: scene count plus the tag with the highest
+  `play_duration` across yesterday's plays. Auto-dismisses after 9 s or on
+  the first scroll within the feed track. `localStorage
+  feed.wrap.lastShownDay` records the calendar date so it can't reappear
+  before tomorrow. Skips entirely if nothing was watched yesterday.
+* Buffering loader simplified. The hub-purple ring + buffered percentage
+  overlay is removed: the percentage often misrepresented HLS / transcoded
+  stream progress and was visually noisy. Stuck tiles now just breathe,
+  the poster pulses between opacity 1 and 0.45 via the existing
+  `feed-loader-pulse` keyframe.
+
 ### stashhub v1.1.0
 
 * Three new feed algorithm buckets driven by real watch behaviour:

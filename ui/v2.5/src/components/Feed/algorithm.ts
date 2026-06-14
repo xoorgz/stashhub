@@ -140,6 +140,52 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
+  // Skip-learning: tags the user has dismissed under SKIP_THRESHOLD_SEC of
+  // playback accumulate counts in localStorage feed.skips.tags. Take the
+  // top N tags by count, fetch scenes that have those tags, add to the
+  // exclude set so they never enter the queue. Decay on read keeps this
+  // from poisoning forever, the storage layer drops entries older than 30d.
+  const SKIPPED_TAGS_KEY = "feed.skips.tags";
+  const SKIP_TAG_TOP_N = 10;
+  // A tag needs at least this many skips before it's used to filter,
+  // otherwise a single mis-swipe blocks an entire tag.
+  const SKIP_TAG_MIN_COUNT = 3;
+  type SkippedTagEntry = { count: number; lastAt: number };
+  let topSkipTagIds: string[] = [];
+  try {
+    const raw = localStorage.getItem(SKIPPED_TAGS_KEY);
+    if (raw) {
+      const map = JSON.parse(raw) as Record<string, SkippedTagEntry>;
+      const entries = Object.entries(map)
+        .filter(([, e]) => e && e.count >= SKIP_TAG_MIN_COUNT)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, SKIP_TAG_TOP_N)
+        .map(([id]) => id);
+      topSkipTagIds = entries;
+    }
+  } catch {
+    /* ignore */
+  }
+  if (topSkipTagIds.length > 0) {
+    const skippy = await fetchBucket({
+      filter: { per_page: 1000, page: 1 },
+      sceneFilter: {
+        tags: {
+          value: topSkipTagIds,
+          modifier: GQL.CriterionModifier.Includes,
+        },
+      },
+    });
+    for (const id of skippy) exclude.add(id);
+    console.info(
+      "[feed] skip-learning excluded",
+      skippy.length,
+      "scenes carrying any of",
+      topSkipTagIds.length,
+      "high-skip tags"
+    );
+  }
+
   const fetches: Array<Promise<BucketSpec | null>> = [];
 
   // Hottest. Prefer tag id; fall back to name lookup for older configs.
