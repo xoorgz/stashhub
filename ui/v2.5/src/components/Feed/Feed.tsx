@@ -590,10 +590,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, []);
 
-  // Double-click → fullscreen
+  // Double-click to fullscreen, desktop only. On touch devices a quick
+  // double-tap on the edge of the video accidentally triggered fullscreen
+  // when the user actually wanted edge-tap seek. Gate on `hover: hover`
+  // which is true on pointer devices and false on touch-only ones.
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    if (!window.matchMedia("(hover: hover)").matches) return;
     function onDbl(ev: Event) {
       ev.preventDefault();
       ev.stopPropagation();

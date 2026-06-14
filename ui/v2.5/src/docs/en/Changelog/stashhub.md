@@ -1,3 +1,12 @@
+### stashhub v1.2.2
+
+* Mobile fix: the feed's double-click-to-fullscreen handler is now gated on
+  `matchMedia("(hover: hover)")` so it only registers on pointer devices.
+  On touch devices, a quick double-tap near the left or right edge of the
+  video was accidentally triggering fullscreen when the user meant to
+  edge-tap-seek. Touch users still get fullscreen via the explicit
+  fullscreen button in the action stack.
+
 ### stashhub v1.2.1
 
 * New **edge-tap seek** in the feed. Tapping the left 10% of the active
