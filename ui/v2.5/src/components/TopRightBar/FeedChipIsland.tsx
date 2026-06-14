@@ -102,7 +102,7 @@ export const FeedChipIsland: React.FC = () => {
             }}
           >
             {c.iconName ? (
-              <FilterChipIcon name={c.iconName} size={18} />
+              <FilterChipIcon name={c.iconName} size={20} />
             ) : (
               <span className="feed-chip-island-emoji">{c.emoji}</span>
             )}

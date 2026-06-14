@@ -17,17 +17,28 @@
   z-index: 200;
 }
 
+/* Shared glass surface variables. Bumped the blur + dropped opacity to make
+   both pills feel "frostier" against whatever's behind them; the saturate
+   boost keeps poster colours visible through the glass instead of muting
+   them flat. Used by both the topright bar and the filter chip island. */
+$glass-bg: rgba(14, 14, 18, 0.28);
+$glass-blur: blur(32px) saturate(190%);
+$glass-border: 1px solid rgba(255, 255, 255, 0.08);
+$glass-shadow:
+  0 8px 32px rgba(0, 0, 0, 0.45),
+  inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
 .topright-bar {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px;
-  background: rgba(10, 10, 12, 0.6);
-  backdrop-filter: blur(18px) saturate(170%);
-  -webkit-backdrop-filter: blur(18px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: $glass-bg;
+  backdrop-filter: $glass-blur;
+  -webkit-backdrop-filter: $glass-blur;
+  border: $glass-border;
   border-radius: 999px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: $glass-shadow;
 }
 
 /* Filter chips island. Its own pill, sits left of the bell. Each chip is a
@@ -37,44 +48,52 @@
   align-items: center;
   gap: 4px;
   padding: 4px;
-  background: rgba(10, 10, 12, 0.6);
-  backdrop-filter: blur(18px) saturate(170%);
-  -webkit-backdrop-filter: blur(18px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: $glass-bg;
+  backdrop-filter: $glass-blur;
+  -webkit-backdrop-filter: $glass-blur;
+  border: $glass-border;
   border-radius: 999px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: $glass-shadow;
 }
 .feed-chip-island-btn {
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background: transparent;
-  border: 1px solid transparent;
-  color: rgba(255, 255, 255, 0.85);
+  /* Subtle inner glass: a top-light, bottom-shadow gradient so the icon
+     sits on a curved surface even when not active. Strong enough to read,
+     soft enough to not compete with the active state. */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: background 0.18s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease, transform 0.12s ease;
 
   svg { display: block; }
   &:hover, &:focus {
-    background: rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
     color: #fff;
     outline: 0;
+    transform: translateY(-1px);
   }
   &.is-strict {
     border-style: dashed;
-    border-color: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.3);
   }
   &.is-active {
     color: #fff;
-    background: color-mix(in srgb, var(--color-hubs, #df73ff) 28%, transparent);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04)),
+      color-mix(in srgb, var(--color-hubs, #df73ff) 36%, transparent);
     border-color: var(--color-hubs, #df73ff);
     box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
       inset 0 0 0 1px var(--color-hubs, #df73ff),
-      0 0 14px 1px color-mix(in srgb, var(--color-hubs, #df73ff) 50%, transparent);
+      0 0 16px 1px color-mix(in srgb, var(--color-hubs, #df73ff) 55%, transparent);
   }
 }
 .feed-chip-island-emoji {

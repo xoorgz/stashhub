@@ -1,3 +1,20 @@
+### stashhub v1.3.3
+
+* Filter chip icon set replaced with tightened white-fill SVGs (tongue,
+  boobs, sex, blowjob) supplied by the user. Each icon now declares its
+  own `viewBox` so the source artwork at 100x100 or 90x90 stays usable
+  without forcing everything onto a 24x24 grid. Render size bumped from
+  18 to 20 px so the new artwork fills the chip button properly.
+* Generic icon set (lips, peach, drop, flame, heart, star, sparkle, eye,
+  bolt) kept as a fallback selection in the settings dropdown.
+* Topright bar and chip island restyled to read as proper frosted glass.
+  Blur raised from 18 px to 32 px, background opacity dropped from 0.6 to
+  0.28, saturation boost from 170 % to 190 %, plus a 1 px inset top
+  highlight so each pill catches light along its top edge. Same treatment
+  applied to chip buttons: subtle top-light vertical gradient at rest, a
+  brighter gradient on hover with a 1 px lift, hub-purple gradient on
+  active.
+
 ### stashhub v1.3.2
 
 * Filter chips are now a separate floating "island" pill in the top-right,
