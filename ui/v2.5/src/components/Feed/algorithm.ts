@@ -108,6 +108,64 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   const seed = `random_${Math.floor(Math.random() * 1e9)}`;
   const over = 3; // over-fetch so post-exclude there's still material
 
+  // Filter chips: read which configured chips are toggled on right now from
+  // localStorage, partition by mode. Strict chips wrap every bucket's
+  // sceneFilter in AND { tags: includes union }. Boost chips contribute a
+  // dedicated weighted bucket pulling scenes carrying any of their tags.
+  // If any strict chip is active, boost chips are silently ignored: a
+  // restrict-and-widen-at-once mix has no sensible semantics.
+  let strictTagIds: string[] = [];
+  let boostTagIds: string[] = [];
+  let boostWeight = 0;
+  try {
+    const rawActive = localStorage.getItem("feed.filterChips.active");
+    const active: number[] = rawActive ? JSON.parse(rawActive) : [];
+    if (Array.isArray(active) && active.length > 0) {
+      const strictUnion = new Set<string>();
+      const boostUnion = new Set<string>();
+      for (const idx of active) {
+        const chip = settings.filterChips?.[idx];
+        if (!chip || !chip.tagIds || chip.tagIds.length === 0) continue;
+        if (chip.mode === "strict") {
+          for (const id of chip.tagIds) strictUnion.add(id);
+        } else {
+          for (const id of chip.tagIds) boostUnion.add(id);
+          if (chip.weight > boostWeight) boostWeight = chip.weight;
+        }
+      }
+      strictTagIds = Array.from(strictUnion);
+      boostTagIds = Array.from(boostUnion);
+      if (strictTagIds.length > 0) {
+        // Strict trumps boost; ignore boost union.
+        boostTagIds = [];
+        boostWeight = 0;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Wrap a bucket's sceneFilter in the strict-chip tag constraint, if any.
+  // Uses AND so the bucket's own tag filter (hottest, watched, favored)
+  // composes correctly instead of clobbering.
+  const withStrict = (sf: GQL.SceneFilterType): GQL.SceneFilterType => {
+    if (strictTagIds.length === 0) return sf;
+    return {
+      ...sf,
+      AND: {
+        ...(sf.AND ?? {}),
+        tags: {
+          value: strictTagIds,
+          modifier: GQL.CriterionModifier.Includes,
+        },
+      },
+    };
+  };
+  // Wrap the module-level fetchBucket so every bucket below picks up the
+  // strict constraint without touching their call sites individually.
+  const fetchBucketStrict = (opts: BucketOpts) =>
+    fetchBucket({ ...opts, sceneFilter: withStrict(opts.sceneFilter) });
+
   // Recently-played exclude: fetch IDs of scenes whose last_played_at is
   // within the configured window and add them to the exclude set. Done as a
   // separate query rather than per-bucket filters because GQL Int/Time filters
@@ -196,7 +254,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
           settings.hottestTagId || (await getHottestTagId(settings.hottestTagName));
         if (!tagId) return { name: "hottest", weight: settings.hottestWeight, ids: [] };
         const perPage = Math.max(5, Math.ceil(targetCount * 0.6 * over));
-        const ids = await fetchBucket({
+        const ids = await fetchBucketStrict({
           filter: { per_page: perPage, page: 1, sort: seed },
           sceneFilter: {
             organized: true,
@@ -217,7 +275,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     fetches.push(
       (async () => {
         const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
-        const ids = await fetchBucket({
+        const ids = await fetchBucketStrict({
           filter: {
             per_page: perPage,
             page: 1,
@@ -244,7 +302,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     fetches.push(
       (async () => {
         const perPage = Math.max(5, Math.ceil(targetCount * 0.5 * over));
-        const ids = await fetchBucket({
+        const ids = await fetchBucketStrict({
           filter: {
             per_page: perPage,
             page: 1,
@@ -316,7 +374,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
           .map(([id]) => id);
 
         const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
-        const ids = await fetchBucket({
+        const ids = await fetchBucketStrict({
           filter: { per_page: perPage, page: 1, sort: seed },
           sceneFilter: {
             tags: {
@@ -342,7 +400,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     fetches.push(
       (async () => {
         const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
-        const ids = await fetchBucket({
+        const ids = await fetchBucketStrict({
           filter: { per_page: perPage, page: 1, sort: seed },
           sceneFilter: {
             tags: {
@@ -362,7 +420,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     fetches.push(
       (async () => {
         const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
-        const ids = await fetchBucket({
+        const ids = await fetchBucketStrict({
           filter: {
             per_page: perPage,
             page: 1,
@@ -390,7 +448,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   if (settings.topRatedEnabled && settings.topRatedWeight > 0) {
     const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
     fetches.push(
-      fetchBucket({
+      fetchBucketStrict({
         filter: { per_page: perPage, page: 1, sort: seed },
         sceneFilter: {
           organized: true,
@@ -413,7 +471,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
       .toISOString()
       .slice(0, 10);
     fetches.push(
-      fetchBucket({
+      fetchBucketStrict({
         filter: { per_page: perPage, page: 1, sort: seed },
         sceneFilter: {
           organized: true,
@@ -430,10 +488,28 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   if (settings.randomWeight > 0) {
     const perPage = Math.max(5, Math.ceil(targetCount * 0.3 * over));
     fetches.push(
-      fetchBucket({
+      fetchBucketStrict({
         filter: { per_page: perPage, page: 1, sort: seed },
         sceneFilter: { organized: true },
       }).then((ids) => ({ name: "random", weight: settings.randomWeight, ids }))
+    );
+  }
+
+  // Chip boost: scenes carrying any of the union of active boost-chip tags.
+  // Note this skips withStrict (boostTagIds is empty whenever a strict chip
+  // is active, so the two modes can't both contribute at once).
+  if (boostTagIds.length > 0 && boostWeight > 0) {
+    const perPage = Math.max(5, Math.ceil(targetCount * 0.5 * over));
+    fetches.push(
+      fetchBucket({
+        filter: { per_page: perPage, page: 1, sort: seed },
+        sceneFilter: {
+          tags: {
+            value: boostTagIds,
+            modifier: GQL.CriterionModifier.Includes,
+          },
+        },
+      }).then((ids) => ({ name: "chipBoost", weight: boostWeight, ids }))
     );
   }
 
@@ -477,7 +553,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     console.warn(
       "[feed] all buckets empty, falling back to unfiltered random"
     );
-    const fallback = await fetchBucket({
+    const fallback = await fetchBucketStrict({
       filter: { per_page: targetCount, page: 1, sort: seed },
       sceneFilter: {},
     });

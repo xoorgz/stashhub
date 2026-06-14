@@ -5,6 +5,11 @@ import { getClient } from "src/core/StashService";
 const client = getClient();
 import { buildQueue, fetchSceneDetails } from "./algorithm";
 import {
+  loadAlgorithmSettings,
+  ALGORITHM_SETTINGS_EVENT,
+  FilterChip,
+} from "../Settings/SettingsAlgorithmPanel";
+import {
   ChevronIcon,
   HeartIcon,
   DropIcon,
@@ -182,74 +187,6 @@ const DailyWrapCard: React.FC<{ data: DailyWrap; onDismiss: () => void }> = ({
     </div>
   </div>
 );
-
-/** Module-level cache: poster URL -> dominant rgb() string.
- *  Posters are content-addressed by Stash (hashed filenames), so the same
- *  scene returns the same colour across mounts without re-sampling. */
-const posterAccentCache = new Map<string, string>();
-
-/** Downscale the poster to a 16x16 grid, average pixels that aren't
- *  near-black or near-white, boost saturation a touch so the accent is
- *  vivid against the dark UI. Returns an rgb() string or null on failure
- *  (canvas tainting, zero usable pixels). */
-function sampleDominantColor(img: HTMLImageElement): string | null {
-  const W = 16;
-  const H = 16;
-  const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return null;
-  ctx.drawImage(img, 0, 0, W, H);
-  const data = ctx.getImageData(0, 0, W, H).data;
-  let r = 0,
-    g = 0,
-    b = 0,
-    n = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    const pr = data[i];
-    const pg = data[i + 1];
-    const pb = data[i + 2];
-    const luma = 0.2126 * pr + 0.7152 * pg + 0.0722 * pb;
-    // Drop letterbox black and washed-out highlights, keep mid-tones.
-    if (luma < 24 || luma > 240) continue;
-    r += pr;
-    g += pg;
-    b += pb;
-    n++;
-  }
-  if (n === 0) return null;
-  r = Math.round(r / n);
-  g = Math.round(g / n);
-  b = Math.round(b / n);
-  // Boost saturation in HSL space so dimly-coloured posters still glow.
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) return `rgb(${r}, ${g}, ${b})`;
-  const d = max - min;
-  let h = 0;
-  const s = l > 127 ? d / (510 - max - min) : d / (max + min);
-  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-  else if (max === g) h = ((b - r) / d + 2) / 6;
-  else h = ((r - g) / d + 4) / 6;
-  const sBoosted = Math.min(1, s * 1.45);
-  const lClamped = Math.min(0.7, Math.max(0.35, l / 255));
-  const c = (1 - Math.abs(2 * lClamped - 1)) * sBoosted;
-  const hh = h * 6;
-  const x = c * (1 - Math.abs((hh % 2) - 1));
-  let rOut = 0,
-    gOut = 0,
-    bOut = 0;
-  if (hh < 1) [rOut, gOut, bOut] = [c, x, 0];
-  else if (hh < 2) [rOut, gOut, bOut] = [x, c, 0];
-  else if (hh < 3) [rOut, gOut, bOut] = [0, c, x];
-  else if (hh < 4) [rOut, gOut, bOut] = [0, x, c];
-  else if (hh < 5) [rOut, gOut, bOut] = [x, 0, c];
-  else [rOut, gOut, bOut] = [c, 0, x];
-  const m = lClamped - c / 2;
-  return `rgb(${Math.round((rOut + m) * 255)}, ${Math.round((gOut + m) * 255)}, ${Math.round((bOut + m) * 255)})`;
-}
 
 /** localStorage map of tagId -> {count, lastAt}. Entries decay after
  *  SKIPPED_TAGS_DECAY_DAYS; reads strip stale entries on the fly. */
@@ -439,6 +376,9 @@ interface FeedItemProps {
   onSkip: () => void;
   onSpawnHearts: (x: number, y: number, count: number) => void;
   onSpawnDrops: (x: number, y: number, count: number) => void;
+  chips: FilterChip[];
+  activeChips: number[];
+  onToggleChip: (idx: number) => void;
 }
 
 const FeedItem: React.FC<FeedItemProps> = ({
@@ -448,6 +388,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
   onSkip,
   onSpawnHearts,
   onSpawnDrops,
+  chips,
+  activeChips,
+  onToggleChip,
 }) => {
   const itemRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -467,47 +410,35 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const pulseTimerRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Show the same centred chip on keyboard seek (ArrowLeft / ArrowRight)
+  // as on edge-tap. Feed dispatches `feed-pulse-trigger` on the active
+  // .feed-item with detail "back" or "fwd"; we just mirror it into local
+  // pulse state with the same 600 ms auto-clear timer.
+  useEffect(() => {
+    const item = itemRef.current;
+    if (!item) return;
+    function onPulse(e: Event) {
+      const kind = (e as CustomEvent).detail as
+        | "play"
+        | "pause"
+        | "back"
+        | "fwd";
+      if (kind !== "play" && kind !== "pause" && kind !== "back" && kind !== "fwd") return;
+      setPulse(kind);
+      if (pulseTimerRef.current != null) window.clearTimeout(pulseTimerRef.current);
+      pulseTimerRef.current = window.setTimeout(() => setPulse(null), 600);
+    }
+    item.addEventListener("feed-pulse-trigger", onPulse as EventListener);
+    return () => {
+      item.removeEventListener("feed-pulse-trigger", onPulse as EventListener);
+    };
+  }, []);
+
   const previewSrc = useMemo(
     () => relativize(scene.paths.stream || scene.paths.preview),
     [scene.paths.stream, scene.paths.preview]
   );
   const posterSrc = useMemo(() => relativize(scene.paths.screenshot), [scene.paths.screenshot]);
-
-  // Adaptive accent: sample the dominant non-black colour from the poster
-  // and write it onto the .feed-item as --feed-scene-accent. Used by the
-  // action stack's rim glow to subtly tie UI chrome to the current scene's
-  // palette. Sampling runs once per scene (memoised in module-level cache
-  // since posters are content-addressed, same URL across mounts).
-  useEffect(() => {
-    if (!posterSrc) return;
-    const item = itemRef.current;
-    if (!item) return;
-    const cached = posterAccentCache.get(posterSrc);
-    if (cached) {
-      item.style.setProperty("--feed-scene-accent", cached);
-      return;
-    }
-    let cancelled = false;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.decoding = "async";
-    img.onload = () => {
-      if (cancelled) return;
-      try {
-        const accent = sampleDominantColor(img);
-        if (accent) {
-          posterAccentCache.set(posterSrc, accent);
-          item.style.setProperty("--feed-scene-accent", accent);
-        }
-      } catch {
-        /* canvas tainting or memory error; leave the CSS var unset */
-      }
-    };
-    img.src = posterSrc;
-    return () => {
-      cancelled = true;
-    };
-  }, [posterSrc]);
 
   // Set the wrap aspect-ratio from the video's intrinsic dimensions so the
   // CSS height: 100% rule scales it to viewport height regardless of source
@@ -1013,6 +944,32 @@ const FeedItem: React.FC<FeedItemProps> = ({
         </div>
 
         <div className="feed-actions">
+          {chips.some((c) => c.tagIds.length > 0) && (
+            <div className="feed-chips">
+              {chips.map((c, idx) => {
+                if (c.tagIds.length === 0) return null;
+                const active = activeChips.includes(idx);
+                const label = c.emoji || c.label || `#${idx + 1}`;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    className={`feed-chip${active ? " is-active" : ""}${
+                      c.mode === "strict" ? " is-strict" : ""
+                    }`}
+                    title={`${c.label || `Chip ${idx + 1}`} (${c.mode})`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onToggleChip(idx);
+                    }}
+                  >
+                    <span className="feed-chip-emoji">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {performerImage && performer && (
             <Link
               className="feed-avatar"
@@ -1156,6 +1113,48 @@ export const Feed: React.FC = () => {
   const dropIdRef = useRef(0);
   const [dailyWrap, setDailyWrap] = useState<DailyWrap | null>(null);
 
+  // Filter chips: chip config comes from algorithm settings, active state is
+  // a separate localStorage entry so it survives a settings reload but isn't
+  // exported with the algorithm blob (which is shared across sessions/devices
+  // if the user moves their config).
+  const [chips, setChips] = useState<FilterChip[]>(
+    () => loadAlgorithmSettings().filterChips ?? []
+  );
+  const [activeChips, setActiveChips] = useState<number[]>(() => {
+    try {
+      const raw = localStorage.getItem("feed.filterChips.active");
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((n) => Number.isInteger(n)) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    function onChange() {
+      setChips(loadAlgorithmSettings().filterChips ?? []);
+    }
+    window.addEventListener(ALGORITHM_SETTINGS_EVENT, onChange);
+    return () => window.removeEventListener(ALGORITHM_SETTINGS_EVENT, onChange);
+  }, []);
+
+  const toggleChip = useCallback((idx: number) => {
+    setActiveChips((prev) => {
+      const next = prev.includes(idx)
+        ? prev.filter((i) => i !== idx)
+        : [...prev, idx];
+      try {
+        localStorage.setItem("feed.filterChips.active", JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      // Rebuild the queue: the boost/strict filters change which scenes
+      // qualify. ReloadKey is the existing handle for "tear down and refetch".
+      setReloadKey((k) => k + 1);
+      return next;
+    });
+  }, []);
+
   // Persist mute per tab
   useEffect(() => {
     sessionStorage.setItem(MUTED_KEY, muted ? "1" : "0");
@@ -1287,21 +1286,63 @@ export const Feed: React.FC = () => {
       fadeTimers.set(item, t);
     }
 
+    // Live-transcode pre-warm. Stash builds the streaming MP4 on demand:
+    // CIFS open + ffmpeg startup + first GOP encoded before any bytes
+    // reach the browser. Issuing a Range request for the first ~512 KB
+    // ahead of time kicks that whole chain off, so by the time the user
+    // scrolls onto the tile the transcode is already running and bytes
+    // are already in the kernel buffer. Dedupe in-flight by URL, abort
+    // when we slide past so we don't keep transcoding scenes the user
+    // already left behind.
+    const warmedUrls: Map<string, AbortController> = (window as any).__feedWarmedUrls
+      ?? new Map<string, AbortController>();
+    (window as any).__feedWarmedUrls = warmedUrls;
+    function warmStreamUrl(url: string) {
+      if (warmedUrls.has(url)) return;
+      const ac = new AbortController();
+      warmedUrls.set(url, ac);
+      // GET with a small Range. The fetch is deliberately not awaited;
+      // we just want the request on the wire. Errors are silent: any
+      // failure mode (offline, 403 expired token) is better handled by
+      // the actual video element when it gets its turn.
+      fetch(url, {
+        method: "GET",
+        headers: { Range: "bytes=0-524287" },
+        cache: "no-store",
+        signal: ac.signal,
+        credentials: "same-origin",
+      })
+        .then((r) => r.arrayBuffer().catch(() => null))
+        .catch(() => null);
+    }
+    function abortFarWarms(keepUrls: Set<string>) {
+      for (const [url, ac] of Array.from(warmedUrls.entries())) {
+        if (!keepUrls.has(url)) {
+          try { ac.abort(); } catch { /* ignore */ }
+          warmedUrls.delete(url);
+        }
+      }
+    }
+
     function ensureNeighborSrcs(activeItem: HTMLDivElement) {
-      // Prime: active + 2 ahead use preload="auto" so a swipe-down has no
-      // buffer pause. 1 back + 3 ahead get src set but preload="metadata".
-      // The further-back items stay untouched to limit bandwidth.
+      // Prime: active + N ahead use preload="auto" so a swipe-down has no
+      // buffer pause. N is bumped on desktop because we can spare the
+      // bandwidth there; on mobile we stay conservative.
       const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
       const idx = items.indexOf(activeItem);
       if (idx === -1) return;
+      const isDesktop = typeof window.matchMedia === "function"
+        && window.matchMedia("(hover: hover)").matches;
+      const aheadAggressive = isDesktop ? 3 : 2;
+      const aheadSrcOnly = aheadAggressive + 1;
       const start = Math.max(0, idx - 1);
-      const end = Math.min(items.length - 1, idx + 3);
+      const end = Math.min(items.length - 1, idx + aheadSrcOnly);
+      const keepWarm = new Set<string>();
       for (let i = start; i <= end; i++) {
         const it = items[i];
         const v = it.querySelector<HTMLVideoElement>("video.feed-video");
         if (!v) continue;
-        // Active + the next 2 get aggressive preload; everything else metadata.
-        const aggressive = i >= idx && i <= idx + 2;
+        const aggressive = i >= idx && i <= idx + aheadAggressive;
         const desiredPreload = aggressive ? "auto" : "metadata";
         if (v.preload !== desiredPreload) v.preload = desiredPreload;
         const src = v.dataset.src;
@@ -1309,7 +1350,14 @@ export const Feed: React.FC = () => {
           v.src = src;
           try { v.load(); } catch { /* ignore */ }
         }
+        // Pre-warm the stream URL for the active item and the next ones.
+        // Skip the already-active tile (its <video> is already pulling).
+        if (src && i > idx && i <= idx + aheadAggressive) {
+          keepWarm.add(src);
+          warmStreamUrl(src);
+        }
       }
+      abortFarWarms(keepWarm);
     }
 
     const io = new IntersectionObserver(
@@ -1361,19 +1409,28 @@ export const Feed: React.FC = () => {
         e.preventDefault();
         t.scrollBy({ top: -t.clientHeight, behavior: "smooth" });
       } else if (e.key === "ArrowRight" || e.key === "l" || e.key === "L") {
-        // Seek the currently-visible video forward 10s
+        // Seek the currently-visible video forward 10s and fire the same
+        // pulse chip the edge-tap shows, so keyboard nav gets the same
+        // visual confirmation as touch.
         e.preventDefault();
-        const v = currentVisibleRef.current?.querySelector<HTMLVideoElement>("video");
+        const item = currentVisibleRef.current;
+        const v = item?.querySelector<HTMLVideoElement>("video");
         if (v && Number.isFinite(v.duration)) {
           v.currentTime = Math.min(v.duration - 0.1, v.currentTime + 10);
         }
+        item?.dispatchEvent(
+          new CustomEvent("feed-pulse-trigger", { detail: "fwd" })
+        );
       } else if (e.key === "ArrowLeft" || e.key === "h" || e.key === "H") {
-        // Seek the currently-visible video back 10s
         e.preventDefault();
-        const v = currentVisibleRef.current?.querySelector<HTMLVideoElement>("video");
+        const item = currentVisibleRef.current;
+        const v = item?.querySelector<HTMLVideoElement>("video");
         if (v) {
           v.currentTime = Math.max(0, v.currentTime - 10);
         }
+        item?.dispatchEvent(
+          new CustomEvent("feed-pulse-trigger", { detail: "back" })
+        );
       } else if (e.key === "m" || e.key === "M") {
         e.preventDefault();
         setMuted((m) => !m);
@@ -1463,6 +1520,9 @@ export const Feed: React.FC = () => {
             onSkip={handleSkip}
             onSpawnHearts={spawnHearts}
             onSpawnDrops={spawnDrops}
+            chips={chips}
+            activeChips={activeChips}
+            onToggleChip={toggleChip}
           />
         ))}
         {scenes.length === 0 && feedState === "loading" && (

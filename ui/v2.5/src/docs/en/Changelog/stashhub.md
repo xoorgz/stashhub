@@ -1,3 +1,50 @@
+### stashhub v1.3.0
+
+* New **filter chips** in the feed. Three configurable quick filters,
+  defined under Settings, Feed Algorithm, Advanced. Each chip stores an
+  emoji, a label, a list of tag IDs, a weight, and a mode (Boost or
+  Strict). Empty slots are hidden, so the public defaults ship as three
+  blank rows and only appear in the feed once you fill them in.
+  * Boost mode adds the chip's tag union as a new "Chip boost" bucket in
+    the queue at the chip's weight. Tap to widen toward those tags.
+  * Strict mode wraps every bucket's `findScenes` call in
+    `AND { tags: includes [...] }` so the queue only contains scenes
+    carrying at least one of the chip's tags. Strict overrides Boost
+    when both are active at once.
+  * Active chip state is per-device in `localStorage feed.filterChips.active`.
+    Toggling a chip rebuilds the queue immediately.
+* Arrow keys on desktop now show the same centred pulse chip that
+  edge-tap shows. ArrowLeft / `h` keeps rewinding 10s, ArrowRight / `l`
+  keeps advancing 10s. The Feed dispatches a `feed-pulse-trigger` event
+  on the active item which FeedItem mirrors into pulse state.
+* **Buffering pre-warm.** On every scroll into a new active tile, the
+  feed kicks off `fetch(streamUrl, { headers: { Range: 'bytes=0-524287' } })`
+  for the next two or three tiles ahead. That forces Stash to start the
+  live transcode and warms the CIFS source-file read before the user
+  scrolls there, cutting time-to-first-frame on cold tiles dramatically.
+  In-flight requests are aborted when the user scrolls past so we don't
+  keep transcoding scenes that have left the window.
+* **Bigger preload window on desktop.** On pointer devices, the
+  aggressive `preload="auto"` window goes from 2 ahead to 3 ahead.
+  Mobile stays at 2 to avoid cellular bandwidth burn.
+* **Streaming transcode capped at 720p**, server-side. `config.yml` now
+  carries `max_streaming_transcode_size: STANDARD_HD`. Live transcode
+  produces bytes 2-3x faster at 720p than at 1080p, with no visible
+  loss on phones. This is the single biggest contributor to
+  buffer-less feel.
+* **Transcode cache moved to the storagebox.** The local SSD was
+  fighting the DB for space; transcodes now live on the storagebox CIFS
+  mount via a symlink, cap raised from 4 GB to 30 GB. Prune cron
+  simplified, the SSD emergency-mode is no longer needed because the DB
+  has the SSD to itself again.
+* **Revert: adaptive poster accent removed.** The v1.2.0 feature that
+  sampled the dominant poster colour and wrote it onto `.feed-item` as
+  `--feed-scene-accent` is gone. The action button borders, hover glow,
+  filter chip "active" ring, and progress bar gradient all go back to
+  hub-purple (or a neutral white-alpha border on the action buttons).
+  Sampled colours misread on washed or letterboxed posters and ended up
+  changing more of the chrome than intended.
+
 ### stashhub v1.2.2
 
 * Mobile fix: the feed's double-click-to-fullscreen handler is now gated on

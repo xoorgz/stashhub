@@ -7,6 +7,14 @@ import * as GQL from "src/core/generated-graphql";
 export const ALGORITHM_SETTINGS_KEY = "algorithm.settings";
 export const ALGORITHM_SETTINGS_EVENT = "stashhub:algorithm-settings-changed";
 
+export interface FilterChip {
+  label: string;
+  emoji: string;
+  tagIds: string[];
+  weight: number;
+  mode: "boost" | "strict";
+}
+
 export interface AlgorithmSettings {
   hottestEnabled: boolean;
   hottestWeight: number;
@@ -35,6 +43,7 @@ export interface AlgorithmSettings {
   topRatingMin: number;
   excludeRecentlyPlayed: boolean;
   excludeRecentlyPlayedDays: number;
+  filterChips: FilterChip[];
 }
 
 export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
@@ -64,6 +73,11 @@ export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
   topRatingMin: 80,
   excludeRecentlyPlayed: true,
   excludeRecentlyPlayedDays: 7,
+  filterChips: [
+    { label: "", emoji: "", tagIds: [], weight: 3, mode: "boost" },
+    { label: "", emoji: "", tagIds: [], weight: 3, mode: "boost" },
+    { label: "", emoji: "", tagIds: [], weight: 3, mode: "boost" },
+  ],
 };
 
 export function loadAlgorithmSettings(): AlgorithmSettings {
@@ -432,6 +446,102 @@ export const SettingsAlgorithmPanel: React.FC = () => {
             />
           </div>
         </div>
+        <div className="setting">
+          <div>
+            <h3>Filter chips</h3>
+            <div className="value">
+              Three configurable quick filters shown above the feed action
+              stack. Each chip combines tag IDs of your choice. Tap a chip in
+              the feed to activate it. Empty slots are hidden. Boost adds the
+              chip's tags as an extra weighted bucket. Strict restricts every
+              bucket to scenes carrying any of the chip's tags.
+            </div>
+          </div>
+        </div>
+        {s.filterChips.map((chip, idx) => (
+          <div className="setting" key={`chip-${idx}`}>
+            <div>
+              <h3>Chip {idx + 1}</h3>
+              <div className="value">
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <Form.Control
+                    type="text"
+                    placeholder="Emoji"
+                    value={chip.emoji}
+                    maxLength={4}
+                    onChange={(e) => {
+                      const next = [...s.filterChips];
+                      next[idx] = { ...next[idx], emoji: e.target.value };
+                      update("filterChips", next);
+                    }}
+                    style={{ width: 70 }}
+                  />
+                  <Form.Control
+                    type="text"
+                    placeholder="Label"
+                    value={chip.label}
+                    maxLength={24}
+                    onChange={(e) => {
+                      const next = [...s.filterChips];
+                      next[idx] = { ...next[idx], label: e.target.value };
+                      update("filterChips", next);
+                    }}
+                    style={{ width: 160 }}
+                  />
+                  <Form.Control
+                    as="select"
+                    value={chip.mode}
+                    onChange={(e) => {
+                      const next = [...s.filterChips];
+                      next[idx] = {
+                        ...next[idx],
+                        mode: (e.target.value === "strict" ? "strict" : "boost"),
+                      };
+                      update("filterChips", next);
+                    }}
+                    style={{ width: 110 }}
+                  >
+                    <option value="boost">Boost</option>
+                    <option value="strict">Strict</option>
+                  </Form.Control>
+                  <Form.Control
+                    type="number"
+                    min={1}
+                    max={10}
+                    step={1}
+                    value={chip.weight}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      if (Number.isFinite(n) && n >= 1 && n <= 10) {
+                        const next = [...s.filterChips];
+                        next[idx] = { ...next[idx], weight: n };
+                        update("filterChips", next);
+                      }
+                    }}
+                    style={{ width: 70 }}
+                    title="Boost weight (ignored in strict mode)"
+                  />
+                </div>
+                <div style={{ marginTop: 8, minWidth: 260, maxWidth: 440 }}>
+                  <TagSelect
+                    isMulti
+                    isClearable
+                    ids={chip.tagIds}
+                    onSelect={(items) => {
+                      const ids = (items ?? [])
+                        .map((it) => (it as { id?: string }).id)
+                        .filter((id): id is string => !!id);
+                      const next = [...s.filterChips];
+                      next[idx] = { ...next[idx], tagIds: ids };
+                      update("filterChips", next);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+
         <div className="setting">
           <div>
             <h3>Reset to defaults</h3>
