@@ -98,96 +98,6 @@ function markViewed(id: string) {
   }
 }
 
-const WRAP_LAST_SHOWN_KEY = "feed.wrap.lastShownDay";
-const WRAP_DISMISS_MS = 9000;
-
-function todayKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-interface DailyWrap {
-  scenesCount: number;
-  topTagName: string | null;
-}
-
-/** Fetch yesterday's wrap stats: scenes whose last_played_at falls within
- *  yesterday, and the tag with the highest play_duration across them. */
-async function fetchYesterdayWrap(): Promise<DailyWrap | null> {
-  const now = new Date();
-  const yEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yStart = new Date(yEnd.getTime() - 86400_000);
-  const startStr = yStart.toISOString().slice(0, 10);
-  const endStr = yEnd.toISOString().slice(0, 10);
-  try {
-    const r = await client.query<
-      GQL.FindScenesQuery,
-      GQL.FindScenesQueryVariables
-    >({
-      query: GQL.FindScenesDocument,
-      variables: {
-        filter: { per_page: 100, page: 1 },
-        scene_filter: {
-          last_played_at: {
-            value: startStr,
-            value2: endStr,
-            modifier: GQL.CriterionModifier.Between,
-          },
-        },
-      },
-    });
-    const scenes = r.data.findScenes.scenes;
-    if (!scenes.length) return null;
-    const tagScore = new Map<string, { name: string; score: number }>();
-    for (const s of scenes) {
-      const dur = s.play_duration ?? 0;
-      for (const t of s.tags ?? []) {
-        const prev = tagScore.get(t.id) ?? { name: t.name, score: 0 };
-        prev.score += dur;
-        tagScore.set(t.id, prev);
-      }
-    }
-    let topTagName: string | null = null;
-    let topScore = 0;
-    for (const v of tagScore.values()) {
-      if (v.score > topScore) {
-        topScore = v.score;
-        topTagName = v.name;
-      }
-    }
-    return { scenesCount: scenes.length, topTagName };
-  } catch {
-    return null;
-  }
-}
-
-const DailyWrapCard: React.FC<{ data: DailyWrap; onDismiss: () => void }> = ({
-  data,
-  onDismiss,
-}) => (
-  <div className="feed-wrap-card" role="status">
-    <button
-      type="button"
-      className="feed-wrap-close"
-      aria-label="Dismiss"
-      onClick={onDismiss}
-    >
-      ×
-    </button>
-    <div className="feed-wrap-title">Yesterday</div>
-    <div className="feed-wrap-body">
-      <strong>{data.scenesCount}</strong>
-      <span> scene{data.scenesCount === 1 ? "" : "s"}</span>
-      {data.topTagName ? (
-        <>
-          <span className="feed-wrap-sep">•</span>
-          <span className="feed-wrap-tag">#{data.topTagName}</span>
-        </>
-      ) : null}
-    </div>
-  </div>
-);
-
 /** localStorage map of tagId -> {count, lastAt}. Entries decay after
  *  SKIPPED_TAGS_DECAY_DAYS; reads strip stale entries on the fly. */
 type SkippedTagEntry = { count: number; lastAt: number };
@@ -1065,7 +975,6 @@ export const Feed: React.FC = () => {
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
   const [drops, setDrops] = useState<DropParticle[]>([]);
   const dropIdRef = useRef(0);
-  const [dailyWrap, setDailyWrap] = useState<DailyWrap | null>(null);
 
   // Filter chips. Chip defs live in Stash's server-side UI config and the
   // UI for choosing/toggling them lives in the FeedChipIsland (top-right).
@@ -1124,37 +1033,6 @@ export const Feed: React.FC = () => {
   useEffect(() => {
     sessionStorage.setItem(MUTED_KEY, muted ? "1" : "0");
   }, [muted]);
-
-  // Daily wrap: once per local-calendar-day, fetch yesterday's stats and
-  // show a small card. Mark today as shown so it doesn't reappear until
-  // the next day. Auto-dismiss after WRAP_DISMISS_MS or on first swipe.
-  useEffect(() => {
-    const today = todayKey();
-    if (localStorage.getItem(WRAP_LAST_SHOWN_KEY) === today) return;
-    let cancelled = false;
-    fetchYesterdayWrap().then((wrap) => {
-      if (cancelled || !wrap) return;
-      setDailyWrap(wrap);
-      try {
-        localStorage.setItem(WRAP_LAST_SHOWN_KEY, today);
-      } catch {
-        /* ignore */
-      }
-      window.setTimeout(() => setDailyWrap(null), WRAP_DISMISS_MS);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  // Dismiss the card on first scroll within the feed.
-  useEffect(() => {
-    if (!dailyWrap) return;
-    const t = trackRef.current;
-    if (!t) return;
-    const onScroll = () => setDailyWrap(null);
-    t.addEventListener("scroll", onScroll, { once: true, passive: true });
-    return () => t.removeEventListener("scroll", onScroll);
-  }, [dailyWrap]);
 
   // Initial load. Resumes the saved scene if one is present.
   useEffect(() => {
@@ -1430,9 +1308,6 @@ export const Feed: React.FC = () => {
 
   return (
     <div className="feed-root">
-      {dailyWrap && (
-        <DailyWrapCard data={dailyWrap} onDismiss={() => setDailyWrap(null)} />
-      )}
       <div className="feed-track" ref={trackRef}>
         {scenes.map((s) => (
           <FeedItem

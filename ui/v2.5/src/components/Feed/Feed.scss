@@ -431,7 +431,6 @@
   /* Push the daily wrap card below the topright island row so they don't
      overlap horizontally on narrow phones. The island is ~40px tall +
      8px top inset, so 60px clears it. */
-  .feed-wrap-card { top: 60px; }
 }
 
 /* Drop particles, O button splash. Burst outward in a radial pattern with
@@ -579,75 +578,6 @@
   25%  { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
   60%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1.25); }
-}
-
-/* Daily wrap card: small floating chip at the top of the feed shown once
-   per local-calendar-day. Auto-dismiss after WRAP_DISMISS_MS or on first
-   scroll within .feed-track. */
-.feed-wrap-card {
-  position: absolute;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  /* Must sit above the topright island row (z-index 200). It was
-     getting hidden behind the bell pill on mobile because of overlap. */
-  z-index: 240;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 10px 36px 12px 16px;
-  background: rgba(20, 20, 22, 0.85);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-  color: #fff;
-  pointer-events: auto;
-  animation: feed-wrap-in 0.28s cubic-bezier(0.2, 0.7, 0.3, 1.05) both;
-}
-.feed-wrap-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.55);
-}
-.feed-wrap-body {
-  font-size: 14px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-
-  strong { font-size: 18px; font-weight: 700; color: var(--color-hubs, #df73ff); }
-  .feed-wrap-sep { opacity: 0.4; padding: 0 2px; }
-  .feed-wrap-tag { color: var(--color-hubs, #df73ff); font-weight: 500; }
-}
-.feed-wrap-close {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: transparent;
-  border: 0;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
-}
-@keyframes feed-wrap-in {
-  from { opacity: 0; transform: translate(-50%, -12px); }
-  to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
 /* Buffering state: when the active tile is genuinely stuck (paused or

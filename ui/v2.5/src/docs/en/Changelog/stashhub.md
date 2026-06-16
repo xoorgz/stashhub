@@ -1,3 +1,7 @@
+### stashhub v1.3.9
+
+* Removed daily wrap card.
+
 ### stashhub v1.3.8
 
 * Removed all polling-based video recovery. `onWaiting` retries capped at 3 then waits for native events.
