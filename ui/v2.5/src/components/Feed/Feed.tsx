@@ -18,6 +18,8 @@ import {
   SkipIcon,
   MuteOffIcon,
   MuteOnIcon,
+  CcOnIcon,
+  CcOffIcon,
   OpenSceneIcon,
 } from "./icons";
 import "./Feed.scss";
@@ -27,6 +29,7 @@ const VIEWED_LIMIT = 500;
 const LIKES_KEY = "feed.likes";
 const LIKE_THRESHOLD = 5;
 const MUTED_KEY = "feed.muted";
+const CAPTIONS_KEY = "feed.captions";
 const CURRENT_KEY = "feed.currentSceneId";
 const SKIPPED_TAGS_KEY = "feed.skips.tags";
 const SKIP_THRESHOLD_SEC = 5;
@@ -279,10 +282,65 @@ function toggleFullscreen(el: HTMLElement | null) {
 
 // ───────── components ─────────
 
+function resolutionLabel(height: number): string | null {
+  if (!height || !Number.isFinite(height)) return null;
+  if (height >= 2160) return "4K";
+  if (height >= 1440) return "1440p";
+  if (height >= 1080) return "1080p";
+  if (height >= 720) return "720p";
+  if (height >= 480) return "480p";
+  if (height >= 360) return "360p";
+  if (height >= 240) return "240p";
+  return `${Math.round(height)}p`;
+}
+
+function videoCodecLabel(codec: string | undefined | null): string | null {
+  if (!codec) return null;
+  const c = codec.toLowerCase();
+  if (c === "h264" || c === "avc" || c === "avc1") return "H.264";
+  if (c === "hevc" || c === "h265") return "HEVC";
+  if (c === "av1") return "AV1";
+  if (c === "vp9") return "VP9";
+  if (c === "vp8") return "VP8";
+  if (c === "mpeg4") return "MPEG-4";
+  return codec.toUpperCase();
+}
+
+function audioCodecLabel(codec: string | undefined | null): string | null {
+  if (!codec) return null;
+  const c = codec.toLowerCase();
+  if (c === "ac3") return "Dolby";
+  if (c === "eac3") return "Dolby+";
+  if (c === "truehd") return "TrueHD";
+  if (c === "dts" || c.startsWith("dts")) return "DTS";
+  return null;
+}
+
+const FeedTitleTags: React.FC<{
+  file?: { height?: number; video_codec?: string; audio_codec?: string };
+}> = ({ file }) => {
+  if (!file) return null;
+  const res = resolutionLabel(file.height ?? 0);
+  const vCodec = videoCodecLabel(file.video_codec);
+  const aCodec = audioCodecLabel(file.audio_codec);
+  if (!res && !vCodec && !aCodec) return null;
+  return (
+    <span className="feed-title-tags">
+      {res && <span className="feed-title-tag">{res}</span>}
+      {vCodec && <span className="feed-title-tag">{vCodec}</span>}
+      {aCodec && (
+        <span className="feed-title-tag feed-title-tag-dolby">{aCodec}</span>
+      )}
+    </span>
+  );
+};
+
 interface FeedItemProps {
   scene: Scene;
   muted: boolean;
   onToggleMute: () => void;
+  captionsOn: boolean;
+  onToggleCaptions: () => void;
   onSkip: () => void;
   onSpawnHearts: (x: number, y: number, count: number) => void;
   onSpawnDrops: (x: number, y: number, count: number) => void;
@@ -292,6 +350,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
   scene,
   muted,
   onToggleMute,
+  captionsOn,
+  onToggleCaptions,
   onSkip,
   onSpawnHearts,
   onSpawnDrops,
@@ -446,6 +506,26 @@ const FeedItem: React.FC<FeedItemProps> = ({
   useEffect(() => {
     if (videoRef.current) videoRef.current.muted = muted;
   }, [muted]);
+
+  // Captions toggle: imperatively drive track.mode so the user's preference
+  // wins over the browser's default-track heuristics. `disabled` removes the
+  // cue rendering entirely; `showing` paints them in the video element.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !v.textTracks) return;
+    const apply = () => {
+      for (let i = 0; i < v.textTracks.length; i++) {
+        v.textTracks[i].mode = captionsOn && i === 0 ? "showing" : "disabled";
+      }
+    };
+    apply();
+    v.textTracks.addEventListener("addtrack", apply);
+    v.textTracks.addEventListener("removetrack", apply);
+    return () => {
+      v.textTracks.removeEventListener("addtrack", apply);
+      v.textTracks.removeEventListener("removetrack", apply);
+    };
+  }, [captionsOn, scene.captions?.length]);
 
   // Robust load/play + buffering UI: handle slow initial buffering and "stuck"
   // states. The IO handler calls play() the moment a tile crosses the
@@ -787,8 +867,20 @@ const FeedItem: React.FC<FeedItemProps> = ({
             playsInline
             loop
             preload="metadata"
+            crossOrigin="anonymous"
             onClick={handleVideoClick}
-          />
+          >
+            {(scene.captions ?? []).map((c, i) => (
+              <track
+                key={`${c.language_code}-${c.caption_type}-${i}`}
+                kind="captions"
+                srcLang={c.language_code}
+                label={c.language_code}
+                src={`${scene.paths.caption}?lang=${c.language_code}&type=${c.caption_type}`}
+                default={i === 0}
+              />
+            ))}
+          </video>
           <div className="feed-progress" ref={progressRef}>
             <div className="feed-progress-bar" ref={barRef} />
           </div>
@@ -821,7 +913,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
           )}
           <div className="feed-overlay">
             <div className="feed-meta">
-              <div className="feed-title">{title}</div>
+              <div className="feed-title">
+                <span className="feed-title-text">{title}</span>
+                <FeedTitleTags file={scene.files?.[0]} />
+              </div>
               {tags.length > 0 && (
                 <div className="feed-tags">
                   {tags.map((t) => (
@@ -895,6 +990,21 @@ const FeedItem: React.FC<FeedItemProps> = ({
           >
             {muted ? <MuteOffIcon /> : <MuteOnIcon />}
           </button>
+
+          {(scene.captions?.length ?? 0) > 0 && (
+            <button
+              type="button"
+              className="feed-action feed-cc-toggle"
+              title={captionsOn ? "Hide captions" : "Show captions"}
+              aria-pressed={captionsOn}
+              onClick={(e) => {
+                e.preventDefault();
+                onToggleCaptions();
+              }}
+            >
+              {captionsOn ? <CcOnIcon /> : <CcOffIcon />}
+            </button>
+          )}
 
           <button
             type="button"
@@ -972,6 +1082,10 @@ export const Feed: React.FC = () => {
   const [muted, setMuted] = useState<boolean>(
     () => sessionStorage.getItem(MUTED_KEY) !== "0"
   );
+  // Captions ON by default; toggle persists per tab like mute does.
+  const [captionsOn, setCaptionsOn] = useState<boolean>(
+    () => sessionStorage.getItem(CAPTIONS_KEY) !== "0"
+  );
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
   const [drops, setDrops] = useState<DropParticle[]>([]);
   const dropIdRef = useRef(0);
@@ -1033,6 +1147,9 @@ export const Feed: React.FC = () => {
   useEffect(() => {
     sessionStorage.setItem(MUTED_KEY, muted ? "1" : "0");
   }, [muted]);
+  useEffect(() => {
+    sessionStorage.setItem(CAPTIONS_KEY, captionsOn ? "1" : "0");
+  }, [captionsOn]);
 
   // Initial load. Resumes the saved scene if one is present.
   useEffect(() => {
@@ -1249,6 +1366,13 @@ export const Feed: React.FC = () => {
 
   const handleSkip = useCallback(() => scrollBy(1), [scrollBy]);
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
+  const toggleCaptions = useCallback(() => {
+    setCaptionsOn((c) => {
+      const next = !c;
+      try { sessionStorage.setItem(CAPTIONS_KEY, next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   // Drop splash spawner, burst outward in a radial pattern, with a downward
   // bias and rotation for a "wet" feel. Travels far so the whole viewport sees
@@ -1315,6 +1439,8 @@ export const Feed: React.FC = () => {
             scene={s}
             muted={muted}
             onToggleMute={toggleMute}
+            captionsOn={captionsOn}
+            onToggleCaptions={toggleCaptions}
             onSkip={handleSkip}
             onSpawnHearts={spawnHearts}
             onSpawnDrops={spawnDrops}

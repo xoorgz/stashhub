@@ -1,3 +1,9 @@
+### stashhub v1.4.0
+
+* Captions: feed renders sidecar VTT/SRT, CC button next to mute, ON by default per tab.
+* Cue styling: 50% black bg, white text, Netflix Sans stack with sane fallbacks.
+* Resolution + codec mini-tags after title (1080p, HEVC, Dolby etc), dark bg, slight radius.
+
 ### stashhub v1.3.9
 
 * Removed daily wrap card.

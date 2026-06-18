@@ -100,6 +100,19 @@ export const MuteOnIcon: React.FC = () =>
     18
   );
 
+export const CcOnIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" aria-hidden="true">
+    <path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm5 5.5c-1.7 0-2.8 1.3-2.8 3s1.1 3 2.8 3c1 0 1.8-.5 2.2-1.3l-1.3-.6c-.2.4-.5.6-.9.6-.7 0-1.1-.6-1.1-1.7s.4-1.7 1.1-1.7c.4 0 .7.2.9.6l1.3-.6c-.4-.8-1.2-1.3-2.2-1.3Zm7 0c-1.7 0-2.8 1.3-2.8 3s1.1 3 2.8 3c1 0 1.8-.5 2.2-1.3l-1.3-.6c-.2.4-.5.6-.9.6-.7 0-1.1-.6-1.1-1.7s.4-1.7 1.1-1.7c.4 0 .7.2.9.6l1.3-.6c-.4-.8-1.2-1.3-2.2-1.3Z" />
+  </svg>
+);
+
+export const CcOffIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
+    <rect x="2" y="5" width="20" height="14" rx="1" />
+    <line x1="4" y1="20" x2="20" y2="4" />
+  </svg>
+);
+
 /** TikTok-style forward arrow (open scene) */
 export const OpenSceneIcon: React.FC = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
