@@ -1,3 +1,8 @@
+### stashhub v1.4.4
+
+* Pretty feed URLs: /feed/:id reflects the visible scene, updates via replaceState as you scroll.
+* Captions: 15 px, Bold + double white-stroke shadow for a chunkier read.
+
 ### stashhub v1.4.3
 
 * Caption font: Netflix Sans Light/Medium/Bold bundled, cues at 18 px Bold.

@@ -1158,11 +1158,14 @@ export const Feed: React.FC = () => {
     setDebugInfo("");
     (async () => {
       const viewed = getViewed();
-      // URL deep link: /?scene=ID jumps to a specific scene at the top of
-      // the queue. Takes precedence over the persisted CURRENT_KEY.
+      // Deep link in: pretty form /feed/:id wins; legacy /?scene=ID for
+      // backward compat with anything already shared. Both override the
+      // persisted CURRENT_KEY for this initial load.
       let urlScene = "";
       try {
-        urlScene = new URLSearchParams(window.location.search).get("scene") || "";
+        const m = window.location.pathname.match(/^\/feed\/(\d+)/);
+        if (m) urlScene = m[1];
+        else urlScene = new URLSearchParams(window.location.search).get("scene") || "";
       } catch { /* ignore */ }
       const savedId = urlScene || localStorage.getItem(CURRENT_KEY) || "";
 
@@ -1213,6 +1216,16 @@ export const Feed: React.FC = () => {
   const persistCurrent = useCallback((sceneId: string | undefined) => {
     if (!sceneId) return;
     try { localStorage.setItem(CURRENT_KEY, sceneId); } catch { /* ignore */ }
+    // Update the URL to /feed/:id without a navigation so the user can
+    // copy/share the address of the scene they're currently looking at.
+    // Only fire when path differs to avoid spamming history.replaceState
+    // on every IntersectionObserver tick.
+    try {
+      const target = `/feed/${sceneId}`;
+      if (window.location.pathname !== target) {
+        window.history.replaceState(null, "", target + window.location.search);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   const loadMore = useCallback(async () => {

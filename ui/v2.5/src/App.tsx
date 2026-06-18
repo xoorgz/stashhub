@@ -243,6 +243,7 @@ export const App: React.FC = () => {
         <Suspense fallback={<LoadingIndicator />}>
           <Switch>
             <Route exact path="/" component={Feed} />
+            <Route exact path="/feed/:id" component={Feed} />
             <Route exact path="/dashboard" component={FrontPage} />
             <Route path="/scenes" component={Scenes} />
             <Route path="/images" component={Images} />
