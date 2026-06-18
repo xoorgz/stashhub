@@ -1,3 +1,7 @@
+### stashhub v1.4.2
+
+* Caption styling: 22 px, Netflix Sans Medium with `@font-face` slot at /fonts/NetflixSans-Medium.woff2.
+
 ### stashhub v1.4.1
 
 * Feed deep link: /?scene=ID jumps that scene to the front of the queue.
