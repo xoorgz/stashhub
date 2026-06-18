@@ -4,9 +4,15 @@
   --feed-hubs: var(--color-hubs, #df73ff);
 }
 
-/* Netflix Sans Medium for subtitle cues. Drop the woff2 at
-   ui/v2.5/public/fonts/NetflixSans-Medium.woff2; if absent, the stack
-   falls through to TikTokSans-500 (already shipped) then Inter / system. */
+/* Netflix Sans bundled at ui/v2.5/public/fonts/. Three weights so any
+   future copy that needs Light / Medium / Bold can use them. */
+@font-face {
+  font-family: "Netflix Sans";
+  src: url("/fonts/NetflixSans-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
 @font-face {
   font-family: "Netflix Sans";
   src: url("/fonts/NetflixSans-Medium.woff2") format("woff2");
@@ -14,27 +20,34 @@
   font-style: normal;
   font-display: swap;
 }
-$cue-font: "Netflix Sans", "TikTokSans-500", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+@font-face {
+  font-family: "Netflix Sans";
+  src: url("/fonts/NetflixSans-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+$cue-font: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
 
 video::cue {
   background-color: rgba(0, 0, 0, 0.5);
   color: #fff;
   font-family: $cue-font;
-  font-weight: 500;
-  font-size: 22px;
+  font-weight: 700;
+  font-size: 18px;
   line-height: 1.3;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 .vjs-text-track-cue {
   font-family: $cue-font !important;
-  font-size: 22px !important;
+  font-size: 18px !important;
 }
 .vjs-text-track-cue > div {
   background-color: rgba(0, 0, 0, 0.5) !important;
   color: #fff !important;
   font-family: $cue-font !important;
-  font-weight: 500 !important;
-  font-size: 22px !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55) !important;
   padding: 2px 8px !important;
   border-radius: 4px !important;

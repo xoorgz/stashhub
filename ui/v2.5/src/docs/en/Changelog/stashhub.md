@@ -1,3 +1,8 @@
+### stashhub v1.4.3
+
+* Caption font: Netflix Sans Light/Medium/Bold bundled, cues at 18 px Bold.
+* ScenePlayer captions always default-on, prefer user's language else first available.
+
 ### stashhub v1.4.2
 
 * Caption styling: 22 px, Netflix Sans Medium with `@font-face` slot at /fonts/NetflixSans-Medium.woff2.
