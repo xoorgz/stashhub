@@ -626,32 +626,30 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
       }
 
       if (scene.captions && scene.captions.length > 0) {
+        // stashhub: always default-on. Prefer a track matching the user's
+        // configured language; if none match, default the first available
+        // anyway so captions are visible by default in every scene.
         const languageCode = getDefaultLanguageCode();
-        let hasDefault = false;
+        const preferIdx = scene.captions.findIndex(
+          (c) => c.language_code === languageCode
+        );
+        const defaultIdx = preferIdx >= 0 ? preferIdx : 0;
 
-        for (let caption of scene.captions) {
+        scene.captions.forEach((caption, idx) => {
           const lang = caption.language_code;
-          let label = lang;
-          if (languageMap.has(lang)) {
-            label = languageMap.get(lang)!;
-          }
-
+          let label = languageMap.has(lang) ? languageMap.get(lang)! : lang;
           label = label + " (" + caption.caption_type + ")";
-          const setAsDefault = !hasDefault && languageCode == lang;
-          if (setAsDefault) {
-            hasDefault = true;
-          }
           sourceSelector.addTextTrack(
             {
               src: `${scene.paths.caption}?lang=${lang}&type=${caption.caption_type}`,
               kind: "captions",
               srclang: lang,
               label: label,
-              default: setAsDefault,
+              default: idx === defaultIdx,
             },
             false
           );
-        }
+        });
       }
 
       auto.current =
