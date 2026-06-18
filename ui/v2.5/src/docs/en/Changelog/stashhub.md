@@ -1,3 +1,8 @@
+### stashhub v1.4.1
+
+* Feed deep link: /?scene=ID jumps that scene to the front of the queue.
+* ScenePlayer captions: video.js emulated cues now styled to match feed.
+
 ### stashhub v1.4.0
 
 * Captions: feed renders sidecar VTT/SRT, CC button next to mute, ON by default per tab.

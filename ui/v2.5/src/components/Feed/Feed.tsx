@@ -1158,7 +1158,13 @@ export const Feed: React.FC = () => {
     setDebugInfo("");
     (async () => {
       const viewed = getViewed();
-      const savedId = localStorage.getItem(CURRENT_KEY) || "";
+      // URL deep link: /?scene=ID jumps to a specific scene at the top of
+      // the queue. Takes precedence over the persisted CURRENT_KEY.
+      let urlScene = "";
+      try {
+        urlScene = new URLSearchParams(window.location.search).get("scene") || "";
+      } catch { /* ignore */ }
+      const savedId = urlScene || localStorage.getItem(CURRENT_KEY) || "";
 
       // Build the queue with the saved id excluded; it is prepended below.
       const exclude = new Set(viewed);
