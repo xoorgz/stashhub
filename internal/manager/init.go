@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -195,6 +196,12 @@ const (
 	jobWatchdogTick    = 1 * time.Minute
 	jobStallTimeout    = 15 * time.Minute
 	jobStallProgressEps = 1e-6
+	// Generate-side ffmpegs sometimes chew on a single huge file for
+	// hours, so the parent job's progress moves forward just enough
+	// to dodge the stall timer. Treat any ffmpeg writing into
+	// generated/tmp older than this as a runaway and kill it; the
+	// generate task will move on to the next file.
+	ffmpegMaxAge = 25 * time.Minute
 )
 
 type stallSeen struct {
@@ -233,13 +240,93 @@ func runJobStallWatchdog(ctx context.Context, mgr *job.Manager) {
 				delete(seen, j.ID)
 			}
 		}
-		// Forget jobs that have left the queue so the map can't grow.
 		for id := range seen {
 			if !alive[id] {
 				delete(seen, id)
 			}
 		}
+		killRunawayFfmpegs()
 	}
+}
+
+// killRunawayFfmpegs scans /proc for ffmpeg processes writing into the
+// generated/tmp directory and SIGKILLs any that have been running longer
+// than ffmpegMaxAge. Stash retries the file on the next pass, so the
+// only cost is having to redo whatever that single ffmpeg was producing.
+// Pure /proc reads, no shell out.
+func killRunawayFfmpegs() {
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return
+	}
+	bootSec := readBtime()
+	hz := uint64(100)
+	now := time.Now()
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		pid, err := strconv.Atoi(e.Name())
+		if err != nil || pid <= 1 {
+			continue
+		}
+		cmdline, err := os.ReadFile(filepath.Join("/proc", e.Name(), "cmdline"))
+		if err != nil || len(cmdline) == 0 {
+			continue
+		}
+		// /proc/PID/cmdline is NUL-separated. Look for "ffmpeg" as
+		// the binary and "generated/tmp" anywhere in args.
+		args := string(cmdline)
+		if !strings.Contains(args, "ffmpeg") || !strings.Contains(args, "generated/tmp") {
+			continue
+		}
+		statBytes, err := os.ReadFile(filepath.Join("/proc", e.Name(), "stat"))
+		if err != nil {
+			continue
+		}
+		// stat field 22 is starttime in clock ticks since boot. The first
+		// two fields (pid, comm) can contain spaces/parens; parse defensively.
+		stat := string(statBytes)
+		rparen := strings.LastIndex(stat, ")")
+		if rparen < 0 || rparen+2 >= len(stat) {
+			continue
+		}
+		fields := strings.Fields(stat[rparen+1:])
+		// Index 21 within `fields` (because we trimmed off the first 2 stat fields).
+		if len(fields) < 20 {
+			continue
+		}
+		startTicks, err := strconv.ParseUint(fields[19], 10, 64)
+		if err != nil {
+			continue
+		}
+		startSec := bootSec + int64(startTicks/hz)
+		age := now.Sub(time.Unix(startSec, 0))
+		if age < ffmpegMaxAge {
+			continue
+		}
+		logger.Warnf("[job-watchdog] killing runaway ffmpeg pid=%d age=%s",
+			pid, age.Round(time.Second))
+		if proc, err := os.FindProcess(pid); err == nil {
+			_ = proc.Kill()
+		}
+	}
+}
+
+// readBtime returns the system boot epoch from /proc/stat once per call.
+// Cheap enough not to cache.
+func readBtime() int64 {
+	b, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return 0
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(line, "btime ") {
+			n, _ := strconv.ParseInt(strings.TrimSpace(strings.TrimPrefix(line, "btime ")), 10, 64)
+			return n
+		}
+	}
+	return 0
 }
 
 // postInit initialises the paths, caches and database after the initial

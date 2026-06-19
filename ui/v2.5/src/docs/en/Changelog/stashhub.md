@@ -1,3 +1,8 @@
+### stashhub v1.4.11
+
+* In-app watchdog also kills ffmpegs writing to generated/tmp older than 25 min.
+* Stash config: scan_task.scangenerate*:false defaults so manual scans no longer auto-queue Generate.
+
 ### stashhub v1.4.10
 
 * Mobile ScenePlayer: hide secondary controls (skip, airplay, chromecast, PiP, playback rate) under 576 px so the fullscreen button stays on-screen.
