@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -180,7 +181,65 @@ func initJobManager(cfg *config.Config) *job.Manager {
 		}
 	}()
 
+	// stashhub in-app job watchdog: cancels any RUNNING job whose
+	// progress has not advanced for jobStallTimeout. Replaces the
+	// external cron-based watchdog so Stash is self-healing without
+	// any system-level glue. Tick every minute; track progress per job
+	// ID in a small in-memory map.
+	go runJobStallWatchdog(ctx, ret)
+
 	return ret
+}
+
+const (
+	jobWatchdogTick    = 1 * time.Minute
+	jobStallTimeout    = 15 * time.Minute
+	jobStallProgressEps = 1e-6
+)
+
+type stallSeen struct {
+	progress float64
+	at       time.Time
+}
+
+func runJobStallWatchdog(ctx context.Context, mgr *job.Manager) {
+	seen := make(map[int]stallSeen)
+	t := time.NewTicker(jobWatchdogTick)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		queue := mgr.GetQueue()
+		now := time.Now()
+		alive := make(map[int]bool, len(queue))
+		for _, j := range queue {
+			alive[j.ID] = true
+			if j.Status != job.StatusRunning {
+				delete(seen, j.ID)
+				continue
+			}
+			prev, ok := seen[j.ID]
+			if !ok || math.Abs(j.Progress-prev.progress) > jobStallProgressEps {
+				seen[j.ID] = stallSeen{progress: j.Progress, at: now}
+				continue
+			}
+			if now.Sub(prev.at) >= jobStallTimeout {
+				logger.Warnf("[job-watchdog] cancelling stalled job id=%d \"%s\" stuck at progress=%.4f for %s",
+					j.ID, j.Description, j.Progress, now.Sub(prev.at).Round(time.Second))
+				mgr.CancelJob(j.ID)
+				delete(seen, j.ID)
+			}
+		}
+		// Forget jobs that have left the queue so the map can't grow.
+		for id := range seen {
+			if !alive[id] {
+				delete(seen, id)
+			}
+		}
+	}
 }
 
 // postInit initialises the paths, caches and database after the initial

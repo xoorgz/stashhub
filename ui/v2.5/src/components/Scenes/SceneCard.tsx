@@ -19,6 +19,7 @@ import { RatingBanner } from "../Shared/RatingBanner";
 import { FormattedMessage } from "react-intl";
 import {
   faBox,
+  faClosedCaptioning,
   faCopy,
   faFilm,
   faImages,
@@ -271,6 +272,26 @@ const SceneCardPopovers = PatchComponent(
       }
     }
 
+    function maybeRenderCaptions() {
+      const n = props.scene.captions?.length ?? 0;
+      if (!n) return undefined;
+      const langs = (props.scene.captions ?? [])
+        .map((c) => c.language_code.toUpperCase())
+        .join(", ");
+      return (
+        <OverlayTrigger
+          overlay={<Tooltip id="captions-tooltip">Captions: {langs}</Tooltip>}
+          placement="bottom"
+        >
+          <div className="captions">
+            <Button className="minimal">
+              <Icon icon={faClosedCaptioning} />
+            </Button>
+          </div>
+        </OverlayTrigger>
+      );
+    }
+
     function maybeRenderDupeCopies() {
       const phash = file
         ? file.fingerprints.find((fp) => fp.type === "phash")
@@ -300,6 +321,7 @@ const SceneCardPopovers = PatchComponent(
           props.scene?.o_counter ||
           props.scene.galleries.length > 0 ||
           props.scene.organized ||
+          (props.scene.captions?.length ?? 0) > 0 ||
           sceneNumber !== undefined)
       ) {
         return (
@@ -314,6 +336,7 @@ const SceneCardPopovers = PatchComponent(
               {maybeRenderOCounter()}
               {maybeRenderGallery()}
               {maybeRenderOrganized()}
+              {maybeRenderCaptions()}
               {maybeRenderDupeCopies()}
             </ButtonGroup>
           </>

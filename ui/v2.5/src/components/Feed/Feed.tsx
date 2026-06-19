@@ -18,10 +18,9 @@ import {
   SkipIcon,
   MuteOffIcon,
   MuteOnIcon,
-  CcOnIcon,
-  CcOffIcon,
   OpenSceneIcon,
 } from "./icons";
+import { FeedCcButton } from "./FeedCcButton";
 import "./Feed.scss";
 
 const VIEWED_KEY = "feed.viewedIds";
@@ -991,20 +990,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
             {muted ? <MuteOffIcon /> : <MuteOnIcon />}
           </button>
 
-          {(scene.captions?.length ?? 0) > 0 && (
-            <button
-              type="button"
-              className="feed-action feed-cc-toggle"
-              title={captionsOn ? "Hide captions" : "Show captions"}
-              aria-pressed={captionsOn}
-              onClick={(e) => {
-                e.preventDefault();
-                onToggleCaptions();
-              }}
-            >
-              {captionsOn ? <CcOnIcon /> : <CcOffIcon />}
-            </button>
-          )}
+          <FeedCcButton
+            sceneId={scene.id}
+            hasCaptions={(scene.captions?.length ?? 0) > 0}
+            captionsOn={captionsOn}
+            onToggle={onToggleCaptions}
+          />
 
           <button
             type="button"
@@ -1141,6 +1132,33 @@ export const Feed: React.FC = () => {
         onActiveChange as EventListener
       );
     };
+  }, []);
+
+  // FeedCcButton dispatches "stashhub:scene-captions-appeared" when its
+  // background poll detects new captions on a scene. Refetch that scene
+  // here so the <video><track> nodes appear without the user having to
+  // scroll away and back.
+  useEffect(() => {
+    function onCaptionsAppeared(e: Event) {
+      const id = (e as CustomEvent<{ sceneId: string }>).detail?.sceneId;
+      if (!id) return;
+      fetchSceneDetails([id]).then((details) => {
+        if (!details.length) return;
+        const fresh = details[0];
+        setScenes((prev) =>
+          prev.map((s) => (s.id === fresh.id ? fresh : s))
+        );
+      });
+    }
+    window.addEventListener(
+      "stashhub:scene-captions-appeared",
+      onCaptionsAppeared as EventListener
+    );
+    return () =>
+      window.removeEventListener(
+        "stashhub:scene-captions-appeared",
+        onCaptionsAppeared as EventListener
+      );
   }, []);
 
   // Persist mute per tab

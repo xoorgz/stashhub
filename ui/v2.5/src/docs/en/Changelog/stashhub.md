@@ -1,3 +1,10 @@
+### stashhub v1.4.7
+
+* In-app job watchdog: cancels any RUNNING job whose progress hasn't advanced in 15 min. External cron retired.
+* Scene cards show a CC badge when scene.captions exist.
+* Scene detail page: Generate captions button next to Organized.
+* Feed CC button now cycles: no-CC → generating (spinner ring) → captions on/off toggle. Generation runs server-side.
+
 ### stashhub v1.4.6
 
 * Arrow up/down and j/k feed nav use a 220 ms ease-out-cubic slide, snappier than browser smooth.

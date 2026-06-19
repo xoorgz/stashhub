@@ -113,6 +113,16 @@ export const CcOffIcon: React.FC = () => (
   </svg>
 );
 
+// "Generate captions" prompt: a faded CC rect with a small + above it.
+export const CcGenerateIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
+    <rect x="2" y="8" width="20" height="13" rx="1" />
+    <path d="M9 13.5c-.5-.7-1.3-.7-1.6 0M16.5 13.5c-.5-.7-1.3-.7-1.6 0" />
+    <line x1="18" y1="2.5" x2="18" y2="6.5" />
+    <line x1="16" y1="4.5" x2="20" y2="4.5" />
+  </svg>
+);
+
 /** TikTok-style forward arrow (open scene) */
 export const OpenSceneIcon: React.FC = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="20" height="20">

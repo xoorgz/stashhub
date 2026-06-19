@@ -33,6 +33,7 @@ import SceneQueue, { QueuedScene } from "src/models/sceneQueue";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import Mousetrap from "mousetrap";
 import { OrganizedButton } from "./OrganizedButton";
+import { GenerateCaptionsButton } from "./GenerateCaptionsButton";
 import { ConfigurationContext } from "src/hooks/Config";
 import { getPlayerPosition } from "src/components/ScenePlayer/util";
 import {
@@ -674,6 +675,12 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
                   loading={organizedLoading}
                   organized={scene.organized}
                   onClick={onOrganizedClick}
+                />
+              </span>
+              <span>
+                <GenerateCaptionsButton
+                  sceneId={scene.id}
+                  hasCaptions={(scene.captions?.length ?? 0) > 0}
                 />
               </span>
               <span>{renderOperations()}</span>

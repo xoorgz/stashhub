@@ -382,6 +382,25 @@ video::cue {
   align-self: flex-end;     /* stay at the bottom of the (vertically centered) stage */
   z-index: 3;
 }
+/* CC button: 4 states. Generating shows a rotating dashed ring. */
+.feed-cc-toggle.no-captions { opacity: 0.75; }
+.feed-cc-toggle.captions-off { opacity: 0.7; }
+.feed-cc-toggle.captions-on { color: var(--feed-hubs); }
+.feed-cc-toggle.is-generating { cursor: progress; }
+.feed-cc-progress {
+  position: absolute;
+  inset: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  color: var(--feed-hubs);
+  animation: feed-cc-spin 1.2s linear infinite;
+  pointer-events: none;
+}
+@keyframes feed-cc-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .feed-action {
   position: relative;
   width: 40px;
