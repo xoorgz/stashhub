@@ -1,3 +1,7 @@
+### stashhub v1.4.6
+
+* Arrow up/down and j/k feed nav use a 220 ms ease-out-cubic slide, snappier than browser smooth.
+
 ### stashhub v1.4.4
 
 * Pretty feed URLs: /feed/:id reflects the visible scene, updates via replaceState as you scroll.

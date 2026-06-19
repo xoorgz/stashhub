@@ -1332,6 +1332,34 @@ export const Feed: React.FC = () => {
   }, [scenes, muted, loadMore, persistCurrent]);
 
   // Keyboard nav
+  // Custom snap-slide animation for arrow / j-k navigation. Browser
+  // behavior:"smooth" runs ~300 ms; this is ~220 ms ease-out-cubic so
+  // the page lands on the next tile faster and feels like a TikTok swipe.
+  // Cancels any in-flight slide so quick double-presses chain instead of
+  // queueing up.
+  const slideRafRef = useRef<number | null>(null);
+  const fastSlide = useCallback((track: HTMLElement, target: number) => {
+    if (slideRafRef.current != null) {
+      cancelAnimationFrame(slideRafRef.current);
+      slideRafRef.current = null;
+    }
+    const startTop = track.scrollTop;
+    const dist = target - startTop;
+    if (dist === 0) return;
+    const duration = 220;
+    let startTs: number | null = null;
+    const step = (ts: number) => {
+      if (startTs === null) startTs = ts;
+      const elapsed = ts - startTs;
+      const p = Math.min(1, elapsed / duration);
+      const ease = 1 - Math.pow(1 - p, 3);
+      track.scrollTop = startTop + dist * ease;
+      if (p < 1) slideRafRef.current = requestAnimationFrame(step);
+      else slideRafRef.current = null;
+    };
+    slideRafRef.current = requestAnimationFrame(step);
+  }, []);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement | null)?.tagName ?? "";
@@ -1341,10 +1369,10 @@ export const Feed: React.FC = () => {
       if (!t) return;
       if (e.key === "ArrowDown" || e.key === "j") {
         e.preventDefault();
-        t.scrollBy({ top: t.clientHeight, behavior: "smooth" });
+        fastSlide(t, t.scrollTop + t.clientHeight);
       } else if (e.key === "ArrowUp" || e.key === "k") {
         e.preventDefault();
-        t.scrollBy({ top: -t.clientHeight, behavior: "smooth" });
+        fastSlide(t, t.scrollTop - t.clientHeight);
       } else if (e.key === "ArrowRight" || e.key === "l" || e.key === "L") {
         // Seek the currently-visible video forward 10s and fire the same
         // pulse chip the edge-tap shows, so keyboard nav gets the same
@@ -1380,8 +1408,8 @@ export const Feed: React.FC = () => {
   const scrollBy = useCallback((dir: 1 | -1) => {
     const t = trackRef.current;
     if (!t) return;
-    t.scrollBy({ top: dir * t.clientHeight, behavior: "smooth" });
-  }, []);
+    fastSlide(t, t.scrollTop + dir * t.clientHeight);
+  }, [fastSlide]);
 
   const handleSkip = useCallback(() => scrollBy(1), [scrollBy]);
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
