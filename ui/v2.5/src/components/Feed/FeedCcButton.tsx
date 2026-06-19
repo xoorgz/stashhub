@@ -153,12 +153,12 @@ export const FeedCcButton: React.FC<Props> = ({
           fetchPolicy: "no-cache",
         });
         if ((r.data.findScene?.captions?.length ?? 0) > 0) {
-          window.dispatchEvent(
-            new CustomEvent("stashhub:scene-captions-appeared", {
-              detail: { sceneId },
-            })
-          );
-          Toast.success("Captions already exist; refreshing.");
+          // The Feed's scenes state somewhere caches the pre-captions
+          // version of this scene and the in-place refetch path hasn't
+          // been reliable. URL is /feed/:id so a hard reload lands the
+          // user back exactly where they were with fresh data.
+          Toast.success("Captions exist, reloading.");
+          window.setTimeout(() => window.location.reload(), 400);
           return;
         }
       } catch {

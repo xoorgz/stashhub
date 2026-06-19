@@ -1,3 +1,7 @@
+### stashhub v1.4.16
+
+* Feed CC button: when defensive check finds existing captions, hard-reload the page so the new scene record loads cleanly.
+
 ### stashhub v1.4.15
 
 * Captions-appeared listener bypasses Apollo cache so the refetched scene actually carries the new captions.
