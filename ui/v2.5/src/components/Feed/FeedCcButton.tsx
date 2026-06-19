@@ -114,42 +114,6 @@ export const FeedCcButton: React.FC<Props> = ({
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // When this scene becomes the active visible item in the feed,
-  // double-check its captions against the server in case they were
-  // generated elsewhere (scene detail page, cron, plugin task from
-  // another tab). One request per become-active, no polling.
-  useEffect(() => {
-    function onActive(e: Event) {
-      const detail = (e as CustomEvent<{ sceneId: string }>).detail;
-      if (!detail || detail.sceneId !== sceneId) return;
-      if (hasCaptions || generating) return;
-      getClient()
-        .query<GQL.FindSceneQuery>({
-          query: GQL.FindSceneDocument,
-          variables: { id: sceneId },
-          fetchPolicy: "no-cache",
-        })
-        .then((r) => {
-          if ((r.data.findScene?.captions?.length ?? 0) > 0) {
-            window.dispatchEvent(
-              new CustomEvent("stashhub:scene-captions-appeared", {
-                detail: { sceneId },
-              })
-            );
-          }
-        })
-        .catch(() => { /* ignore */ });
-    }
-    window.addEventListener(
-      "stashhub:feed-active-scene",
-      onActive as EventListener
-    );
-    return () =>
-      window.removeEventListener(
-        "stashhub:feed-active-scene",
-        onActive as EventListener
-      );
-  }, [sceneId, hasCaptions, generating]);
 
   const triggerGenerate = useCallback(async () => {
     try {

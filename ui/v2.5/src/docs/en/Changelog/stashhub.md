@@ -1,3 +1,7 @@
+### stashhub v1.4.13
+
+* Revert v1.4.12 feed-active-scene event; per-IO-tick setScenes was breaking pause. Click CC+ to refresh stale captions.
+
 ### stashhub v1.4.12
 
 * Feed CC button re-checks captions against the server when the scene becomes active or on click, so generations triggered elsewhere stop showing the stale "+" icon.

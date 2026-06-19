@@ -1234,17 +1234,6 @@ export const Feed: React.FC = () => {
   const persistCurrent = useCallback((sceneId: string | undefined) => {
     if (!sceneId) return;
     try { localStorage.setItem(CURRENT_KEY, sceneId); } catch { /* ignore */ }
-    // Notify any per-scene UI (like the CC button) that this scene is
-    // now active. It can then do a defensive captions re-check so a
-    // generation triggered elsewhere (scene detail page, cron) lights
-    // the button up without the user having to click.
-    try {
-      window.dispatchEvent(
-        new CustomEvent("stashhub:feed-active-scene", {
-          detail: { sceneId },
-        })
-      );
-    } catch { /* ignore */ }
     // Update the URL to /feed/:id without a navigation so the user can
     // copy/share the address of the scene they're currently looking at.
     // Only fire when path differs to avoid spamming history.replaceState
