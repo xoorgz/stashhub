@@ -383,8 +383,8 @@ video::cue {
   z-index: 3;
 }
 /* CC button: 4 states. Generating shows a rotating dashed ring. */
-.feed-cc-toggle.no-captions { opacity: 0.75; }
-.feed-cc-toggle.captions-off { opacity: 0.7; }
+.feed-cc-toggle.no-captions { opacity: 0.95; }
+.feed-cc-toggle.captions-off { opacity: 0.55; }
 .feed-cc-toggle.captions-on { color: var(--feed-hubs); }
 .feed-cc-toggle.is-generating { cursor: progress; }
 .feed-cc-progress {

@@ -113,13 +113,15 @@ export const CcOffIcon: React.FC = () => (
   </svg>
 );
 
-// "Generate captions" prompt: a faded CC rect with a small + above it.
+// "Generate captions" prompt: the same filled CC pill as CcOnIcon
+// (so it reads as a closed-caption mark at a glance), with a clear
+// "+" badge in the top-right corner to signal that activation will
+// create something rather than just toggle visibility.
 export const CcGenerateIcon: React.FC = () => (
-  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
-    <rect x="2" y="8" width="20" height="13" rx="1" />
-    <path d="M9 13.5c-.5-.7-1.3-.7-1.6 0M16.5 13.5c-.5-.7-1.3-.7-1.6 0" />
-    <line x1="18" y1="2.5" x2="18" y2="6.5" />
-    <line x1="16" y1="4.5" x2="20" y2="4.5" />
+  <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true" fill="currentColor">
+    <path d="M3 7h13a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Zm4 4.5c-1.45 0-2.45 1.1-2.45 2.5s1 2.5 2.45 2.5c.85 0 1.55-.4 1.9-1.1l-1.1-.5c-.15.3-.4.5-.8.5-.6 0-.95-.5-.95-1.4s.35-1.4.95-1.4c.4 0 .65.2.8.5l1.1-.5c-.35-.7-1.05-1.1-1.9-1.1Zm6 0c-1.45 0-2.45 1.1-2.45 2.5s1 2.5 2.45 2.5c.85 0 1.55-.4 1.9-1.1l-1.1-.5c-.15.3-.4.5-.8.5-.6 0-.95-.5-.95-1.4s.35-1.4.95-1.4c.4 0 .65.2.8.5l1.1-.5c-.35-.7-1.05-1.1-1.9-1.1Z" />
+    <circle cx="20" cy="5" r="4" />
+    <path d="M20 3v4M18 5h4" stroke="#000" strokeWidth="1.5" strokeLinecap="round" />
   </svg>
 );
 

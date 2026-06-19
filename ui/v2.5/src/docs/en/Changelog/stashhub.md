@@ -1,3 +1,7 @@
+### stashhub v1.4.8
+
+* Feed CC "generate" icon redrawn as the filled CC pill + a clear "+" badge.
+
 ### stashhub v1.4.7
 
 * In-app job watchdog: cancels any RUNNING job whose progress hasn't advanced in 15 min. External cron retired.
