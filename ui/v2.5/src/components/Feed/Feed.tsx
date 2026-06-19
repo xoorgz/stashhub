@@ -866,7 +866,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
             playsInline
             loop
             preload="metadata"
-            crossOrigin="anonymous"
             onClick={handleVideoClick}
           >
             {(scene.captions ?? []).map((c, i) => (

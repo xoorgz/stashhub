@@ -1,3 +1,7 @@
+### stashhub v1.4.14
+
+* Feed video drops `crossOrigin="anonymous"`; `<track>` requests can now send session cookies, captions actually load.
+
 ### stashhub v1.4.13
 
 * Revert v1.4.12 feed-active-scene event; per-IO-tick setScenes was breaking pause. Click CC+ to refresh stale captions.
