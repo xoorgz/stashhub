@@ -337,6 +337,17 @@ $sceneTabWidth: 450px;
   // make controls a little more compact on smaller screens
   @media (max-width: 576px) {
     .vjs-control-bar {
+      // Keep the bar within the player width so the right-most button
+      // (fullscreen) never gets clipped. Hide the secondary controls
+      // that aren't usable on small touch screens anyway.
+      overflow: hidden;
+      .vjs-skip-button,
+      .vjs-airplay-button,
+      .vjs-chromecast-button,
+      .vjs-picture-in-picture-control,
+      .vjs-playback-rate {
+        display: none !important;
+      }
       .vjs-control {
         width: 2.5em;
       }

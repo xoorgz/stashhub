@@ -1,3 +1,7 @@
+### stashhub v1.4.10
+
+* Mobile ScenePlayer: hide secondary controls (skip, airplay, chromecast, PiP, playback rate) under 576 px so the fullscreen button stays on-screen.
+
 ### stashhub v1.4.9
 
 * Mobile feed: pin overflow-x:hidden on the track so stray-pixel children can't drag a horizontal scrollbar in.
