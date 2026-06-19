@@ -72,6 +72,7 @@ video::cue {
 .feed-track {
   position: absolute;
   inset: 0;
+  overflow-x: hidden;
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;

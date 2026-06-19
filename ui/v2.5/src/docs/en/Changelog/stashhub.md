@@ -1,3 +1,7 @@
+### stashhub v1.4.9
+
+* Mobile feed: pin overflow-x:hidden on the track so stray-pixel children can't drag a horizontal scrollbar in.
+
 ### stashhub v1.4.8
 
 * Feed CC "generate" icon redrawn as the filled CC pill + a clear "+" badge.
