@@ -1,3 +1,7 @@
+### stashhub v1.4.15
+
+* Captions-appeared listener bypasses Apollo cache so the refetched scene actually carries the new captions.
+
 ### stashhub v1.4.14
 
 * Feed video drops `crossOrigin="anonymous"`; `<track>` requests can now send session cookies, captions actually load.

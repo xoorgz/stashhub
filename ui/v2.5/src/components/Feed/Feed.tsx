@@ -1134,20 +1134,30 @@ export const Feed: React.FC = () => {
   }, []);
 
   // FeedCcButton dispatches "stashhub:scene-captions-appeared" when its
-  // background poll detects new captions on a scene. Refetch that scene
-  // here so the <video><track> nodes appear without the user having to
-  // scroll away and back.
+  // background poll (or click defensive check) detects new captions on a
+  // scene. Refetch that scene bypassing Apollo's cache so the <track>
+  // nodes actually appear; cache-first would just hand back the stale
+  // captions=null record the feed loaded with.
   useEffect(() => {
-    function onCaptionsAppeared(e: Event) {
+    async function onCaptionsAppeared(e: Event) {
       const id = (e as CustomEvent<{ sceneId: string }>).detail?.sceneId;
       if (!id) return;
-      fetchSceneDetails([id]).then((details) => {
-        if (!details.length) return;
-        const fresh = details[0];
-        setScenes((prev) =>
-          prev.map((s) => (s.id === fresh.id ? fresh : s))
-        );
-      });
+      try {
+        const r = await client.query<GQL.FindScenesQuery>({
+          query: GQL.FindScenesDocument,
+          variables: {
+            filter: { per_page: 1, page: 1 },
+            scene_filter: {},
+            scene_ids: [parseInt(id, 10)],
+          },
+          fetchPolicy: "no-cache",
+        });
+        const fresh = r.data.findScenes.scenes[0];
+        if (!fresh) return;
+        setScenes((prev) => prev.map((s) => (s.id === fresh.id ? fresh : s)));
+      } catch {
+        /* swallow */
+      }
     }
     window.addEventListener(
       "stashhub:scene-captions-appeared",
