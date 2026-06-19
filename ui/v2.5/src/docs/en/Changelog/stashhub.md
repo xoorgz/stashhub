@@ -1,3 +1,7 @@
+### stashhub v1.4.12
+
+* Feed CC button re-checks captions against the server when the scene becomes active or on click, so generations triggered elsewhere stop showing the stale "+" icon.
+
 ### stashhub v1.4.11
 
 * In-app watchdog also kills ffmpegs writing to generated/tmp older than 25 min.
