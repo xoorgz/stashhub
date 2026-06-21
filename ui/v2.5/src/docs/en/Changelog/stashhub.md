@@ -1,3 +1,8 @@
+### stashhub v1.4.18
+
+* Captions: drop the smudgy text-shadow, drop border-radius, more padding. Single Bold weight reads cleaner.
+* Feed: remove cue-reader's track-mode override so captionsOn always wins; captions show in feed reliably.
+
 ### stashhub v1.4.17
 
 * Feed: scrub-to-start fixed. Stuck-load recovery now skips while `seeking`, so user seeks don't snap to 0.

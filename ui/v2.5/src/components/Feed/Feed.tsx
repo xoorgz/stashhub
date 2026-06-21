@@ -540,10 +540,13 @@ const FeedItem: React.FC<FeedItemProps> = ({
       const v2 = videoRef.current;
       if (!v2 || !v2.textTracks?.length) return;
       const track = v2.textTracks[0];
-      // Tracks default to "disabled" which doesn't populate cues; flip
-      // to "hidden" just so the cues parse, then back to whatever the
-      // captionsOn effect wants.
-      if (track.mode === "disabled") track.mode = "hidden";
+      // We don't touch track.mode here. The captionsOn effect above is
+      // the single owner of mode; this used to flip "disabled" → "hidden"
+      // for cue parsing, but that fought with the captionsOn=true path
+      // and sometimes left captions invisible on the feed. When
+      // captionsOn is on, mode is already "showing" (which parses cues
+      // and displays them). When captionsOn is off, mode is "disabled"
+      // and we just won't get cue data, no markers drawn. Fair trade.
       const cues = track.cues;
       if (!cues || !cues.length) return;
       const starts: number[] = [];

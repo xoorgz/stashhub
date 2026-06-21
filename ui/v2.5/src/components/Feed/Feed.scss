@@ -29,19 +29,16 @@
 }
 $cue-font: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
 
+/* No text-shadow, no glow, no border-radius. The double white-shadow
+   that used to widen glyphs read as a smudgy bold; a single weight (Bold
+   from the bundled woff2) renders sharp on its own. */
 video::cue {
   background-color: rgba(0, 0, 0, 0.5);
   color: #fff;
   font-family: $cue-font;
   font-weight: 700;
   font-size: 15px;
-  line-height: 1.3;
-  /* Double white shadow widens the glyph silhouette, dark shadow beneath
-     keeps contrast on light scenes. Reads chunkier than just font-weight. */
-  text-shadow:
-    0 0 1px #fff,
-    0 0 1px #fff,
-    0 1px 3px rgba(0, 0, 0, 0.7);
+  line-height: 1.4;
 }
 .vjs-text-track-cue {
   font-family: $cue-font !important;
@@ -53,12 +50,9 @@ video::cue {
   font-family: $cue-font !important;
   font-weight: 700 !important;
   font-size: 15px !important;
-  text-shadow:
-    0 0 1px #fff,
-    0 0 1px #fff,
-    0 1px 3px rgba(0, 0, 0, 0.7) !important;
-  padding: 2px 8px !important;
-  border-radius: 4px !important;
+  text-shadow: none !important;
+  padding: 4px 12px !important;
+  border-radius: 0 !important;
 }
 
 .feed-root {
