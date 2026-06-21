@@ -1,3 +1,7 @@
+### stashhub v1.4.21
+
+* Captions: ::cue is the only renderer, video.js wrapper background nulled. Fixes ScenePlayer "black rectangle, no text".
+
 ### stashhub v1.4.20
 
 * ScenePlayer caption double background fixed; native ::cue made transparent so only video.js renders.

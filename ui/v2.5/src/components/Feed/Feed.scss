@@ -29,8 +29,11 @@
 }
 $cue-font: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-/* Feed uses native track rendering (::cue on the video element). */
-.feed-video::cue {
+/* Native ::cue is the actual text renderer in both feed and
+   ScenePlayer. video.js wraps cues in `.vjs-text-track-cue` for
+   positioning; killing its background prevents the second background
+   layer the user saw in ScenePlayer. */
+video::cue {
   background-color: rgba(0, 0, 0, 0.5);
   color: #fff;
   font-family: $cue-font;
@@ -38,26 +41,8 @@ $cue-font: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-ser
   font-size: 15px;
   line-height: 1.4;
 }
-
-/* ScenePlayer (video.js) renders cues itself; killing the native ::cue
-   background on its <video> avoids the double-background the user saw,
-   then styling the video.js DOM gives us the controlled look. */
-.video-js video::cue {
-  background-color: transparent;
-  color: transparent;
-}
 .vjs-text-track-cue {
-  font-family: $cue-font !important;
-  font-size: 15px !important;
-}
-.vjs-text-track-cue > div {
-  background-color: rgba(0, 0, 0, 0.5) !important;
-  color: #fff !important;
-  font-family: $cue-font !important;
-  font-weight: 700 !important;
-  font-size: 15px !important;
-  text-shadow: none !important;
-  padding: 6px 14px !important;
+  background-color: transparent !important;
   border-radius: 0 !important;
 }
 
