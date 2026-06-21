@@ -29,10 +29,11 @@
 }
 $cue-font: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-/* Native ::cue is the actual text renderer in both feed and
-   ScenePlayer. video.js wraps cues in `.vjs-text-track-cue` for
-   positioning; killing its background prevents the second background
-   layer the user saw in ScenePlayer. */
+/* Native ::cue is the text renderer in feed and ScenePlayer. video.js's
+   vtt.js polyfill stamps an inline backgroundColor #000 on the inner
+   cue div by default; only !important on `.vjs-text-track-cue > div`
+   beats inline style, otherwise the user sees ::cue's bg PLUS vtt.js's
+   inline #000 = double background. */
 video::cue {
   background-color: rgba(0, 0, 0, 0.5);
   color: #fff;
@@ -41,7 +42,8 @@ video::cue {
   font-size: 15px;
   line-height: 1.4;
 }
-.vjs-text-track-cue {
+.vjs-text-track-cue,
+.vjs-text-track-cue > div {
   background-color: transparent !important;
   border-radius: 0 !important;
 }

@@ -1,3 +1,7 @@
+### stashhub v1.4.22
+
+* Captions: kill the vtt.js inline #000 on the cue inner div. ::cue is now the single background source.
+
 ### stashhub v1.4.21
 
 * Captions: ::cue is the only renderer, video.js wrapper background nulled. Fixes ScenePlayer "black rectangle, no text".
