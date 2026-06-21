@@ -1,3 +1,8 @@
+### stashhub v1.4.17
+
+* Feed: scrub-to-start fixed. Stuck-load recovery now skips while `seeking`, so user seeks don't snap to 0.
+* Feed: speech markers. Hub-purple ticks on the progress bar at each VTT cue start.
+
 ### stashhub v1.4.16
 
 * Feed CC button: when defensive check finds existing captions, hard-reload the page so the new scene record loads cleanly.

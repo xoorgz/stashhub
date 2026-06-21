@@ -526,6 +526,53 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [captionsOn, scene.captions?.length]);
 
+  // Read cue start-times from the first caption track and render them
+  // as small ticks on the progress bar (one per spoken utterance).
+  // VTT loads asynchronously; the tracks list fires addtrack and the
+  // individual TextTrack fires load + cuechange when cues parse. Read
+  // on each of those so we catch the cues regardless of timing.
+  const [cueStarts, setCueStarts] = useState<number[]>([]);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !v.textTracks) return;
+    let detach: Array<() => void> = [];
+    function read() {
+      const v2 = videoRef.current;
+      if (!v2 || !v2.textTracks?.length) return;
+      const track = v2.textTracks[0];
+      // Tracks default to "disabled" which doesn't populate cues; flip
+      // to "hidden" just so the cues parse, then back to whatever the
+      // captionsOn effect wants.
+      if (track.mode === "disabled") track.mode = "hidden";
+      const cues = track.cues;
+      if (!cues || !cues.length) return;
+      const starts: number[] = [];
+      for (let i = 0; i < cues.length; i++) starts.push(cues[i].startTime);
+      setCueStarts(starts);
+    }
+    function onTrackAdded(ev: Event) {
+      const track = (ev as TrackEvent).track as TextTrack | undefined;
+      if (!track) return;
+      track.addEventListener("cuechange", read);
+      track.addEventListener("load", read);
+      detach.push(() => track.removeEventListener("cuechange", read));
+      detach.push(() => track.removeEventListener("load", read));
+      read();
+    }
+    // Wire existing tracks (if any are present at mount).
+    for (let i = 0; i < v.textTracks.length; i++) {
+      const t = v.textTracks[i];
+      t.addEventListener("cuechange", read);
+      t.addEventListener("load", read);
+      detach.push(() => t.removeEventListener("cuechange", read));
+      detach.push(() => t.removeEventListener("load", read));
+    }
+    read();
+    v.textTracks.addEventListener("addtrack", onTrackAdded);
+    detach.push(() => v.textTracks.removeEventListener("addtrack", onTrackAdded));
+    return () => detach.forEach((d) => d());
+  }, [scene.id, scene.captions?.length]);
+
   // Robust load/play + buffering UI: handle slow initial buffering and "stuck"
   // states. The IO handler calls play() the moment a tile crosses the
   // visibility threshold, but if src was only just assigned the play() promise
@@ -537,6 +584,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
     let stuckTimer: number | null = null;
     let loaderTimer: number | null = null;
     let waitingSince = 0;
+    // Track user-initiated seeks. The browser fires `waiting` while it
+    // buffers the new position, which used to trip the stuck-load
+    // recovery, which then v.load()'d the element and reset currentTime
+    // to 0. Result: scrubbing snapped back to the start. While `seeking`
+    // is true, we treat the wait as expected and skip the recovery.
+    let seeking = false;
+    const onSeeking = () => { seeking = true; };
+    const onSeeked = () => { seeking = false; };
     const showLoader = () => {
       if (loaderTimer != null) return;
       // Defer 250ms so a quick load doesn't flash a loader frame. At the
@@ -584,6 +639,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
       if (stuckTimer != null) window.clearTimeout(stuckTimer);
       if (loadAttempts >= MAX_LOAD_ATTEMPTS) return;
       stuckTimer = window.setTimeout(() => {
+        // Skip the recovery while the user is seeking; v.load() would
+        // reset currentTime to 0 and snap the scrubber to start.
+        if (seeking || v.seeking) return;
         if (v.readyState < 3 && performance.now() - waitingSince >= 2900) {
           if (loadAttempts >= MAX_LOAD_ATTEMPTS) return;
           loadAttempts++;
@@ -622,6 +680,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     v.addEventListener("error", onError);
     v.addEventListener("loadstart", onLoadStart);
     v.addEventListener("play", onPlay);
+    v.addEventListener("seeking", onSeeking);
+    v.addEventListener("seeked", onSeeked);
     return () => {
       v.removeEventListener("canplay", onCanPlay);
       v.removeEventListener("loadeddata", onCanPlay);
@@ -631,6 +691,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
       v.removeEventListener("error", onError);
       v.removeEventListener("loadstart", onLoadStart);
       v.removeEventListener("play", onPlay);
+      v.removeEventListener("seeking", onSeeking);
+      v.removeEventListener("seeked", onSeeked);
       if (stuckTimer != null) window.clearTimeout(stuckTimer);
       if (loaderTimer != null) window.clearTimeout(loaderTimer);
     };
@@ -881,6 +943,19 @@ const FeedItem: React.FC<FeedItemProps> = ({
           </video>
           <div className="feed-progress" ref={progressRef}>
             <div className="feed-progress-bar" ref={barRef} />
+            {cueStarts.length > 0 && scene.files?.[0]?.duration ? (
+              <div className="feed-progress-markers" aria-hidden="true">
+                {cueStarts.map((t, i) => (
+                  <span
+                    key={i}
+                    className="feed-progress-marker"
+                    style={{
+                      left: `${(t / (scene.files![0].duration || 1)) * 100}%`,
+                    }}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
           {pulse && (
             <div className={`feed-pulse feed-pulse-${pulse}`} aria-hidden="true">

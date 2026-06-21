@@ -372,6 +372,25 @@ video::cue {
   z-index: 7;
 }
 
+/* Speech markers: one tick per VTT cue startTime, ride the 4 px progress
+   strip. Hub-purple at 60 % alpha so they show against both unplayed
+   (white-on-dark) and played (hub-purple gradient) sections of the bar. */
+.feed-progress-markers {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4px;
+  pointer-events: none;
+  z-index: 8;
+}
+.feed-progress-marker {
+  position: absolute;
+  bottom: 0;
+  width: 2px;
+  height: 4px;
+  background: rgba(223, 115, 255, 0.7);
+  transform: translateX(-1px);
+}
+
 /* Action stack */
 .feed-actions {
   display: flex;
