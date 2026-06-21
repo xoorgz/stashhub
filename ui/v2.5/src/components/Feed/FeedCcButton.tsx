@@ -169,6 +169,13 @@ export const FeedCcButton: React.FC<Props> = ({
     [generating, hasCaptions, onToggle, triggerGenerate, sceneId, Toast]
   );
 
+  // Diagnostic for the "CC+ on scenes that have captions" issue; logs
+  // once per render per scene so we can confirm whether hasCaptions is
+  // arriving correctly.
+  if (typeof window !== "undefined") {
+    // eslint-disable-next-line no-console
+    console.debug("[FeedCcButton]", { sceneId, hasCaptions, captionsOn, generating });
+  }
   let icon: React.ReactNode;
   let title: string;
   let cls = "feed-action feed-cc-toggle";

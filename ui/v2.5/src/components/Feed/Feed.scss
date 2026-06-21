@@ -29,16 +29,22 @@
 }
 $cue-font: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-/* No text-shadow, no glow, no border-radius. The double white-shadow
-   that used to widen glyphs read as a smudgy bold; a single weight (Bold
-   from the bundled woff2) renders sharp on its own. */
-video::cue {
+/* Feed uses native track rendering (::cue on the video element). */
+.feed-video::cue {
   background-color: rgba(0, 0, 0, 0.5);
   color: #fff;
   font-family: $cue-font;
   font-weight: 700;
   font-size: 15px;
   line-height: 1.4;
+}
+
+/* ScenePlayer (video.js) renders cues itself; killing the native ::cue
+   background on its <video> avoids the double-background the user saw,
+   then styling the video.js DOM gives us the controlled look. */
+.video-js video::cue {
+  background-color: transparent;
+  color: transparent;
 }
 .vjs-text-track-cue {
   font-family: $cue-font !important;
@@ -51,7 +57,7 @@ video::cue {
   font-weight: 700 !important;
   font-size: 15px !important;
   text-shadow: none !important;
-  padding: 4px 12px !important;
+  padding: 6px 14px !important;
   border-radius: 0 !important;
 }
 

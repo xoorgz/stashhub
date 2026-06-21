@@ -1,3 +1,9 @@
+### stashhub v1.4.20
+
+* ScenePlayer caption double background fixed; native ::cue made transparent so only video.js renders.
+* Caption padding bumped to 6/14 px. Feed-only ::cue scope so it can't leak into ScenePlayer.
+* Diagnostic console.debug in FeedCcButton to surface caption state per render.
+
 ### stashhub v1.4.19
 
 * Feed fetchSceneDetails switched to no-cache so caption metadata is always fresh.
