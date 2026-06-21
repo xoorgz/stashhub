@@ -569,6 +569,10 @@ export async function fetchSceneDetails(
     client
       .query<GQL.FindScenesQuery, GQL.FindScenesQueryVariables>({
         query: GQL.FindScenesDocument,
+        // Bypass Apollo cache so captions / metadata changes since the
+        // last feed render show up; cache-first was leaving stale
+        // captions=null records on the page.
+        fetchPolicy: "no-cache",
         variables: {
           filter: { per_page: numericIds.length, page: 1 },
           scene_filter: {},

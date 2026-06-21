@@ -1,3 +1,7 @@
+### stashhub v1.4.19
+
+* Feed fetchSceneDetails switched to no-cache so caption metadata is always fresh.
+
 ### stashhub v1.4.18
 
 * Captions: drop the smudgy text-shadow, drop border-radius, more padding. Single Bold weight reads cleaner.
