@@ -1396,3 +1396,63 @@ select {
   overflow-y: auto;
   padding-right: 1.5rem;
 }
+
+/* Caption styling, global so it covers Feed and ScenePlayer routes
+   (Feed.scss is code-split). Netflix Sans is bundled in /public/fonts.
+   video.js renders cues into `.vjs-text-track-cue > div` with inline
+   styles; native browsers also paint `::cue`. Style both so whichever
+   path renders gets our font, weight, and flat 50% background. */
+@font-face {
+  font-family: "Netflix Sans";
+  src: url("/fonts/NetflixSans-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Netflix Sans";
+  src: url("/fonts/NetflixSans-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Netflix Sans";
+  src: url("/fonts/NetflixSans-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+video::cue {
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-family: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+/* Outer cue wrapper. Kill its bg so it never adds a second layer. */
+.vjs-text-track-cue {
+  background-color: transparent !important;
+  border-radius: 0 !important;
+}
+
+/* Inner div is where vtt.js paints inline backgroundColor #000 and where
+   the actual text node lives. Override inline styles with !important and
+   add padding here since ::cue does not support padding. */
+.vjs-text-track-cue > div {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  color: #fff !important;
+  font-family: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 15px !important;
+  line-height: 1.4 !important;
+  padding: 4px 10px !important;
+  border-radius: 0 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}

@@ -1,3 +1,8 @@
+### stashhub v1.4.23
+
+* Feed captions rendered in a React overlay so iOS accessibility caption prefs can't override the styling. Flat 50% bg, Netflix Sans Bold, real padding.
+* Netflix Sans @font-face moved into the main bundle so caption fonts load on every route.
+
 ### stashhub v1.4.22
 
 * Captions: kill the vtt.js inline #000 on the cue inner div. ::cue is now the single background source.

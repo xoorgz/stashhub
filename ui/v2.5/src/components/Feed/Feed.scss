@@ -4,48 +4,51 @@
   --feed-hubs: var(--color-hubs, #df73ff);
 }
 
-/* Netflix Sans bundled at ui/v2.5/public/fonts/. Three weights so any
-   future copy that needs Light / Medium / Bold can use them. */
-@font-face {
-  font-family: "Netflix Sans";
-  src: url("/fonts/NetflixSans-Light.woff2") format("woff2");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Netflix Sans";
-  src: url("/fonts/NetflixSans-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Netflix Sans";
-  src: url("/fonts/NetflixSans-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-$cue-font: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+/* Caption font-face + ScenePlayer ::cue overrides live in src/index.scss
+   (main bundle) so they apply on every route. In the feed we bypass
+   native ::cue entirely with our own React-rendered overlay below, so
+   iOS accessibility caption prefs can't override our styling. */
 
-/* Native ::cue is the text renderer in feed and ScenePlayer. video.js's
-   vtt.js polyfill stamps an inline backgroundColor #000 on the inner
-   cue div by default; only !important on `.vjs-text-track-cue > div`
-   beats inline style, otherwise the user sees ::cue's bg PLUS vtt.js's
-   inline #000 = double background. */
-video::cue {
-  background-color: rgba(0, 0, 0, 0.5);
+.feed-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 84px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+  padding: 0 24px;
+  text-align: center;
+}
+.feed-caption-line {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.5);
   color: #fff;
-  font-family: $cue-font;
+  font-family: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 700;
   font-size: 15px;
   line-height: 1.4;
+  padding: 4px 10px;
+  border-radius: 0;
+  text-shadow: none;
+  box-shadow: none;
+  white-space: pre-wrap;
+  max-width: min(640px, 92%);
+  word-break: break-word;
 }
-.vjs-text-track-cue,
-.vjs-text-track-cue > div {
-  background-color: transparent !important;
-  border-radius: 0 !important;
+
+@media (max-width: 768px) {
+  .feed-caption {
+    bottom: 110px;
+    padding: 0 16px;
+  }
+  .feed-caption-line {
+    font-size: 14px;
+    padding: 3px 8px;
+  }
 }
 
 .feed-root {

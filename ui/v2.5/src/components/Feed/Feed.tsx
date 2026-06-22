@@ -506,15 +506,16 @@ const FeedItem: React.FC<FeedItemProps> = ({
     if (videoRef.current) videoRef.current.muted = muted;
   }, [muted]);
 
-  // Captions toggle: imperatively drive track.mode so the user's preference
-  // wins over the browser's default-track heuristics. `disabled` removes the
-  // cue rendering entirely; `showing` paints them in the video element.
+  // Captions: we render cues ourselves in a React overlay so iOS
+  // accessibility caption prefs (rounded bg, thin font, no padding)
+  // can't override our styling. Mode "hidden" still parses VTT cues
+  // and fires cuechange, but tells the browser not to paint them.
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !v.textTracks) return;
     const apply = () => {
       for (let i = 0; i < v.textTracks.length; i++) {
-        v.textTracks[i].mode = captionsOn && i === 0 ? "showing" : "disabled";
+        v.textTracks[i].mode = captionsOn && i === 0 ? "hidden" : "disabled";
       }
     };
     apply();
@@ -525,6 +526,56 @@ const FeedItem: React.FC<FeedItemProps> = ({
       v.textTracks.removeEventListener("removetrack", apply);
     };
   }, [captionsOn, scene.captions?.length]);
+
+  // Active cue text for the React-rendered overlay. Hidden tracks still
+  // fire cuechange and expose activeCues, so we just mirror whatever's
+  // active into local state.
+  const [activeCue, setActiveCue] = useState<string>("");
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !v.textTracks) return;
+    if (!captionsOn) {
+      setActiveCue("");
+      return;
+    }
+    let detach: Array<() => void> = [];
+    const read = () => {
+      const v2 = videoRef.current;
+      if (!v2 || !v2.textTracks?.length) {
+        setActiveCue("");
+        return;
+      }
+      const track = v2.textTracks[0];
+      const active = track.activeCues;
+      if (!active || !active.length) {
+        setActiveCue("");
+        return;
+      }
+      const parts: string[] = [];
+      for (let i = 0; i < active.length; i++) {
+        const c = active[i] as VTTCue;
+        if (c.text) parts.push(c.text);
+      }
+      setActiveCue(parts.join("\n"));
+    };
+    const wireTrack = (t: TextTrack) => {
+      t.addEventListener("cuechange", read);
+      detach.push(() => t.removeEventListener("cuechange", read));
+    };
+    for (let i = 0; i < v.textTracks.length; i++) wireTrack(v.textTracks[i]);
+    const onAdd = (ev: Event) => {
+      const t = (ev as TrackEvent).track as TextTrack | undefined;
+      if (t) wireTrack(t);
+      read();
+    };
+    v.textTracks.addEventListener("addtrack", onAdd);
+    detach.push(() => v.textTracks.removeEventListener("addtrack", onAdd));
+    read();
+    return () => {
+      detach.forEach((d) => d());
+      setActiveCue("");
+    };
+  }, [captionsOn, scene.id, scene.captions?.length]);
 
   // Read cue start-times from the first caption track and render them
   // as small ticks on the progress bar (one per spoken utterance).
@@ -944,6 +995,19 @@ const FeedItem: React.FC<FeedItemProps> = ({
               />
             ))}
           </video>
+          {captionsOn && activeCue ? (
+            <div className="feed-caption" aria-live="polite">
+              {activeCue
+                .replace(/<[^>]+>/g, "")
+                .split("\n")
+                .filter(Boolean)
+                .map((line, i) => (
+                  <span key={i} className="feed-caption-line">
+                    {line}
+                  </span>
+                ))}
+            </div>
+          ) : null}
           <div className="feed-progress" ref={progressRef}>
             <div className="feed-progress-bar" ref={barRef} />
             {cueStarts.length > 0 && scene.files?.[0]?.duration ? (
