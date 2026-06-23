@@ -1,3 +1,7 @@
+### stashhub v1.4.27
+
+* SQLite page cache 256 MB → 1 GB. Box has plenty of RAM headroom.
+
 ### stashhub v1.4.26
 
 * SQLite: bump page cache to 256 MB, mmap the DB, route temp B-trees to RAM. UI queries are dramatically faster on a 66 MB DB that previously fit in 2 MB of cache.

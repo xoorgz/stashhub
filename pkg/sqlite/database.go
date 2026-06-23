@@ -236,7 +236,7 @@ func (db *Database) Close() error {
 
 func (db *Database) open(disableForeignKeys bool, writable bool) (*sqlx.DB, error) {
 	// https://github.com/mattn/go-sqlite3
-	// stashhub: bump page cache to 256 MB (negative = kB-of-RAM target),
+	// stashhub: bump page cache to 1 GB (negative = kB-of-RAM target),
 	// mmap the file (DB is ~66 MB so it fits in a 256 MB mmap with room
 	// to grow), and route temp B-trees to RAM. These three pragmas
 	// together cut typical GraphQL query latency dramatically on the
@@ -244,7 +244,7 @@ func (db *Database) open(disableForeignKeys bool, writable bool) (*sqlx.DB, erro
 	// for every list query.
 	url := "file:" + db.dbPath +
 		"?_journal=WAL&_sync=NORMAL&_busy_timeout=50" +
-		"&_cache_size=-262144" +
+		"&_cache_size=-1048576" +
 		"&_mmap_size=268435456" +
 		"&_temp_store=MEMORY"
 	if !disableForeignKeys {
