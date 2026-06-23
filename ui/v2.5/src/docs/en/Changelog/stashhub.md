@@ -1,3 +1,7 @@
+### stashhub v1.4.26
+
+* SQLite: bump page cache to 256 MB, mmap the DB, route temp B-trees to RAM. UI queries are dramatically faster on a 66 MB DB that previously fit in 2 MB of cache.
+
 ### stashhub v1.4.25
 
 * Feed caption text bumped to 22 px desktop / 16 px mobile, with more padding to match.
