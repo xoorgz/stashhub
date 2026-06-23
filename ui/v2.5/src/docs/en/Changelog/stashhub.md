@@ -1,3 +1,7 @@
+### stashhub v1.4.25
+
+* Feed caption text bumped to 22 px desktop / 16 px mobile, with more padding to match.
+
 ### stashhub v1.4.24
 
 * Feed CC button: SlimSceneData now carries captions so the feed actually knows which scenes have captions instead of showing CC+ on everything.

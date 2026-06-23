@@ -29,14 +29,14 @@
   color: #fff;
   font-family: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 700;
-  font-size: 15px;
-  line-height: 1.4;
-  padding: 4px 10px;
+  font-size: 22px;
+  line-height: 1.35;
+  padding: 6px 14px;
   border-radius: 0;
   text-shadow: none;
   box-shadow: none;
   white-space: pre-wrap;
-  max-width: min(640px, 92%);
+  max-width: min(760px, 92%);
   word-break: break-word;
 }
 
@@ -46,8 +46,8 @@
     padding: 0 16px;
   }
   .feed-caption-line {
-    font-size: 14px;
-    padding: 3px 8px;
+    font-size: 16px;
+    padding: 4px 10px;
   }
 }
 
