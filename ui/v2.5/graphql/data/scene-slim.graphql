@@ -87,4 +87,9 @@ fragment SlimSceneData on Scene {
     stash_id
     updated_at
   }
+
+  captions {
+    language_code
+    caption_type
+  }
 }

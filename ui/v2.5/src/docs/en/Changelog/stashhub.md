@@ -1,3 +1,8 @@
+### stashhub v1.4.24
+
+* Feed CC button: SlimSceneData now carries captions so the feed actually knows which scenes have captions instead of showing CC+ on everything.
+* Feed arrow/j/k nav: disable scroll-snap during the animation so the slide is visible instead of an instant jump.
+
 ### stashhub v1.4.23
 
 * Feed captions rendered in a React overlay so iOS accessibility caption prefs can't override the styling. Flat 50% bg, Netflix Sans Bold, real padding.

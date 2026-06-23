@@ -1515,6 +1515,12 @@ export const Feed: React.FC = () => {
     const startTop = track.scrollTop;
     const dist = target - startTop;
     if (dist === 0) return;
+    // scroll-snap-type: mandatory re-snaps every frame and makes our
+    // animated scrollTop jump to the destination instantly. Disable
+    // snap for the duration of the animation; restore at the end so
+    // touch/wheel snapping keeps working.
+    const prevSnap = track.style.scrollSnapType;
+    track.style.scrollSnapType = "none";
     const duration = 220;
     let startTs: number | null = null;
     const step = (ts: number) => {
@@ -1523,8 +1529,12 @@ export const Feed: React.FC = () => {
       const p = Math.min(1, elapsed / duration);
       const ease = 1 - Math.pow(1 - p, 3);
       track.scrollTop = startTop + dist * ease;
-      if (p < 1) slideRafRef.current = requestAnimationFrame(step);
-      else slideRafRef.current = null;
+      if (p < 1) {
+        slideRafRef.current = requestAnimationFrame(step);
+      } else {
+        slideRafRef.current = null;
+        track.style.scrollSnapType = prevSnap;
+      }
     };
     slideRafRef.current = requestAnimationFrame(step);
   }, []);
