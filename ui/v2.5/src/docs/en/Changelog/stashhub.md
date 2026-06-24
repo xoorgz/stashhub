@@ -1,3 +1,7 @@
+### stashhub v1.4.31
+
+* Favicon: the actual "box" (the 256x256 background rect) is now hub-purple, inner shape dark. Previous recolours only touched the small inner accent.
+
 ### stashhub v1.4.30
 
 * Favicon revert: keep the original icon design intact, only the accent recoloured to hub-purple. v1.4.29 had over-recoloured the base.
