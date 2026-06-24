@@ -1,22 +1,7 @@
-### stashhub v1.4.31
-
-* Favicon: the actual "box" (the 256x256 background rect) is now hub-purple, inner shape dark. Previous recolours only touched the small inner accent.
-
-### stashhub v1.4.30
-
-* Favicon revert: keep the original icon design intact, only the accent recoloured to hub-purple. v1.4.29 had over-recoloured the base.
-
-### stashhub v1.4.29
-
-* Favicons re-rendered. v1.4.28 embedded a stale build/ cache; the deep-purple base + hub accent now actually ship.
-
 ### stashhub v1.4.28
 
-* Favicons recoloured to the hub-purple accent. Originals stashed in public/favicon-backup-orig.
-
-### stashhub v1.4.27
-
-* SQLite page cache 256 MB → 1 GB. Box has plenty of RAM headroom.
+* Favicon recoloured to hub-purple: the 256x256 box rect is hub-purple, inner shape dark for contrast. Originals stashed in public/favicon-backup-orig.
+* SQLite page cache 256 MB → 1 GB.
 
 ### stashhub v1.4.26
 
