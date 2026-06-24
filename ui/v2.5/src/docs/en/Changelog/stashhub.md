@@ -1,3 +1,7 @@
+### stashhub v1.4.29
+
+* Favicons re-rendered. v1.4.28 embedded a stale build/ cache; the deep-purple base + hub accent now actually ship.
+
 ### stashhub v1.4.28
 
 * Favicons recoloured to the hub-purple accent. Originals stashed in public/favicon-backup-orig.
