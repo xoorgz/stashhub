@@ -63,7 +63,7 @@
   <sodipodi:namedview
      id="base"
      pagecolor="#ffffff"
-     bordercolor="#7a3a90"
+     bordercolor="#666666"
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
@@ -85,7 +85,7 @@
      inkscape:showpageshadow="2"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:export-bgcolor="#1a0a2500">
+     inkscape:export-bgcolor="#24242400">
     <inkscape:page
        x="0"
        y="0"
@@ -111,7 +111,7 @@
      id="layer2"
      inkscape:label="Layer 2">
     <rect
-       style="fill:#1a0a25;fill-opacity:1;stroke-width:0.982009"
+       style="fill:#242424;fill-opacity:1;stroke-width:0.982009"
        id="rect17"
        width="256.0011"
        height="256.07516"

@@ -1,3 +1,7 @@
+### stashhub v1.4.30
+
+* Favicon revert: keep the original icon design intact, only the accent recoloured to hub-purple. v1.4.29 had over-recoloured the base.
+
 ### stashhub v1.4.29
 
 * Favicons re-rendered. v1.4.28 embedded a stale build/ cache; the deep-purple base + hub accent now actually ship.
