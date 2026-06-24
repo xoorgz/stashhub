@@ -1,3 +1,7 @@
+### stashhub v1.4.28
+
+* Favicons recoloured to the hub-purple accent. Originals stashed in public/favicon-backup-orig.
+
 ### stashhub v1.4.27
 
 * SQLite page cache 256 MB → 1 GB. Box has plenty of RAM headroom.
