@@ -1433,15 +1433,17 @@ video::cue {
   line-height: 1.4;
 }
 
-/* Outer cue wrapper. Kill its bg so it never adds a second layer. */
-.vjs-text-track-cue {
+/* ScenePlayer (video.js) captions. The double-background came from two
+   elements in the cue tree each painting a bg. Kill bg/radius on the whole
+   tree, then paint a single flat 50% bg on the inner box only — matching
+   the feed overlay exactly. */
+.vjs-text-track-cue,
+.vjs-text-track-cue * {
   background-color: transparent !important;
   border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
-
-/* Inner div is where vtt.js paints inline backgroundColor #000 and where
-   the actual text node lives. Override inline styles with !important and
-   add padding here since ::cue does not support padding. */
 .vjs-text-track-cue > div {
   background-color: rgba(0, 0, 0, 0.5) !important;
   color: #fff !important;
@@ -1450,9 +1452,6 @@ video::cue {
   font-size: 15px !important;
   line-height: 1.4 !important;
   padding: 4px 10px !important;
-  border-radius: 0 !important;
-  text-shadow: none !important;
-  box-shadow: none !important;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }

@@ -1,3 +1,7 @@
+### stashhub v1.4.29
+
+* ScenePlayer captions: fix double background + rounded corners. Single flat 50% bg on the inner box only, matching the feed.
+
 ### stashhub v1.4.28
 
 * Favicon recoloured to hub-purple: the 256x256 box rect is hub-purple, inner shape dark for contrast. Originals stashed in public/favicon-backup-orig.
