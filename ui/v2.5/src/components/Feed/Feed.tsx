@@ -1456,14 +1456,17 @@ export const Feed: React.FC = () => {
       const isDesktop = typeof window.matchMedia === "function"
         && window.matchMedia("(hover: hover)").matches;
       const aheadAggressive = isDesktop ? 3 : 2;
+      // Prime the previous tile too (preload="auto") so ArrowUp / swipe-back
+      // lands on a buffered video with no rebuffer pause, symmetric with ahead.
+      const behindAggressive = 1;
       const aheadSrcOnly = aheadAggressive + 1;
-      const start = Math.max(0, idx - 1);
+      const start = Math.max(0, idx - behindAggressive);
       const end = Math.min(items.length - 1, idx + aheadSrcOnly);
       for (let i = start; i <= end; i++) {
         const it = items[i];
         const v = it.querySelector<HTMLVideoElement>("video.feed-video");
         if (!v) continue;
-        const aggressive = i >= idx && i <= idx + aheadAggressive;
+        const aggressive = i >= idx - behindAggressive && i <= idx + aheadAggressive;
         const desiredPreload = aggressive ? "auto" : "metadata";
         if (v.preload !== desiredPreload) v.preload = desiredPreload;
         const src = v.dataset.src;
@@ -1483,9 +1486,22 @@ export const Feed: React.FC = () => {
     const activate = (item: HTMLDivElement) => {
       const video = item.querySelector<HTMLVideoElement>("video.feed-video");
       if (!video) return;
-      ensureNeighborSrcs(item);
+      // Active video gets bandwidth priority: give it its src + preload="auto"
+      // and start it BEFORE priming neighbours, so prefetch never competes with
+      // the tile you're actually watching over a limited connection.
+      if (video.dataset.src && !video.src) {
+        video.src = video.dataset.src;
+        try { video.load(); } catch { /* ignore */ }
+      }
+      video.preload = "auto";
       video.muted = muted;
       video.play().catch(() => {});
+      // Prefetch neighbours a beat later, and only if this is still the tile the
+      // user settled on, so a fast skip-through never kicks off loads for tiles
+      // already scrolled past.
+      window.setTimeout(() => {
+        if (currentVisibleRef.current === item) ensureNeighborSrcs(item);
+      }, 600);
       const id = item.dataset.sceneId;
       if (id) {
         markViewed(id);

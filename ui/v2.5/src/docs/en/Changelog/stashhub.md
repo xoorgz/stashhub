@@ -1,3 +1,10 @@
+### stashhub v1.4.33
+
+* Feed: the playing video now gets bandwidth priority, neighbours prefetch a beat later so playback never stutters.
+* Feed: buffer the previous tile too, so arrow/swipe back plays instantly with no rebuffer.
+* Feed streaming: nginx passes video straight through, browser range requests drive seeks for smoother scrubbing.
+* Scene media (video, posters, previews) now browser-cacheable, so backward seeks and re-scrolls are instant.
+
 ### stashhub v1.4.32
 
 * Feed: show the scene poster, pulsing while it loads, instead of a black tile before the transcode decodes.
