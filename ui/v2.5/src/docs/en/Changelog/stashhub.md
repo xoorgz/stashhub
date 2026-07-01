@@ -1,3 +1,10 @@
+### stashhub v1.4.32
+
+* Feed: show the scene poster, pulsing while it loads, instead of a black tile before the transcode decodes.
+* Feed: fast-skipping now only loads the tile you land on, ending the black-pause-play thrash.
+* Scene player captions: larger (20 px) and lifted clear of the control bar.
+* stash app icon hard-cropped with a full iOS/PWA size set (apple-touch, ico, png, svg).
+
 ### stashhub v1.4.29
 
 * ScenePlayer captions: fix double background + rounded corners. Single flat 50% bg on the inner box only, matching the feed.

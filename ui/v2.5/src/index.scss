@@ -1429,7 +1429,7 @@ video::cue {
   color: #fff;
   font-family: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 20px;
   line-height: 1.4;
 }
 
@@ -1449,9 +1449,24 @@ video::cue {
   color: #fff !important;
   font-family: "Netflix Sans", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
   font-weight: 700 !important;
-  font-size: 15px !important;
+  font-size: 20px !important;
   line-height: 1.4 !important;
   padding: 4px 10px !important;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+}
+
+/* Lift captions above the control bar so they aren't hidden behind it. */
+.vjs-text-track-display {
+  bottom: 5rem !important;
+}
+
+/* Match the feed caption size on phones (feed uses 16px at this breakpoint). */
+@media (max-width: 768px) {
+  video::cue {
+    font-size: 16px;
+  }
+  .vjs-text-track-cue > div {
+    font-size: 16px !important;
+  }
 }

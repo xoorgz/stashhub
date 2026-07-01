@@ -219,14 +219,32 @@
   }
 }
 
+/* Poster backdrop behind the video. Shows the scene still whenever the
+   <video> has no frame yet (initial load, transcode start, v.load() reset)
+   so the tile is never a black rectangle. */
+.feed-video-poster {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: #000;
+  /* contain = match the video's object-fit exactly so the poster sits behind
+     the frame (black letterbox bars), not zoomed-to-fill around it. */
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
 .feed-video {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   /* contain on desktop. the wrap matches video aspect (set by JS),
      so contain renders edge-to-edge with no internal letterbox.
      mobile uses cover for the immersive TikTok feel. */
   object-fit: contain;
-  background: #000;
+  /* transparent so the poster backdrop shows through before the first frame
+     decodes; the browser holds the last frame during mid-play buffering. */
+  background: transparent;
 }
 @media (max-width: 640px) {
   .feed-video { object-fit: cover; }
@@ -703,10 +721,12 @@
    .is-loading and the video element pulses opacity. No ring, no percentage,
    just a soft breathing motion on the poster/first frame so the user knows
    something is happening. */
-.feed-video-wrap.is-loading .feed-video {
-  animation: feed-loader-pulse 1.6s ease-in-out infinite;
+/* Pulse the poster backdrop (not the video, which is black/empty while
+   stuck) so the breathing motion is actually visible during buffering. */
+.feed-video-wrap.is-loading .feed-video-poster {
+  animation: feed-loader-pulse 1.5s ease-in-out infinite;
 }
 @keyframes feed-loader-pulse {
   0%, 100% { opacity: 1; }
-  50%      { opacity: 0.45; }
+  50%      { opacity: 0.5; }
 }

@@ -973,6 +973,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
           className={`feed-video-wrap${loading ? " is-loading" : ""}`}
           ref={wrapRef}
         >
+          {/* Poster backdrop: always behind the video so a not-yet-decoded or
+              reloading transcode shows the scene's still (pulsing while loading)
+              instead of a black tile. */}
+          <div
+            className="feed-video-poster"
+            style={posterSrc ? { backgroundImage: `url("${posterSrc}")` } : undefined}
+            aria-hidden="true"
+          />
           <video
             className="feed-video"
             ref={videoRef}
@@ -1466,6 +1474,29 @@ export const Feed: React.FC = () => {
       }
     }
 
+    // Only the tile the user *settles* on (highly visible for >~120ms) gets
+    // played and its transcode primed. Fast-skipping past tiles never starts
+    // a play() or a transcode, so there's no black-pause-play thrash and only
+    // the landed tile loads. Skipped tiles show their posters (always drawn).
+    let settleTimer: number | null = null;
+    let pendingItem: HTMLDivElement | null = null;
+    const activate = (item: HTMLDivElement) => {
+      const video = item.querySelector<HTMLVideoElement>("video.feed-video");
+      if (!video) return;
+      ensureNeighborSrcs(item);
+      video.muted = muted;
+      video.play().catch(() => {});
+      const id = item.dataset.sceneId;
+      if (id) {
+        markViewed(id);
+        persistCurrent(id);
+      }
+      showMetaAndScheduleFade(item);
+      const items = track.querySelectorAll(".feed-item");
+      const idx = Array.from(items).indexOf(item);
+      if (items.length - idx <= REFILL_AT) loadMore();
+    };
+
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -1473,23 +1504,16 @@ export const Feed: React.FC = () => {
           const video = item.querySelector<HTMLVideoElement>("video.feed-video");
           if (!video) return;
           if (entry.intersectionRatio >= 0.7) {
-            ensureNeighborSrcs(item);
-            video.muted = muted;
-            video.play().catch(() => {});
-            currentVisibleRef.current = item;
-            const id = item.dataset.sceneId;
-            if (id) {
-              markViewed(id);
-              persistCurrent(id);
-            }
-            // Reset meta visibility for the new active item
-            showMetaAndScheduleFade(item);
-            // Refill if near end
-            const items = track.querySelectorAll(".feed-item");
-            const idx = Array.from(items).indexOf(item);
-            if (items.length - idx <= REFILL_AT) loadMore();
+            pendingItem = item;
+            currentVisibleRef.current = item; // immediate for keyboard/persist reads
+            if (settleTimer != null) window.clearTimeout(settleTimer);
+            settleTimer = window.setTimeout(() => {
+              settleTimer = null;
+              if (pendingItem === item) activate(item);
+            }, 120);
           } else if (entry.intersectionRatio < 0.3) {
             video.pause();
+            if (pendingItem === item) pendingItem = null;
           }
         });
       },
@@ -1497,7 +1521,10 @@ export const Feed: React.FC = () => {
     );
     ioRef.current = io;
     track.querySelectorAll(".feed-item").forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    return () => {
+      if (settleTimer != null) window.clearTimeout(settleTimer);
+      io.disconnect();
+    };
   }, [scenes, muted, loadMore, persistCurrent]);
 
   // Keyboard nav
