@@ -1,0 +1,84 @@
+# Example nginx reverse proxy for stashhub, tuned for the vertical feed.
+#
+# The important parts for smooth feed playback are the streaming + caching
+# blocks. By default nginx buffers upstream responses and Stash sends
+# no-cache on posters/previews and no Cache-Control on the stream, so the
+# browser revalidates every scroll and refetches every backward seek. These
+# blocks fix both. Replace stash.example.com with your own hostname.
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name stash.example.com;
+    client_max_body_size 0;
+
+    ssl_certificate     /etc/letsencrypt/live/stash.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/stash.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    add_header Strict-Transport-Security max-age=15768000;
+
+    # Cacheable scene media (posters, animated previews, sprites/vtt, markers).
+    # These are content-hashed and effectively immutable, so let the browser
+    # keep them for a month: posters/previews then load instantly on re-scroll
+    # with no revalidation round-trip. `private` keeps auth-gated media out of
+    # any shared proxy cache.
+    location ~ ^/scene/\d+/(screenshot|webp|sprite|vtt|preview|marker) {
+      proxy_pass http://127.0.0.1:9999;
+      proxy_http_version 1.1;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $remote_addr;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_hide_header Cache-Control;
+      proxy_hide_header Pragma;
+      add_header Cache-Control "private, max-age=2592000, immutable" always;
+      add_header X-Content-Type-Options nosniff always;
+    }
+
+    # Video stream. proxy_buffering off lets the browser's Range requests drive
+    # flow instead of nginx buffering the upstream stream, which smooths seeks.
+    # A 7d private cache means already-fetched byte ranges are served from the
+    # browser cache, so backward seeks and re-watches need no network.
+    location ~ ^/scene/\d+/stream {
+      proxy_pass http://127.0.0.1:9999;
+      proxy_http_version 1.1;
+      proxy_buffering off;
+      proxy_request_buffering off;
+      proxy_read_timeout 3600s;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $remote_addr;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_hide_header Cache-Control;
+      add_header Cache-Control "private, max-age=604800" always;
+      add_header X-Content-Type-Options nosniff always;
+    }
+
+    # App + GraphQL + WebSocket. Buffering off here too keeps GraphQL and any
+    # other streaming responses flowing without nginx read-ahead.
+    location / {
+      proxy_pass http://127.0.0.1:9999/;
+      proxy_http_version 1.1;
+      proxy_buffering off;
+      proxy_request_buffering off;
+      proxy_read_timeout 3600s;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "Upgrade";
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $remote_addr;
+      proxy_set_header X-Forwarded-Port $server_port;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name stash.example.com;
+    location / { return 301 https://$host$request_uri; }
+}
