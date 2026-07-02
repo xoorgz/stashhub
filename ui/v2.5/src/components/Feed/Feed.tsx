@@ -372,6 +372,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const [pulse, setPulse] = useState<"play" | "pause" | "back" | "fwd" | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
+  // True once playback has actually started; drives the poster→video crossfade.
+  const [revealed, setRevealed] = useState(false);
 
   // Show the same centred chip on keyboard seek (ArrowLeft / ArrowRight)
   // as on edge-tap. Feed dispatches `feed-pulse-trigger` on the active
@@ -707,6 +709,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const onPlaying = () => {
       waitingSince = 0;
       loadAttempts = 0;
+      setRevealed(true);
       hideLoader();
       if (stuckTimer != null) {
         window.clearTimeout(stuckTimer);
@@ -970,17 +973,18 @@ const FeedItem: React.FC<FeedItemProps> = ({
     <div className="feed-item" ref={itemRef} data-scene-id={scene.id}>
       <div className="feed-stage">
         <div
-          className={`feed-video-wrap${loading ? " is-loading" : ""}`}
+          className={`feed-video-wrap${loading ? " is-loading" : ""}${revealed ? " is-revealed" : ""}`}
           ref={wrapRef}
         >
-          {/* Poster backdrop: always behind the video so a not-yet-decoded or
-              reloading transcode shows the scene's still (pulsing while loading)
-              instead of a black tile. */}
+          {/* Poster backdrop: sits behind the video so an idle / not-yet-playing
+              tile shows the scene's still instead of a black tile. The video
+              crossfades in over it on play, and a spinner shows while buffering. */}
           <div
             className="feed-video-poster"
             style={posterSrc ? { backgroundImage: `url("${posterSrc}")` } : undefined}
             aria-hidden="true"
           />
+          <div className="feed-loader" aria-hidden="true" />
           <video
             className="feed-video"
             ref={videoRef}

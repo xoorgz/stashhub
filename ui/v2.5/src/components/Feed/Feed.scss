@@ -245,9 +245,16 @@
   /* transparent so the poster backdrop shows through before the first frame
      decodes; the browser holds the last frame during mid-play buffering. */
   background: transparent;
+  /* Crossfade in once playback actually starts, so the poster still dissolves
+     into the first video frame instead of hard-cutting (the "flash"). */
+  opacity: 0;
+  transition: opacity 0.28s ease;
 }
+.feed-video-wrap.is-revealed .feed-video { opacity: 1; }
 @media (max-width: 640px) {
   .feed-video { object-fit: cover; }
+  /* Match the mobile video's cover fit so the poster lines up with the frame. */
+  .feed-video-poster { background-size: cover; }
 }
 
 .feed-overlay {
@@ -716,17 +723,28 @@
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1.25); }
 }
 
-/* Buffering state: when the active tile is genuinely stuck (paused or
-   readyState < HAVE_FUTURE_DATA at the deferred 250ms mark), the wrap gets
-   .is-loading and the video element pulses opacity. No ring, no percentage,
-   just a soft breathing motion on the poster/first frame so the user knows
-   something is happening. */
-/* Pulse the poster backdrop (not the video, which is black/empty while
-   stuck) so the breathing motion is actually visible during buffering. */
-.feed-video-wrap.is-loading .feed-video-poster {
-  animation: feed-loader-pulse 1.5s ease-in-out infinite;
+/* Buffering state: a centered spinning ring (TikTok / Google style) while the
+   active tile is genuinely stuck (paused or readyState < HAVE_FUTURE_DATA at the
+   deferred 250ms mark). Sits over the poster backdrop; replaces the old opacity
+   pulse that read as a weird flash. */
+.feed-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
-@keyframes feed-loader-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.5; }
+.feed-video-wrap.is-loading .feed-loader { display: flex; }
+.feed-loader::after {
+  content: '';
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  border-top-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.35);
+  animation: feed-spin 0.8s linear infinite;
 }
+@keyframes feed-spin { to { transform: rotate(360deg); } }

@@ -1,3 +1,9 @@
+### stashhub v1.4.34
+
+* Feed: video now crossfades in from the poster on play, no more still-frame flash when a clip starts.
+* Feed: buffering shows a spinning loader ring (TikTok/Google style) instead of the poster pulse.
+* Feed: poster fills the frame (cover) on mobile, matching the video.
+
 ### stashhub v1.4.33
 
 * Feed: the playing video now gets bandwidth priority, neighbours prefetch a beat later so playback never stutters.
@@ -7,7 +13,7 @@
 
 ### stashhub v1.4.32
 
-* Feed: show the scene poster, pulsing while it loads, instead of a black tile before the transcode decodes.
+* Feed: show the scene poster instead of a black tile before the video decodes.
 * Feed: fast-skipping now only loads the tile you land on, ending the black-pause-play thrash.
 * Scene player captions: larger (20 px) and lifted clear of the control bar.
 * stash app icon hard-cropped with a full iOS/PWA size set (apple-touch, ico, png, svg).
