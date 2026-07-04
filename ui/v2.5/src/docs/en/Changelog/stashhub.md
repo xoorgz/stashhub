@@ -1,6 +1,10 @@
+### stashhub v1.4.36
+
+* Feed: CC on a subless video shows the generating spinner instantly on press, no more dead-looking presses that quietly queued duplicate caption jobs.
+
 ### stashhub v1.4.35
 
-* Feed: CC button now toggles captions instantly and reliably, no more dead presses that needed several clicks.
+* Feed: caption cues are tracked continuously so the CC show/hide toggle applies instantly.
 
 ### stashhub v1.4.34
 

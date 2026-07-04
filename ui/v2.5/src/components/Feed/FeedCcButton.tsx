@@ -115,25 +115,6 @@ export const FeedCcButton: React.FC<Props> = ({
   }, []);
 
 
-  const triggerGenerate = useCallback(async () => {
-    try {
-      await getClient().mutate<GQL.RunPluginTaskMutation>({
-        mutation: GQL.RunPluginTaskDocument,
-        variables: {
-          plugin_id: "ai-subtitler",
-          task_name: "Generate captions: this scene",
-          args_map: { scene_id: sceneId },
-        },
-      });
-      const next = { ...gen, [sceneId]: { at: Date.now() } };
-      setGen(next);
-      writeGenMap(next);
-      Toast.success("Generating captions in the background.");
-    } catch (e) {
-      Toast.error(e);
-    }
-  }, [sceneId, gen, Toast]);
-
   const onClick = useCallback(
     async (e: React.MouseEvent) => {
       e.preventDefault();
@@ -142,10 +123,23 @@ export const FeedCcButton: React.FC<Props> = ({
         onToggle();
         return;
       }
-      // Defensive: the feed's cached scene record may be stale if the
-      // captions were generated elsewhere (scene detail button, cron,
-      // a previous tab's poll). Confirm against the server before
-      // firing another generate.
+      // Flip to the generating state NOW, before any network round-trip, so a
+      // single press registers instantly (spinner) and further presses are
+      // ignored. Without this the button looked dead until two awaited calls
+      // finished, so users mashed it and queued a pile of duplicate generate
+      // tasks that the serial job queue then chewed through one by one.
+      const optimistic = { ...gen, [sceneId]: { at: Date.now() } };
+      setGen(optimistic);
+      writeGenMap(optimistic);
+      const rollback = () => {
+        const m = readGenMap();
+        delete m[sceneId];
+        setGen(m);
+        writeGenMap(m);
+      };
+      // Defensive: the feed's cached scene record may be stale if the captions
+      // were generated elsewhere (scene detail button, cron, a previous tab's
+      // poll). Confirm against the server before firing another generate.
       try {
         const r = await getClient().query<GQL.FindSceneQuery>({
           query: GQL.FindSceneDocument,
@@ -153,20 +147,30 @@ export const FeedCcButton: React.FC<Props> = ({
           fetchPolicy: "no-cache",
         });
         if ((r.data.findScene?.captions?.length ?? 0) > 0) {
-          // The Feed's scenes state somewhere caches the pre-captions
-          // version of this scene and the in-place refetch path hasn't
-          // been reliable. URL is /feed/:id so a hard reload lands the
-          // user back exactly where they were with fresh data.
+          // Hard reload lands the user back on /feed/:id with fresh data.
           Toast.success("Captions exist, reloading.");
           window.setTimeout(() => window.location.reload(), 400);
-          return;
+          return; // keep the state; the reload replaces it anyway
         }
       } catch {
         /* fall through and start generation */
       }
-      triggerGenerate();
+      try {
+        await getClient().mutate<GQL.RunPluginTaskMutation>({
+          mutation: GQL.RunPluginTaskDocument,
+          variables: {
+            plugin_id: "ai-subtitler",
+            task_name: "Generate captions: this scene",
+            args_map: { scene_id: sceneId },
+          },
+        });
+        Toast.success("Generating captions in the background.");
+      } catch (e) {
+        rollback(); // undo the optimistic spinner so the user can retry
+        Toast.error(e);
+      }
     },
-    [generating, hasCaptions, onToggle, triggerGenerate, sceneId, Toast]
+    [generating, hasCaptions, onToggle, sceneId, gen, Toast]
   );
 
   let icon: React.ReactNode;
