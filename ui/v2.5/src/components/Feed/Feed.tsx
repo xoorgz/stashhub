@@ -510,14 +510,18 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
   // Captions: we render cues ourselves in a React overlay so iOS
   // accessibility caption prefs (rounded bg, thin font, no padding)
-  // can't override our styling. Mode "hidden" still parses VTT cues
-  // and fires cuechange, but tells the browser not to paint them.
+  // can't override our styling. Keep track 0 in "hidden" mode whenever it
+  // exists (not gated on captionsOn): the browser parses its cues and fires
+  // cuechange so activeCue below is always current, but paints nothing. That
+  // way flipping captions on shows the CURRENT cue instantly instead of waiting
+  // for the next cuechange, which was the "CC does nothing / needs multiple
+  // clicks" bug. The overlay's visibility is gated on captionsOn, not the track.
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !v.textTracks) return;
     const apply = () => {
       for (let i = 0; i < v.textTracks.length; i++) {
-        v.textTracks[i].mode = captionsOn && i === 0 ? "hidden" : "disabled";
+        v.textTracks[i].mode = i === 0 ? "hidden" : "disabled";
       }
     };
     apply();
@@ -527,19 +531,17 @@ const FeedItem: React.FC<FeedItemProps> = ({
       v.textTracks.removeEventListener("addtrack", apply);
       v.textTracks.removeEventListener("removetrack", apply);
     };
-  }, [captionsOn, scene.captions?.length]);
+  }, [scene.captions?.length]);
 
   // Active cue text for the React-rendered overlay. Hidden tracks still
   // fire cuechange and expose activeCues, so we just mirror whatever's
-  // active into local state.
+  // active into local state. Tracked continuously (not gated on captionsOn) so
+  // toggling captions on can render the current cue with no delay; the overlay
+  // itself is gated on captionsOn at render time.
   const [activeCue, setActiveCue] = useState<string>("");
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !v.textTracks) return;
-    if (!captionsOn) {
-      setActiveCue("");
-      return;
-    }
     let detach: Array<() => void> = [];
     const read = () => {
       const v2 = videoRef.current;
@@ -577,7 +579,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
       detach.forEach((d) => d());
       setActiveCue("");
     };
-  }, [captionsOn, scene.id, scene.captions?.length]);
+  }, [scene.id, scene.captions?.length]);
 
   // Read cue start-times from the first caption track and render them
   // as small ticks on the progress bar (one per spoken utterance).
@@ -593,13 +595,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
       const v2 = videoRef.current;
       if (!v2 || !v2.textTracks?.length) return;
       const track = v2.textTracks[0];
-      // We don't touch track.mode here. The captionsOn effect above is
-      // the single owner of mode; this used to flip "disabled" → "hidden"
-      // for cue parsing, but that fought with the captionsOn=true path
-      // and sometimes left captions invisible on the feed. When
-      // captionsOn is on, mode is already "showing" (which parses cues
-      // and displays them). When captionsOn is off, mode is "disabled"
-      // and we just won't get cue data, no markers drawn. Fair trade.
+      // We don't touch track.mode here. The captions effect above owns it and
+      // keeps track 0 in "hidden" mode always, so cues are parsed regardless of
+      // whether captions are shown, and these progress markers work either way.
       const cues = track.cues;
       if (!cues || !cues.length) return;
       const starts: number[] = [];

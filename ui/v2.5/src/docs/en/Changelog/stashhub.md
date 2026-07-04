@@ -1,3 +1,7 @@
+### stashhub v1.4.35
+
+* Feed: CC button now toggles captions instantly and reliably, no more dead presses that needed several clicks.
+
 ### stashhub v1.4.34
 
 * Feed: video now crossfades in from the poster on play, no more still-frame flash when a clip starts.
