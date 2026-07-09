@@ -1,3 +1,7 @@
+### stashhub v1.4.37
+
+* Feed: Handy interactive sync with visual thrust indicator. A sextoy icon on funscripted scenes toggles device sync; a glowing dot on the video edge moves in real time with the funscript timeline, visible even without a Handy connected.
+
 ### stashhub v1.4.36
 
 * Feed: CC on a subless video shows the generating spinner instantly on press, no more dead-looking presses that quietly queued duplicate caption jobs.

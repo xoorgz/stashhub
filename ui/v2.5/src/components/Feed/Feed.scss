@@ -232,6 +232,7 @@
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
+  border-radius: inherit;
 }
 .feed-video {
   position: relative;
@@ -249,6 +250,10 @@
      into the first video frame instead of hard-cutting (the "flash"). */
   opacity: 0;
   transition: opacity 0.28s ease;
+  border-radius: inherit;
+  /* prevent sub-pixel rendering leaks at curved corners */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 .feed-video-wrap.is-revealed .feed-video { opacity: 1; }
 @media (max-width: 640px) {
@@ -422,6 +427,60 @@
 .feed-cc-toggle.captions-off { opacity: 0.55; }
 .feed-cc-toggle.captions-on { color: var(--feed-hubs); }
 .feed-cc-toggle.is-generating { cursor: progress; }
+
+/* Handy interactive sync toggle. Mirrors the CC button states: off is muted,
+   synced is hub-purple, busy pulses the icon. */
+.feed-interactive-toggle { opacity: 0.55; }
+.feed-interactive-toggle.no-funscript { opacity: 0.65; }
+.feed-interactive-toggle.is-generating { opacity: 1; cursor: progress; animation: feed-interactive-pulse 1.2s ease-in-out infinite; }
+.feed-interactive-toggle.is-synced { color: var(--feed-hubs); opacity: 1; }
+.feed-interactive-toggle.is-busy { cursor: progress; opacity: 1; animation: feed-interactive-pulse 1.2s ease-in-out infinite; }
+@keyframes feed-interactive-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* Funscript visual indicator: a subtle glowing track on the right edge of the
+   video with a dot that moves vertically in sync with the funscript timeline.
+   Visible even without a Handy connected so the user can confirm the sync is
+   working. */
+.feed-funscript-bar {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 100px;
+  z-index: 5;
+  pointer-events: none;
+}
+.feed-funscript-track {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.feed-funscript-dot {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--feed-hubs);
+  box-shadow: 0 0 6px rgba(223, 115, 255, 0.6);
+  transition: top 0.06s linear;
+}
+.feed-funscript-label {
+  position: absolute;
+  left: 0;
+  font-size: 8px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.25);
+  transform: translateX(-1px);
+}
+.feed-funscript-label.feed-funscript-label-top { top: -10px; }
+.feed-funscript-label.feed-funscript-label-bot { bottom: -10px; }
 .feed-cc-progress {
   position: absolute;
   inset: -2px;

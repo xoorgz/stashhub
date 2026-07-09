@@ -21,6 +21,11 @@ import {
   OpenSceneIcon,
 } from "./icons";
 import { FeedCcButton } from "./FeedCcButton";
+import { FeedInteractiveButton } from "./FeedInteractiveButton";
+import {
+  InteractiveContext,
+  ConnectionState,
+} from "src/hooks/Interactive/context";
 import "./Feed.scss";
 
 const VIEWED_KEY = "feed.viewedIds";
@@ -340,6 +345,10 @@ interface FeedItemProps {
   onToggleMute: () => void;
   captionsOn: boolean;
   onToggleCaptions: () => void;
+  interactiveOn: boolean;
+  interactiveState: ConnectionState;
+  interactiveInitialised: boolean;
+  onToggleInteractive: () => void;
   onSkip: () => void;
   onSpawnHearts: (x: number, y: number, count: number) => void;
   onSpawnDrops: (x: number, y: number, count: number) => void;
@@ -351,6 +360,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
   onToggleMute,
   captionsOn,
   onToggleCaptions,
+  interactiveOn,
+  interactiveState,
+  interactiveInitialised,
+  onToggleInteractive,
   onSkip,
   onSpawnHearts,
   onSpawnDrops,
@@ -374,6 +387,16 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const [loading, setLoading] = useState(false);
   // True once playback has actually started; drives the poster→video crossfade.
   const [revealed, setRevealed] = useState(false);
+
+  // Handy interactive sync
+  const {
+    interactive: interactiveClient,
+    uploadScript,
+  } = React.useContext(InteractiveContext);
+  const interactiveSceneRef = useRef<string | null>(null);
+  // Visual funscript indicator: position (0-100) interpolated from current video time.
+  const [funscriptPos, setFunscriptPos] = useState<number>(50);
+  const funscriptActionsRef = useRef<Array<{ at: number; pos: number }> | null>(null);
 
   // Show the same centred chip on keyboard seek (ArrowLeft / ArrowRight)
   // as on edge-tap. Feed dispatches `feed-pulse-trigger` on the active
@@ -753,6 +776,77 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [scene.id]);
 
+  // Handy interactive playback sync: push currentTime on timeupdate, pause on
+  // scroll-away / unmount. Mirrors what ScenePlayer does in its timeupdate +
+  // pause handlers.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !interactiveOn) return;
+    if (interactiveState !== ConnectionState.Ready) return;
+    if (interactiveSceneRef.current !== scene.id) return;
+    const onTime = () => {
+      if (v.currentTime != null && isFinite(v.currentTime)) {
+        interactiveClient.play(v.currentTime);
+      }
+    };
+    const onPause = () => interactiveClient.pause();
+    v.addEventListener("timeupdate", onTime);
+    v.addEventListener("pause", onPause);
+    v.addEventListener("ended", onPause);
+    return () => {
+      v.removeEventListener("timeupdate", onTime);
+      v.removeEventListener("pause", onPause);
+      v.removeEventListener("ended", onPause);
+      interactiveClient.pause();
+    };
+  }, [interactiveOn, interactiveState, scene.id, interactiveClient]);
+
+  // Fetch funscript JSON when interactive is toggled on for a scene that has one.
+  // Stores the raw action timeline for position interpolation.
+  useEffect(() => {
+    if (!interactiveOn || !scene.paths.funscript) {
+      funscriptActionsRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(scene.paths.funscript!);
+        const json = await r.json();
+        if (!cancelled && json.actions?.length) {
+          funscriptActionsRef.current = json.actions;
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [interactiveOn, scene.paths.funscript]);
+
+  // Interpolate funscript position from current video time on each timeupdate.
+  // Binary-searches the action timeline for a smooth 0-100 value to drive the
+  // visual indicator bar.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !interactiveOn) return;
+    const onTime = () => {
+      const actions = funscriptActionsRef.current;
+      if (!actions || !actions.length) return;
+      const ms = v.currentTime * 1000;
+      // binary search for the interval containing `ms`
+      let lo = 0, hi = actions.length - 1;
+      while (lo < hi - 1) {
+        const mid = (lo + hi) >> 1;
+        if (actions[mid].at <= ms) lo = mid; else hi = mid;
+      }
+      const a = actions[lo], b = actions[hi];
+      if (ms <= a.at) { setFunscriptPos(a.pos); return; }
+      if (ms >= b.at) { setFunscriptPos(b.pos); return; }
+      const t = (ms - a.at) / (b.at - a.at);
+      setFunscriptPos(a.pos + (b.pos - a.pos) * t);
+    };
+    v.addEventListener("timeupdate", onTime);
+    return () => v.removeEventListener("timeupdate", onTime);
+  }, [interactiveOn]);
+
   // Register a play with Stash after 3s of continuous playback + track real
   // watched seconds and flush to sceneSaveActivity every 10s (and on
   // pause/end/unmount). This is what the Top Watched + Watched Tags buckets
@@ -1018,6 +1112,21 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 ))}
             </div>
           ) : null}
+          {/* Funscript visual indicator: a subtle vertical track on the right
+              edge of the video with a glowing dot that moves up/down in sync
+              with the funscript timeline, so the user can see the thrust
+              motion even without a Handy connected. */}
+          {interactiveOn && funscriptActionsRef.current ? (
+            <div className="feed-funscript-bar" aria-hidden="true">
+              <span className="feed-funscript-label feed-funscript-label-top">100</span>
+              <div className="feed-funscript-track" />
+              <div
+                className="feed-funscript-dot"
+                style={{ top: `${100 - funscriptPos}%` }}
+              />
+              <span className="feed-funscript-label feed-funscript-label-bot">0</span>
+            </div>
+          ) : null}
           <div className="feed-progress" ref={progressRef}>
             <div className="feed-progress-bar" ref={barRef} />
             {cueStarts.length > 0 && scene.files?.[0]?.duration ? (
@@ -1148,6 +1257,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
             onToggle={onToggleCaptions}
           />
 
+          <FeedInteractiveButton
+            sceneId={scene.id}
+            hasFunscript={scene.interactive}
+            interactiveOn={interactiveOn}
+            connectionState={interactiveState}
+            onToggle={onToggleInteractive}
+          />
+
           <button
             type="button"
             className="feed-action feed-fs-btn"
@@ -1228,6 +1345,14 @@ export const Feed: React.FC = () => {
   const [captionsOn, setCaptionsOn] = useState<boolean>(
     () => sessionStorage.getItem(CAPTIONS_KEY) !== "0"
   );
+  const INTERACTIVE_KEY = "feed.interactive";
+  const [interactiveOn, setInteractiveOn] = useState<boolean>(
+    () => sessionStorage.getItem(INTERACTIVE_KEY) !== "0"
+  );
+  const {
+    state: interactiveState,
+    initialised: interactiveInitialised,
+  } = React.useContext(InteractiveContext);
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
   const [drops, setDrops] = useState<DropParticle[]>([]);
   const dropIdRef = useRef(0);
@@ -1498,6 +1623,22 @@ export const Feed: React.FC = () => {
       video.preload = "auto";
       video.muted = muted;
       video.play().catch(() => {});
+      // Upload the funscript for this scene if interactive is on and the script
+      // hasn't been uploaded yet (avoids re-uploading on every settle bounce).
+      if (
+        interactiveOn &&
+        scene.interactive &&
+        scene.paths.funscript &&
+        interactiveSceneRef.current !== scene.id &&
+        interactiveInitialised
+      ) {
+        uploadScript(scene.paths.funscript).then(() => {
+          interactiveSceneRef.current = scene.id;
+        });
+      }
+      if (!interactiveOn) {
+        interactiveSceneRef.current = null;
+      }
       // Prefetch neighbours a beat later, and only if this is still the tile the
       // user settled on, so a fast skip-through never kicks off loads for tiles
       // already scrolled past.
@@ -1644,7 +1785,13 @@ export const Feed: React.FC = () => {
       return next;
     });
   }, []);
-
+  const toggleInteractive = useCallback(() => {
+    setInteractiveOn((c) => {
+      const next = !c;
+      try { sessionStorage.setItem(INTERACTIVE_KEY, next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   // Drop splash spawner, burst outward in a radial pattern, with a downward
   // bias and rotation for a "wet" feel. Travels far so the whole viewport sees
   // it, not just a small area near the button.
@@ -1712,6 +1859,10 @@ export const Feed: React.FC = () => {
             onToggleMute={toggleMute}
             captionsOn={captionsOn}
             onToggleCaptions={toggleCaptions}
+            interactiveOn={interactiveOn}
+            interactiveState={interactiveState}
+            interactiveInitialised={interactiveInitialised}
+            onToggleInteractive={toggleInteractive}
             onSkip={handleSkip}
             onSpawnHearts={spawnHearts}
             onSpawnDrops={spawnDrops}
