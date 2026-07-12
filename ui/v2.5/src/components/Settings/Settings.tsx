@@ -9,6 +9,7 @@ import { SettingsAboutPanel } from "./SettingsAboutPanel";
 import { SettingsConfigurationPanel } from "./SettingsSystemPanel";
 import { SettingsNotificationsPanel } from "./SettingsNotificationsPanel";
 import { SettingsAlgorithmPanel } from "./SettingsAlgorithmPanel";
+import { SettingsInteractivePanel } from "./SettingsInteractivePanel";
 import { SettingsNoticesPanel } from "./SettingsNoticesPanel";
 import { SettingsInterfacePanel } from "./SettingsInterfacePanel/SettingsInterfacePanel";
 import { SettingsLogsPanel } from "./SettingsLogsPanel";
@@ -73,6 +74,11 @@ const SettingTabs: React.FC<{ tab: TabKey }> = ({ tab }) => {
             <Nav.Item>
               <LinkContainer to="/settings?tab=algorithm">
                 <Nav.Link eventKey="algorithm">Feed Algorithm</Nav.Link>
+              </LinkContainer>
+            </Nav.Item>
+            <Nav.Item>
+              <LinkContainer to="/settings?tab=interactive">
+                <Nav.Link eventKey="interactive">Interactive Toys</Nav.Link>
               </LinkContainer>
             </Nav.Item>
             <Nav.Item>
@@ -196,6 +202,9 @@ const SettingTabs: React.FC<{ tab: TabKey }> = ({ tab }) => {
             </Tab.Pane>
             <Tab.Pane eventKey="algorithm" unmountOnExit>
               <SettingsAlgorithmPanel />
+            </Tab.Pane>
+            <Tab.Pane eventKey="interactive" unmountOnExit>
+              <SettingsInteractivePanel />
             </Tab.Pane>
             <Tab.Pane eventKey="notices" unmountOnExit>
               <SettingsNoticesPanel />

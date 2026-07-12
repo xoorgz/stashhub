@@ -1,7 +1,8 @@
 /* "Saved" flash pill in the top-right of the algorithm panel. Fades in
    when a setting auto-saves, dwells ~1s, then fades out. Pointer-events
    none so it never blocks clicks on settings underneath. */
-.settings-algorithm-panel { position: relative; }
+.settings-algorithm-panel,
+.settings-interactive-panel { position: relative; }
 .algorithm-save-flash {
   position: sticky;
   top: 8px;
@@ -95,20 +96,114 @@
   }
 }
 
-/* Algorithm panel: on small viewports, let every setting row stack so a
-   wide right-side control (TagSelect, the chip editor, even the existing
-   Switch + number) doesn't push the title into a 1-character-wide column.
-   This rule scopes to the algorithm panel so other settings tabs are
-   untouched. */
-@media (max-width: 720px) {
-  .settings-algorithm-panel .setting {
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 8px;
+/* The global .setting gives its text column flex-grow:0 and renders .value in
+   Courier. That is right for short code-ish values and wrong for the sentences
+   this panel is made of: prose got squeezed into a narrow monospace column.
+   Let the text fill the row and read as prose. */
+.settings-algorithm-panel,
+.settings-interactive-panel {
+  .setting > div:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .setting .value {
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    opacity: 0.75;
+    overflow-wrap: break-word;
+  }
+  .setting p {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    margin-bottom: 0;
 
-    & > div:first-child,
-    & > div:last-child {
+    & + p {
+      margin-top: 0.6rem;
+    }
+  }
+  .setting ul {
+    margin: 0.4rem 0 0;
+    padding-left: 1.15rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    opacity: 0.8;
+
+    li + li {
+      margin-top: 0.3rem;
+    }
+  }
+
+  .algo-row-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+}
+
+/* theme-overrides.scss turns the last div of a .setting into a flex row. The
+   explainer rows hold only one div, so it matched, and their paragraphs and
+   list became side-by-side columns. Outrank it for sole-child prose blocks. */
+body .settings-algorithm-panel .setting > div:first-child:last-child,
+body .settings-interactive-panel .setting > div:first-child:last-child {
+  display: block;
+}
+
+.settings-algorithm-panel {
+  .algo-weight {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .algo-slider {
+    width: 150px;
+    cursor: pointer;
+    accent-color: #ff9000;
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+  /* Show the weight and the share it works out to, so the slider is obviously
+     a weight and not a percentage you set directly. */
+  .algo-share {
+    min-width: 92px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.2;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .algo-weight-num {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .algo-share-pct {
+    font-size: 0.75rem;
+    opacity: 0.65;
+  }
+}
+
+/* Algorithm panel: on small viewports, let every setting row stack so a
+   wide right-side control (TagSelect, the chip editor, the weight slider)
+   doesn't push the title into a 1-character-wide column. This rule scopes to
+   the algorithm panel so other settings tabs are untouched. */
+@media (max-width: 720px) {
+  /* Hard column stack. flex-wrap still let the text column shrink below its
+     content instead of taking the row, which is how a paragraph ended up in a
+     50px strip. Column direction makes full width unconditional. */
+  .settings-algorithm-panel .setting,
+  .settings-interactive-panel .setting {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+
+    & > div {
       width: 100%;
+      max-width: 100%;
       min-width: 0;
     }
   }
@@ -116,5 +211,22 @@
   .settings-algorithm-panel .filter-chip-label-input {
     width: auto;
     flex: 1 1 100px;
+  }
+
+  /* Slider takes the full row on phones, with the share pinned to the right. */
+  .settings-algorithm-panel {
+    .algo-row-controls {
+      width: 100%;
+      gap: 10px;
+    }
+    .algo-weight {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .algo-slider {
+      width: auto;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
   }
 }

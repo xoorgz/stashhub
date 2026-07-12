@@ -49,6 +49,18 @@ export interface AlgorithmSettings {
   favoredTagIds: string[];
   topRatedEnabled: boolean;
   topRatedWeight: number;
+  affinityEnabled: boolean;
+  affinityWeight: number;
+  affinityRecentDays: number;
+  affinityLookback: number;
+  affinityMinSec: number;
+  skipDemoteEnabled: boolean;
+  skipThresholdSec: number;
+  skipHalfLifeDays: number;
+  skipMaxSuppress: number;
+  tagSkipEnabled: boolean;
+  tagSkipMinCount: number;
+  tagSkipDecayDays: number;
   staleEnabled: boolean;
   staleWeight: number;
   staleMinDays: number;
@@ -80,6 +92,18 @@ export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
   favoredTagIds: [],
   topRatedEnabled: true,
   topRatedWeight: 2,
+  affinityEnabled: true,
+  affinityWeight: 7,
+  affinityRecentDays: 14,
+  affinityLookback: 30,
+  affinityMinSec: 60,
+  skipDemoteEnabled: true,
+  skipThresholdSec: 10,
+  skipHalfLifeDays: 7,
+  skipMaxSuppress: 85,
+  tagSkipEnabled: true,
+  tagSkipMinCount: 3,
+  tagSkipDecayDays: 30,
   staleEnabled: true,
   staleWeight: 2,
   staleMinDays: 30,
@@ -87,7 +111,7 @@ export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
   hottestTagName: "hottest",
   topRatingMin: 80,
   excludeRecentlyPlayed: true,
-  excludeRecentlyPlayedDays: 7,
+  excludeRecentlyPlayedDays: 2,
   filterChips: [
     { label: "", iconName: "", tagIds: [], weight: 3, mode: "strict" },
     { label: "", iconName: "", tagIds: [], weight: 3, mode: "strict" },
@@ -194,6 +218,35 @@ export async function saveFilterChipsToServer(chips: FilterChip[]): Promise<void
   }
 }
 
+
+/** A bucket's real influence is its weight over the sum of all active weights,
+ *  so the raw number means nothing on its own. Turn it into a percentage. */
+function bucketShares(s: AlgorithmSettings): Record<string, number> {
+  const active: Array<[string, number]> = [];
+  const add = (key: string, on: boolean, w: number) => {
+    if (on && w > 0) active.push([key, w]);
+  };
+  add("hottest", s.hottestEnabled, s.hottestWeight);
+  add("liked", s.likedEnabled, s.likedWeight);
+  add("topWatched", s.topWatchedEnabled, s.topWatchedWeight);
+  add("topOCount", s.topOCountEnabled, s.topOCountWeight);
+  add("watchedTags", s.watchedTagsEnabled, s.watchedTagsWeight);
+  add(
+    "favoredTags",
+    s.favoredTagsEnabled && s.favoredTagIds.length > 0,
+    s.favoredTagsWeight
+  );
+  add("affinity", s.affinityEnabled, s.affinityWeight);
+  add("topRated", s.topRatedEnabled, s.topRatedWeight);
+  add("stale", s.staleEnabled, s.staleWeight);
+  add("random", true, s.randomWeight);
+
+  const total = active.reduce((sum, [, w]) => sum + w, 0);
+  const out: Record<string, number> = {};
+  for (const [k, w] of active) out[k] = total ? Math.round((w / total) * 100) : 0;
+  return out;
+}
+
 const Row: React.FC<{
   title: string;
   description: string;
@@ -201,13 +254,14 @@ const Row: React.FC<{
   onToggle: (v: boolean) => void;
   weight?: number;
   onWeight?: (v: number) => void;
-}> = ({ title, description, enabled, onToggle, weight, onWeight }) => (
-  <div className="setting">
+  share?: number;
+}> = ({ title, description, enabled, onToggle, weight, onWeight, share }) => (
+  <div className="setting algo-row">
     <div>
       <h3>{title}</h3>
       <div className="value">{description}</div>
     </div>
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div className="algo-row-controls">
       <Form.Switch
         id={`algo-${title.replace(/\s+/g, "-").toLowerCase()}-on`}
         checked={enabled}
@@ -215,24 +269,34 @@ const Row: React.FC<{
         label=""
       />
       {typeof weight === "number" && onWeight && (
-        <Form.Control
-          type="number"
-          min={0}
-          max={10}
-          step={1}
-          value={weight}
-          disabled={!enabled}
-          onChange={(e) => {
-            const n = parseInt(e.target.value, 10);
-            if (Number.isFinite(n) && n >= 0 && n <= 10) onWeight(n);
-          }}
-          style={{ width: 70 }}
-          title="Bucket weight (0–10)"
-        />
+        <div className="algo-weight">
+          <input
+            className="algo-slider"
+            type="range"
+            min={0}
+            max={10}
+            step={1}
+            value={weight}
+            disabled={!enabled}
+            onChange={(e) => onWeight(parseInt(e.target.value, 10))}
+            aria-label={`${title} weight`}
+          />
+          <span className="algo-share">
+            {enabled && weight > 0 ? (
+              <>
+                <span className="algo-weight-num">{weight}</span>
+                <span className="algo-share-pct">{share ?? 0}% of feed</span>
+              </>
+            ) : (
+              "off"
+            )}
+          </span>
+        </div>
       )}
     </div>
   </div>
 );
+
 
 export const SettingsAlgorithmPanel: React.FC = () => {
   const [s, setS] = useState<AlgorithmSettings>(() => loadAlgorithmSettings());
@@ -308,6 +372,8 @@ export const SettingsAlgorithmPanel: React.FC = () => {
     Toast.success("Algorithm settings saved");
   }, [s, flashSaved, Toast]);
 
+  const shares = bucketShares(s);
+
   return (
     <div className="settings-algorithm-panel">
       <div
@@ -317,13 +383,23 @@ export const SettingsAlgorithmPanel: React.FC = () => {
       >
         Saved
       </div>
+
       <SettingSection heading="Feed algorithm">
         <div className="setting">
           <div>
             <p>
-              The feed queue is drawn from independent buckets. Each bucket is
-              weighted; higher weight means it appears more often. Set a weight
-              to 0 to disable that bucket.
+              Each slider sets a bucket&apos;s weight from 0 to 10. The weight
+              is not a percentage: a bucket&apos;s real share is its weight
+              divided by the total of all active weights, shown beneath each
+              slider.
+            </p>
+            <p>
+              The shares always add up to 100%, because every video in the feed
+              comes from exactly one bucket. So you cannot set them all to 100%,
+              and sliding every bucket to 10 gives exactly the same feed as
+              sliding them all to 1, just evenly split. Only the ratio between
+              buckets matters. To make one dominate, raise it and lower the
+              others. Switch a bucket off to drop it entirely.
             </p>
           </div>
         </div>
@@ -335,78 +411,97 @@ export const SettingsAlgorithmPanel: React.FC = () => {
           onToggle={(v) => update("hottestEnabled", v)}
           weight={s.hottestWeight}
           onWeight={(v) => update("hottestWeight", v)}
+          share={shares.hottest}
         />
 
         <Row
           title="Liked"
-          description="Scenes with like_count greater than 0."
+          description="Scenes you have liked."
           enabled={s.likedEnabled}
           onToggle={(v) => update("likedEnabled", v)}
           weight={s.likedWeight}
           onWeight={(v) => update("likedWeight", v)}
+          share={shares.liked}
         />
 
         <Row
           title="Top Watched"
-          description={`Scenes with play_duration at or above ${s.topWatchedMinSec}s, ordered by play_duration desc.`}
+          description={`Scenes you spend the most time on, counting only those you watched at least ${s.topWatchedMinSec}s of.`}
           enabled={s.topWatchedEnabled}
           onToggle={(v) => update("topWatchedEnabled", v)}
           weight={s.topWatchedWeight}
           onWeight={(v) => update("topWatchedWeight", v)}
+          share={shares.topWatched}
         />
 
         <Row
           title="Top O-Count"
-          description={`Scenes with o_counter at or above ${s.topOCountMin}, ordered by o_counter desc.`}
+          description={`Scenes you finished to most often, at least ${s.topOCountMin} time(s).`}
           enabled={s.topOCountEnabled}
           onToggle={(v) => update("topOCountEnabled", v)}
           weight={s.topOCountWeight}
           onWeight={(v) => update("topOCountWeight", v)}
+          share={shares.topOCount}
         />
 
         <Row
           title="Watched Tags"
-          description={`Random scenes from the top-time-spent tags (top ${s.watchedTagsLookback} most-watched scenes feed the tag ranking).`}
+          description={`Random scenes carrying the tags you actually spend time on, learned from your ${s.watchedTagsLookback} most-watched scenes.`}
           enabled={s.watchedTagsEnabled}
           onToggle={(v) => update("watchedTagsEnabled", v)}
           weight={s.watchedTagsWeight}
           onWeight={(v) => update("watchedTagsWeight", v)}
+          share={shares.watchedTags}
         />
 
         <Row
           title="Favored Tags"
-          description="Random scenes tagged with any tag in the Favored Tags list (Advanced). Empty list = bucket inactive."
+          description="Random scenes with a tag from your Favored Tags list, set under Advanced below. Stays inactive while that list is empty."
           enabled={s.favoredTagsEnabled}
           onToggle={(v) => update("favoredTagsEnabled", v)}
           weight={s.favoredTagsWeight}
           onWeight={(v) => update("favoredTagsWeight", v)}
+          share={shares.favoredTags}
+        />
+
+        <Row
+          title="For You"
+          description={`Scenes similar to what you actually watched in the last ${s.affinityRecentDays} days. Learns the performers, tags and title words you spend real time on, then ranks candidates by how many of those they hit. Re-learns on every refresh, so it follows your taste as it shifts.`}
+          enabled={s.affinityEnabled}
+          onToggle={(v) => update("affinityEnabled", v)}
+          weight={s.affinityWeight}
+          onWeight={(v) => update("affinityWeight", v)}
+          share={shares.affinity}
         />
 
         <Row
           title="Top rated"
-          description={`Scenes with rating100 at or above ${s.topRatingMin}.`}
+          description={`Scenes you rated ${s.topRatingMin}% or higher.`}
           enabled={s.topRatedEnabled}
           onToggle={(v) => update("topRatedEnabled", v)}
           weight={s.topRatedWeight}
           onWeight={(v) => update("topRatedWeight", v)}
+          share={shares.topRated}
         />
 
         <Row
           title="Stale"
-          description={`Scenes with no play history in the last ${s.staleMinDays} days.`}
+          description={`Scenes you have not played in the last ${s.staleMinDays} days.`}
           enabled={s.staleEnabled}
           onToggle={(v) => update("staleEnabled", v)}
           weight={s.staleWeight}
           onWeight={(v) => update("staleWeight", v)}
+          share={shares.stale}
         />
 
         <Row
           title="Random"
-          description="Unfiltered random fallback."
+          description="Anything at all, picked at random. Keeps the feed from narrowing to the same scenes."
           enabled={s.randomWeight > 0}
           onToggle={(v) => update("randomWeight", v ? 1 : 0)}
           weight={s.randomWeight}
           onWeight={(v) => update("randomWeight", v)}
+          share={shares.random}
         />
 
         <div className="setting">
@@ -446,6 +541,162 @@ export const SettingsAlgorithmPanel: React.FC = () => {
       </SettingSection>
 
       <SettingSection heading="Advanced">
+        <div className="setting">
+          <div>
+            <h3>Demote scenes you skip</h3>
+            <div className="value">
+              A scene you leave inside 10 seconds is shown less often, and the
+              faster you bounce off it the harder it drops. Skipping ahead does
+              not count as watching. It is never a permanent ban: the penalty
+              fades on its own, so old skips drift back into rotation.
+            </div>
+          </div>
+          <div>
+            <Form.Switch
+              id="algo-skip-demote-on"
+              checked={s.skipDemoteEnabled}
+              onChange={(e) => update("skipDemoteEnabled", e.target.checked)}
+              label=""
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Skip threshold</h3>
+            <div className="value">
+              Seconds of real playback below which leaving a scene counts as a
+              skip. Seeking around inside it never counts, whatever the number.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={1}
+              max={120}
+              step={1}
+              value={s.skipThresholdSec}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 1 && n <= 120)
+                  update("skipThresholdSec", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Skip memory half-life</h3>
+            <div className="value">
+              Days for a skip to lose half its sting. Longer holds a grudge,
+              shorter forgives faster.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={1}
+              max={365}
+              step={1}
+              value={s.skipHalfLifeDays}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 1 && n <= 365)
+                  update("skipHalfLifeDays", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Maximum demotion</h3>
+            <div className="value">
+              Ceiling on how much a heavily skipped scene is held back, as a
+              percentage of its draws. Even at 95 it still comes up sometimes.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={0}
+              max={95}
+              step={5}
+              value={s.skipMaxSuppress}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 0 && n <= 95)
+                  update("skipMaxSuppress", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Hide heavily skipped tags</h3>
+            <div className="value">
+              Separate from scene demotion, and much blunter: once a tag has
+              collected enough skips, every scene carrying it is dropped from
+              the queue outright. Turn off if it is hiding too much.
+            </div>
+          </div>
+          <div>
+            <Form.Switch
+              id="algo-tag-skip-on"
+              checked={s.tagSkipEnabled}
+              onChange={(e) => update("tagSkipEnabled", e.target.checked)}
+              label=""
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Skips before a tag is hidden</h3>
+            <div className="value">
+              How many skipped scenes a tag needs before it is blocked. Low
+              numbers block whole tags off a couple of mis-swipes.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={1}
+              max={50}
+              step={1}
+              value={s.tagSkipMinCount}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 1 && n <= 50)
+                  update("tagSkipMinCount", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Tag skip memory</h3>
+            <div className="value">
+              Days a tag skip is remembered before it is forgotten entirely.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={1}
+              max={365}
+              step={1}
+              value={s.tagSkipDecayDays}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 1 && n <= 365)
+                  update("tagSkipDecayDays", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
         <div className="setting">
           <div>
             <h3>Hottest tag</h3>
@@ -539,6 +790,80 @@ export const SettingsAlgorithmPanel: React.FC = () => {
             />
           </div>
         </div>
+
+        <div className="setting">
+          <div>
+            <h3>For You: memory</h3>
+            <div className="value">
+              How many days back For You looks when learning what you are into.
+              Shorter reacts faster to a new mood, longer is more stable.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={1}
+              max={90}
+              step={1}
+              value={s.affinityRecentDays}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 1 && n <= 90)
+                  update("affinityRecentDays", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>For You: scenes profiled</h3>
+            <div className="value">
+              How many of your recently watched scenes feed the profile.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={5}
+              max={200}
+              step={5}
+              value={s.affinityLookback}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 5 && n <= 200)
+                  update("affinityLookback", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>For You: minimum watch time</h3>
+            <div className="value">
+              A scene only counts toward the profile once you have watched this
+              many seconds of it, so scenes you swiped straight past do not
+              teach it anything.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={5}
+              max={3600}
+              step={5}
+              value={s.affinityMinSec}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 5 && n <= 3600)
+                  update("affinityMinSec", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
+
         <div className="setting">
           <div>
             <h3>Top O-Count minimum</h3>

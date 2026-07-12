@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import * as GQL from "src/core/generated-graphql";
 import { getClient } from "src/core/StashService";
 const client = getClient();
-import { buildQueue, fetchSceneDetails } from "./algorithm";
+import { buildQueue, fetchSceneDetails, FeedScene } from "./algorithm";
 import {
   loadFilterChipsFromServer,
+  loadAlgorithmSettings,
   ALGORITHM_SETTINGS_EVENT,
   FilterChip,
 } from "../Settings/SettingsAlgorithmPanel";
@@ -26,6 +27,11 @@ import {
   InteractiveContext,
   ConnectionState,
 } from "src/hooks/Interactive/context";
+import {
+  buttplug,
+  useButtplug,
+  loadInteractiveConfig,
+} from "src/hooks/Interactive/buttplug";
 import "./Feed.scss";
 
 const VIEWED_KEY = "feed.viewedIds";
@@ -36,15 +42,14 @@ const MUTED_KEY = "feed.muted";
 const CAPTIONS_KEY = "feed.captions";
 const CURRENT_KEY = "feed.currentSceneId";
 const SKIPPED_TAGS_KEY = "feed.skips.tags";
-const SKIP_THRESHOLD_SEC = 5;
-const SKIPPED_TAGS_DECAY_DAYS = 30;
-const SKIPPED_TAG_DECAY_MS = SKIPPED_TAGS_DECAY_DAYS * 24 * 60 * 60 * 1000;
+const SCENE_SKIPS_KEY = "feed.skips.scenes";
+const SCENE_SKIPS_MAX = 3000;
 const QUEUE_TARGET = 30;
 const REFILL_AT = 5;
 
 const HEART_COLORS = ["#ff3b6b", "#ff1744", "#ff5070", "#ff7090", "#ff2d55", "#ff6086"];
 
-type Scene = GQL.SceneDataFragment;
+type Scene = FeedScene;
 
 interface HeartParticle {
   id: number;
@@ -114,7 +119,8 @@ function loadSkippedTags(): SkippedTagMap {
     const raw = localStorage.getItem(SKIPPED_TAGS_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as SkippedTagMap;
-    const cutoff = Date.now() - SKIPPED_TAG_DECAY_MS;
+    const days = Math.max(1, loadAlgorithmSettings().tagSkipDecayDays);
+    const cutoff = Date.now() - days * 86_400_000;
     const out: SkippedTagMap = {};
     for (const [tid, entry] of Object.entries(parsed)) {
       if (entry && typeof entry.count === "number" && entry.lastAt >= cutoff) {
@@ -136,6 +142,34 @@ function recordTagSkips(tagIds: string[]) {
       map[id] = { count: prev.count + 1, lastAt: now };
     }
     localStorage.setItem(SKIPPED_TAGS_KEY, JSON.stringify(map));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** localStorage map of sceneId -> {c: skips, m: fewest seconds ever watched,
+ *  t: last skip}. The algorithm turns this into a decaying demotion, so a
+ *  scene that gets bounced fast is shown less, not never. */
+type SceneSkipEntry = { c: number; m: number; t: number };
+function recordSceneSkip(id: string, watchedSec: number) {
+  try {
+    const raw = localStorage.getItem(SCENE_SKIPS_KEY);
+    const map: Record<string, SceneSkipEntry> = raw ? JSON.parse(raw) : {};
+    const prev = map[id];
+    const sec = Math.max(0, watchedSec);
+    map[id] = {
+      c: (prev?.c ?? 0) + 1,
+      m: prev ? Math.min(prev.m, sec) : sec,
+      t: Date.now(),
+    };
+    const keys = Object.keys(map);
+    if (keys.length > SCENE_SKIPS_MAX) {
+      keys
+        .sort((a, b) => map[a].t - map[b].t)
+        .slice(0, keys.length - SCENE_SKIPS_MAX)
+        .forEach((k) => delete map[k]);
+    }
+    localStorage.setItem(SCENE_SKIPS_KEY, JSON.stringify(map));
   } catch {
     /* ignore */
   }
@@ -397,6 +431,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
   // Visual funscript indicator: position (0-100) interpolated from current video time.
   const [funscriptPos, setFunscriptPos] = useState<number>(50);
   const funscriptActionsRef = useRef<Array<{ at: number; pos: number }> | null>(null);
+  const [funscriptReady, setFunscriptReady] = useState(false);
+  // Intiface/buttplug device status (Kiiroo, Lovense, Handy-over-BT).
+  const { status: buttplugStatus, deviceName: buttplugDeviceName } =
+    useButtplug();
 
   // Show the same centred chip on keyboard seek (ArrowLeft / ArrowRight)
   // as on edge-tap. Feed dispatches `feed-pulse-trigger` on the active
@@ -460,52 +498,107 @@ const FeedItem: React.FC<FeedItemProps> = ({
     return () => v.removeEventListener("timeupdate", onUpdate);
   }, []);
 
-  // Seek (click + drag on progress)
+  // Seek on the progress bar. Touch is intent-aware: a horizontal drag scrubs,
+  // a vertical drag is left to the browser so the feed still scrolls, and a tap
+  // seeks. Scrubbing on touchstart used to hijack any swipe starting near the
+  // bottom edge, both seeking by accident and blocking the swipe.
   useEffect(() => {
     const p = progressRef.current;
     const v = videoRef.current;
     if (!p || !v) return;
+    const SLOP = 6;
     let scrubbing = false;
-    function seek(ev: PointerEvent | MouseEvent | TouchEvent) {
+
+    function seekToX(clientX: number) {
       const rect = p!.getBoundingClientRect();
-      const clientX =
-        "touches" in ev
-          ? (ev as TouchEvent).touches[0]?.clientX ?? 0
-          : (ev as MouseEvent).clientX;
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       if (v!.duration && isFinite(v!.duration)) {
         v!.currentTime = ratio * v!.duration;
         if (barRef.current) barRef.current.style.width = `${ratio * 100}%`;
       }
     }
-    function down(ev: PointerEvent | MouseEvent | TouchEvent) {
-      (ev as Event).stopPropagation();
-      scrubbing = true;
-      p!.classList.add("scrubbing");
-      seek(ev);
-      window.addEventListener("mousemove", move);
-      window.addEventListener("mouseup", up);
-      window.addEventListener("touchmove", move, { passive: false });
-      window.addEventListener("touchend", up);
-    }
-    function move(ev: MouseEvent | TouchEvent) {
+
+    // Mouse: no scroll ambiguity, scrub straight away.
+    function mouseMove(ev: MouseEvent) {
       if (!scrubbing) return;
-      if ((ev as Event).cancelable) ev.preventDefault();
-      seek(ev);
+      seekToX(ev.clientX);
     }
-    function up() {
+    function mouseUp() {
       scrubbing = false;
       p!.classList.remove("scrubbing");
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-      window.removeEventListener("touchmove", move);
-      window.removeEventListener("touchend", up);
+      window.removeEventListener("mousemove", mouseMove);
+      window.removeEventListener("mouseup", mouseUp);
     }
-    p.addEventListener("mousedown", down as EventListener);
-    p.addEventListener("touchstart", down as EventListener, { passive: true });
+    function mouseDown(ev: MouseEvent) {
+      ev.stopPropagation();
+      scrubbing = true;
+      p!.classList.add("scrubbing");
+      seekToX(ev.clientX);
+      window.addEventListener("mousemove", mouseMove);
+      window.addEventListener("mouseup", mouseUp);
+    }
+
+    // Touch: wait for the gesture to declare itself before claiming it.
+    let startX = 0;
+    let startY = 0;
+    let intent: "none" | "scrub" | "scroll" = "none";
+
+    function detachTouch() {
+      window.removeEventListener("touchmove", touchMove);
+      window.removeEventListener("touchend", touchEnd);
+      window.removeEventListener("touchcancel", touchEnd);
+    }
+    function touchMove(ev: TouchEvent) {
+      const t = ev.touches[0];
+      if (!t) return;
+      if (intent === "none") {
+        const dx = Math.abs(t.clientX - startX);
+        const dy = Math.abs(t.clientY - startY);
+        if (dx < SLOP && dy < SLOP) return;
+        if (dy > dx) {
+          // Vertical: a feed swipe that merely began on the bar. Let go of it
+          // entirely and never preventDefault, so the native scroll continues.
+          intent = "scroll";
+          detachTouch();
+          return;
+        }
+        intent = "scrub";
+        scrubbing = true;
+        p!.classList.add("scrubbing");
+      }
+      if (intent === "scrub") {
+        if (ev.cancelable) ev.preventDefault();
+        seekToX(t.clientX);
+      }
+    }
+    function touchEnd(ev: TouchEvent) {
+      if (intent === "none") {
+        const t = ev.changedTouches[0];
+        if (t) seekToX(t.clientX); // tap to seek
+      }
+      scrubbing = false;
+      p!.classList.remove("scrubbing");
+      detachTouch();
+    }
+    function touchStart(ev: TouchEvent) {
+      const t = ev.touches[0];
+      if (!t) return;
+      startX = t.clientX;
+      startY = t.clientY;
+      intent = "none";
+      window.addEventListener("touchmove", touchMove, { passive: false });
+      window.addEventListener("touchend", touchEnd);
+      window.addEventListener("touchcancel", touchEnd);
+    }
+
+    p.addEventListener("mousedown", mouseDown);
+    p.addEventListener("touchstart", touchStart, { passive: true });
     return () => {
-      p.removeEventListener("mousedown", down as EventListener);
-      p.removeEventListener("touchstart", down as EventListener);
+      p.removeEventListener("mousedown", mouseDown);
+      p.removeEventListener("touchstart", touchStart);
+      window.removeEventListener("mousemove", mouseMove);
+      window.removeEventListener("mouseup", mouseUp);
+      detachTouch();
     };
   }, []);
 
@@ -806,6 +899,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   useEffect(() => {
     if (!interactiveOn || !scene.paths.funscript) {
       funscriptActionsRef.current = null;
+      setFunscriptReady(false);
       return;
     }
     let cancelled = false;
@@ -815,6 +909,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         const json = await r.json();
         if (!cancelled && json.actions?.length) {
           funscriptActionsRef.current = json.actions;
+          setFunscriptReady(true);
         }
       } catch { /* ignore */ }
     })();
@@ -847,6 +942,30 @@ const FeedItem: React.FC<FeedItemProps> = ({
     return () => v.removeEventListener("timeupdate", onTime);
   }, [interactiveOn]);
 
+  // Drive an Intiface/buttplug device (Kiiroo, Lovense, Handy-over-BT) from the
+  // same funscript, in parallel to the Handy cloud path. The manager owns its
+  // own rAF loop; we just bind the playing video and release on pause/unmount.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !interactiveOn || buttplugStatus !== "ready") return;
+    if (!funscriptReady) return;
+    const onPlay = () => {
+      if (funscriptActionsRef.current)
+        buttplug.bind(v, funscriptActionsRef.current);
+    };
+    const onPause = () => buttplug.unbind(v);
+    v.addEventListener("play", onPlay);
+    v.addEventListener("pause", onPause);
+    v.addEventListener("ended", onPause);
+    if (!v.paused) onPlay();
+    return () => {
+      v.removeEventListener("play", onPlay);
+      v.removeEventListener("pause", onPause);
+      v.removeEventListener("ended", onPause);
+      buttplug.unbind(v);
+    };
+  }, [interactiveOn, buttplugStatus, funscriptReady, scene.id]);
+
   // Register a play with Stash after 3s of continuous playback + track real
   // watched seconds and flush to sceneSaveActivity every 10s (and on
   // pause/end/unmount). This is what the Top Watched + Watched Tags buckets
@@ -858,6 +977,13 @@ const FeedItem: React.FC<FeedItemProps> = ({
   // reset by flush(), used by skip-learning on unmount to decide whether
   // the user genuinely watched (>= SKIP_THRESHOLD_SEC) or just skipped past.
   const sceneViewedTotalRef = useRef(0);
+  // Tiles for scenes further down the queue also mount. Without this, leaving
+  // the feed would record a skip for every scene the user never reached.
+  const everPlayedRef = useRef(false);
+  // Scrubbing, edge-tapping or arrow-keying through a video is engagement, not
+  // rejection. The user is hunting for the good part, so it must never be
+  // learned as a skip however little of it ends up playing.
+  const seekedRef = useRef(false);
   const lastTickAtRef = useRef<number | null>(null);
   const flushTimerRef = useRef<number | null>(null);
   useEffect(() => {
@@ -872,6 +998,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
     function startTracking() {
       lastTickAtRef.current = performance.now();
+      everPlayedRef.current = true;
       if (playRegisteredRef.current) return;
       if (playTimerRef.current != null) {
         window.clearTimeout(playTimerRef.current);
@@ -929,9 +1056,13 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const onPageHidden = () => {
       if (document.visibilityState === "hidden") flush();
     };
+    const onSeeking = () => {
+      seekedRef.current = true;
+    };
     v.addEventListener("play", startTracking);
     v.addEventListener("pause", stopTracking);
     v.addEventListener("ended", stopTracking);
+    v.addEventListener("seeking", onSeeking);
     v.addEventListener("timeupdate", onTimeUpdateForActivity);
     document.addEventListener("visibilitychange", onPageHidden);
     window.addEventListener("pagehide", flush);
@@ -939,21 +1070,21 @@ const FeedItem: React.FC<FeedItemProps> = ({
       v.removeEventListener("play", startTracking);
       v.removeEventListener("pause", stopTracking);
       v.removeEventListener("ended", stopTracking);
+      v.removeEventListener("seeking", onSeeking);
       v.removeEventListener("timeupdate", onTimeUpdateForActivity);
       document.removeEventListener("visibilitychange", onPageHidden);
       window.removeEventListener("pagehide", flush);
       stopTracking();
-      // Skip-learning: when this tile leaves (user scrolled away or
-      // navigated off the feed), if they spent less than the threshold on
-      // it, treat it as a skip and bump every tag's skip count. Top buckets
-      // exclude scenes whose tags accumulate too many skips.
-      if (
-        sceneViewedTotalRef.current < SKIP_THRESHOLD_SEC &&
-        scene.tags &&
-        scene.tags.length > 0
-      ) {
+      // Skip-learning, only for tiles the user actually reached and never
+      // reached into.
+      if (!everPlayedRef.current || seekedRef.current) return;
+      const viewed = sceneViewedTotalRef.current;
+      const threshold = Math.max(1, loadAlgorithmSettings().skipThresholdSec);
+      if (viewed >= threshold) return;
+      if (scene.tags && scene.tags.length > 0) {
         recordTagSkips(scene.tags.map((t) => t.id));
       }
+      recordSceneSkip(scene.id, viewed);
     };
   }, [scene.id, scene.tags]);
 
@@ -1059,7 +1190,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const performerImage = performer?.image_path ? relativize(performer.image_path) : "";
   const tags = scene.tags ?? [];
   const title =
-    scene.title || scene.files?.[0]?.basename || `Scene ${scene.id}`;
+    scene.title ||
+    scene.files?.[0]?.path?.split("/").pop() ||
+    `Scene ${scene.id}`;
 
   return (
     <div className="feed-item" ref={itemRef} data-scene-id={scene.id}>
@@ -1122,7 +1255,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
               <div className="feed-funscript-track" />
               <div
                 className="feed-funscript-dot"
-                style={{ top: `${100 - funscriptPos}%` }}
+                // Inset travel by 6% each end so the dot stops short of 0/100.
+                style={{ top: `${6 + (100 - funscriptPos) * 0.88}%` }}
               />
               <span className="feed-funscript-label feed-funscript-label-bot">0</span>
             </div>
@@ -1262,6 +1396,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
             hasFunscript={scene.interactive}
             interactiveOn={interactiveOn}
             connectionState={interactiveState}
+            buttplugStatus={buttplugStatus}
+            deviceName={buttplugDeviceName}
             onToggle={onToggleInteractive}
           />
 
@@ -1353,6 +1489,28 @@ export const Feed: React.FC = () => {
     state: interactiveState,
     initialised: interactiveInitialised,
   } = React.useContext(InteractiveContext);
+
+  // Auto-connect to Intiface when the interactive toggle is on and the Intiface
+  // transport is enabled. One attempt per toggle/config change; the settings
+  // panel offers an explicit reconnect if Intiface Central starts up later.
+  useEffect(() => {
+    function maybeConnect() {
+      if (sessionStorage.getItem("feed.interactive") === "0") return;
+      const cfg = loadInteractiveConfig();
+      if (!cfg.intifaceEnabled) return;
+      if (buttplug.status === "disconnected" || buttplug.status === "error") {
+        buttplug.connect(cfg.intifaceUrl);
+      }
+    }
+    maybeConnect();
+    window.addEventListener("stashhub:interactive-config-changed", maybeConnect);
+    return () =>
+      window.removeEventListener(
+        "stashhub:interactive-config-changed",
+        maybeConnect
+      );
+  }, [interactiveOn]);
+
   const [hearts, setHearts] = useState<HeartParticle[]>([]);
   const [drops, setDrops] = useState<DropParticle[]>([]);
   const dropIdRef = useRef(0);
@@ -1477,8 +1635,18 @@ export const Feed: React.FC = () => {
       const exclude = new Set(viewed);
       if (savedId) exclude.add(savedId);
       let debug = `viewed:${viewed.size} savedId:${savedId || "(none)"}`;
-      const ids = await buildQueue({ targetCount: QUEUE_TARGET, exclude });
+      let ids = await buildQueue({ targetCount: QUEUE_TARGET, exclude });
       if (cancelled) return;
+      // Nothing fresh left (everything viewed / recently-played)? Recycle so
+      // the feed still opens with a reshuffled library instead of empty.
+      if (ids.length === 0) {
+        ids = await buildQueue({
+          targetCount: QUEUE_TARGET,
+          exclude: savedId ? new Set([savedId]) : new Set(),
+          recycle: true,
+        });
+        if (cancelled) return;
+      }
       debug += ` | buildQueue→${ids.length} ids`;
 
       const finalIds = savedId ? [savedId, ...ids] : ids;
@@ -1516,20 +1684,48 @@ export const Feed: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey]);
 
+  // Set true while we scroll in response to a back/forward navigation, so the
+  // resulting settle replaces the history entry instead of pushing a new one.
+  const navPopRef = useRef(false);
+
   // Persist the active scene id
   const persistCurrent = useCallback((sceneId: string | undefined) => {
     if (!sceneId) return;
     try { localStorage.setItem(CURRENT_KEY, sceneId); } catch { /* ignore */ }
-    // Update the URL to /feed/:id without a navigation so the user can
-    // copy/share the address of the scene they're currently looking at.
-    // Only fire when path differs to avoid spamming history.replaceState
-    // on every IntersectionObserver tick.
+    // Reflect the current scene in the URL as /feed/:id. pushState gives a real
+    // history entry (back/forward step through videos) and updates the address
+    // bar reliably, iOS Safari included. Only fire on an actual scene change.
     try {
       const target = `/feed/${sceneId}`;
       if (window.location.pathname !== target) {
-        window.history.replaceState(null, "", target + window.location.search);
+        const url = target + window.location.search;
+        if (navPopRef.current) {
+          window.history.replaceState(null, "", url);
+        } else {
+          window.history.pushState(null, "", url);
+        }
       }
     } catch { /* ignore */ }
+    navPopRef.current = false;
+  }, []);
+
+  // Back/forward: scroll the feed to the scene named in the URL.
+  useEffect(() => {
+    function onPop() {
+      const m = window.location.pathname.match(/^\/feed\/(\d+)/);
+      if (!m) return;
+      const track = trackRef.current;
+      if (!track) return;
+      const el = track.querySelector<HTMLElement>(
+        `.feed-item[data-scene-id="${m[1]}"]`
+      );
+      if (el) {
+        navPopRef.current = true;
+        track.scrollTo({ top: el.offsetTop, behavior: "auto" });
+      }
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   const loadMore = useCallback(async () => {
@@ -1538,8 +1734,20 @@ export const Feed: React.FC = () => {
     try {
       const viewed = getViewed();
       const exclude = new Set([...viewed, ...loadedIds]);
-      const ids = await buildQueue({ targetCount: 20, exclude });
-      const details = await fetchSceneDetails(ids);
+      let ids = await buildQueue({ targetCount: 20, exclude });
+      let details = await fetchSceneDetails(ids);
+      // Endless feed: once every eligible scene has been served this session
+      // (or recently-played has eaten the library) the dedup build returns
+      // nothing. Recycle: reshuffle the whole library through the same
+      // algorithm, holding back only the last few tiles so nothing repeats
+      // immediately. This makes the feed swipe forever instead of dead-ending.
+      if (details.length === 0) {
+        const recent = new Set(Array.from(loadedIds).slice(-REFILL_AT * 2));
+        loadedIds.clear();
+        recent.forEach((id) => loadedIds.add(id));
+        ids = await buildQueue({ targetCount: 20, exclude: recent, recycle: true });
+        details = await fetchSceneDetails(ids);
+      }
       details.forEach((s) => loadedIds.add(s.id));
       setScenes((prev) => [...prev, ...details]);
     } finally {
@@ -1602,6 +1810,20 @@ export const Feed: React.FC = () => {
           try { v.load(); } catch { /* ignore */ }
         }
       }
+      // Cap live streams: tear down tiles well outside the window so a long
+      // fast fling can't leave dozens of open transcodes. Removing src ends
+      // the upstream request; the poster stays and src re-attaches from
+      // data-src on swipe-back. Keeps concurrent loads bounded regardless of
+      // scroll speed or distance.
+      const teardown = aheadSrcOnly + 2;
+      for (let i = 0; i < items.length; i++) {
+        if (i >= idx - teardown && i <= idx + teardown) continue;
+        const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
+        if (!v || !v.src || !v.paused) continue;
+        v.removeAttribute("src");
+        v.preload = "none";
+        try { v.load(); } catch { /* ignore */ }
+      }
     }
 
     // Only the tile the user *settles* on (highly visible for >~120ms) gets
@@ -1610,6 +1832,7 @@ export const Feed: React.FC = () => {
     // the landed tile loads. Skipped tiles show their posters (always drawn).
     let settleTimer: number | null = null;
     let pendingItem: HTMLDivElement | null = null;
+    let primeRaf: number | null = null;
     const activate = (item: HTMLDivElement) => {
       const video = item.querySelector<HTMLVideoElement>("video.feed-video");
       if (!video) return;
@@ -1623,22 +1846,9 @@ export const Feed: React.FC = () => {
       video.preload = "auto";
       video.muted = muted;
       video.play().catch(() => {});
-      // Upload the funscript for this scene if interactive is on and the script
-      // hasn't been uploaded yet (avoids re-uploading on every settle bounce).
-      if (
-        interactiveOn &&
-        scene.interactive &&
-        scene.paths.funscript &&
-        interactiveSceneRef.current !== scene.id &&
-        interactiveInitialised
-      ) {
-        uploadScript(scene.paths.funscript).then(() => {
-          interactiveSceneRef.current = scene.id;
-        });
-      }
-      if (!interactiveOn) {
-        interactiveSceneRef.current = null;
-      }
+      // Funscript upload lives in FeedItem, which owns the per-scene interactive
+      // state. It used to be duplicated here against identifiers that do not
+      // exist in this scope, which threw and killed everything below it.
       // Prefetch neighbours a beat later, and only if this is still the tile the
       // user settled on, so a fast skip-through never kicks off loads for tiles
       // already scrolled past.
@@ -1665,6 +1875,17 @@ export const Feed: React.FC = () => {
           if (entry.intersectionRatio >= 0.7) {
             pendingItem = item;
             currentVisibleRef.current = item; // immediate for keyboard/persist reads
+            // Prime upcoming tiles right away (throttled to one rAF), so even a
+            // fast swipe that never "settles" still lands on a buffered video.
+            // ensureNeighborSrcs bounds the aggressive window and tears down far
+            // tiles, so this can't pile up transcodes on the server.
+            if (primeRaf == null) {
+              primeRaf = window.requestAnimationFrame(() => {
+                primeRaf = null;
+                const cur = currentVisibleRef.current as HTMLDivElement | null;
+                if (cur) ensureNeighborSrcs(cur);
+              });
+            }
             if (settleTimer != null) window.clearTimeout(settleTimer);
             settleTimer = window.setTimeout(() => {
               settleTimer = null;
@@ -1682,6 +1903,7 @@ export const Feed: React.FC = () => {
     track.querySelectorAll(".feed-item").forEach((el) => io.observe(el));
     return () => {
       if (settleTimer != null) window.clearTimeout(settleTimer);
+      if (primeRaf != null) window.cancelAnimationFrame(primeRaf);
       io.disconnect();
     };
   }, [scenes, muted, loadMore, persistCurrent]);
@@ -1851,9 +2073,12 @@ export const Feed: React.FC = () => {
   return (
     <div className="feed-root">
       <div className="feed-track" ref={trackRef}>
-        {scenes.map((s) => (
+        {scenes.map((s, i) => (
           <FeedItem
-            key={s.id}
+            // Endless feed recycles scenes, so the same id can legitimately
+            // appear more than once. Keying on id alone collides and the
+            // repeated tiles never mount, which dead-ends the scroll.
+            key={`${s.id}-${i}`}
             scene={s}
             muted={muted}
             onToggleMute={toggleMute}

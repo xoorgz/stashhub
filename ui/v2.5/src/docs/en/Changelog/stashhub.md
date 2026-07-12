@@ -1,3 +1,30 @@
+### stashhub v1.4.40
+
+* Feed is now endless: when fresh scenes run out it reshuffles the whole library through the same algorithm instead of stopping.
+* Feed: upcoming videos preload during fast swipes so the next tile plays instantly; far tiles are torn down to spare the server.
+* Feed algorithm: recently-played hide window default lowered from 7 days to 2.
+* Feed: swipe works from anywhere on the tile, buttons and progress bar still take their own taps.
+* Feed: title, tags and progress bar fade out with the rest of the overlay, and the button column sits higher.
+* Feed algorithm: new For You source learns from what you actually watch, matching performers, tags and title words.
+* Feed algorithm: weights are sliders now, each showing its live share of the feed, and the shares are what the queue actually draws.
+* Settings: algorithm panel reads as prose and stacks properly on phones.
+* Settings: Interactive Toys is now its own tab instead of hiding under Feed Algorithm.
+* Feed algorithm: scenes you bounce off fast are shown less, hardest for instant skips. The penalty decays, so they return.
+* Feed: seeking inside a video is never learned as a skip, and scenes you never reached no longer count either.
+* Settings: skip threshold, memory half-life, demotion ceiling and the tag-skip blocker are all tunable under Advanced.
+
+### stashhub v1.4.39
+
+* Feed top bar: new CC and Toy filters, show only captioned scenes or only scenes with a funscript.
+* Feed: the URL updates per scene as you swipe, and back/forward step through videos.
+
+### stashhub v1.4.38
+
+* Feed: interactive toys now work with any Intiface Central device (Kiiroo Keon and Powerblow, Lovense, Handy over Bluetooth), alongside the existing Handy cloud sync.
+* Settings: new Interactive toys section to enable Intiface, set its address, and connect. The feed auto-connects when the toy toggle is on.
+* Feed toy sync drives strokers by position, suction/oscillating toys by stroke speed, and vibrators by intensity, all from the same funscript.
+* Feed toy button is now sync-only: dimmed on scenes without a funscript, active by default on scenes with one.
+
 ### stashhub v1.4.37
 
 * Feed: Handy interactive sync with visual thrust indicator. A sextoy icon on funscripted scenes toggles device sync; a glowing dot on the video edge moves in real time with the funscript timeline, visible even without a Handy connected.

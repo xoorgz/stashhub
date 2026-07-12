@@ -1,3 +1,4 @@
+import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import legacy from "@vitejs/plugin-legacy";
@@ -37,6 +38,16 @@ export default defineConfig(() => {
     },
     optimizeDeps: {
       entries: "src/index.tsx",
+    },
+    resolve: {
+      alias: {
+        // buttplug ships its Node build as main (pulls in `ws`); point the
+        // bundler at the self-contained browser ESM instead.
+        buttplug: path.resolve(
+          __dirname,
+          "node_modules/buttplug/dist/web/buttplug.mjs"
+        ),
+      },
     },
     server: {
       port: 3000,

@@ -5,7 +5,16 @@ import { getClient } from "src/core/StashService";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import { PerformerIsMissingCriterionOption } from "src/models/list-filter/criteria/is-missing";
 import { OrganizedCriterionOption } from "src/models/list-filter/criteria/organized";
-import { createMandatoryTimestampCriterionOption } from "src/models/list-filter/criteria/criterion";
+import {
+  Criterion,
+  createMandatoryTimestampCriterionOption,
+} from "src/models/list-filter/criteria/criterion";
+
+// The concrete criteria carry value/modifier, the abstract base does not.
+type MutableCriterion = Criterion & {
+  value: unknown;
+  modifier?: CriterionModifier;
+};
 
 const CreatedAtCriterionOption = createMandatoryTimestampCriterionOption("created_at");
 import { FilterMode, CriterionModifier } from "src/core/generated-graphql";
@@ -90,7 +99,7 @@ async function fetchCounts(s: NotificationSettings): Promise<Counts> {
 
 function buildUnorganizedScenesUrl(): string {
   const f = new ListFilterModel(FilterMode.Scenes);
-  const c = OrganizedCriterionOption.makeCriterion(f.config);
+  const c = OrganizedCriterionOption.makeCriterion() as MutableCriterion;
   c.value = false;
   f.criteria = [c];
   const qp = f.makeQueryParameters();
@@ -99,7 +108,7 @@ function buildUnorganizedScenesUrl(): string {
 
 function buildPerformersMissingImageUrl(): string {
   const f = new ListFilterModel(FilterMode.Performers);
-  const c = PerformerIsMissingCriterionOption.makeCriterion(f.config);
+  const c = PerformerIsMissingCriterionOption.makeCriterion() as MutableCriterion;
   c.value = "image";
   f.criteria = [c];
   const qp = f.makeQueryParameters();
@@ -108,7 +117,7 @@ function buildPerformersMissingImageUrl(): string {
 
 function buildNewVideosUrl(windowHours: number): string {
   const f = new ListFilterModel(FilterMode.Scenes);
-  const c = CreatedAtCriterionOption.makeCriterion(f.config) as any;
+  const c = CreatedAtCriterionOption.makeCriterion() as MutableCriterion;
   const since = new Date(Date.now() - windowHours * 3600_000)
     .toISOString()
     .slice(0, 10); // YYYY-MM-DD. Stash UI uses date-only for created_at criterion

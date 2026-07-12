@@ -9,7 +9,7 @@ const useInterval = (
   delay: number | null = 5000
 ): (() => void)[] => {
   const savedCallback = useRef<() => void>();
-  const savedIntervalId = useRef<number>();
+  const savedIntervalId = useRef<ReturnType<typeof setInterval>>();
   const [savedDelay, setSavedDelay] = useState<number | null>(delay);
 
   useEffect(() => {

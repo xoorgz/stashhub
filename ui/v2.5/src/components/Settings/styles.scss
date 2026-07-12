@@ -4,6 +4,19 @@
   }
 }
 
+/* The columns are only sized from sm up (col-sm-3 / offset-sm-3), so on phones
+   they stay bare flex items sharing one row and the content column gets
+   crushed to a sliver. Stack them, which is what the d-sm-none divider in the
+   menu already assumes. */
+@include media-breakpoint-down(xs) {
+  #settings-menu-container,
+  #settings-container {
+    flex: 0 0 100%;
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
 #settings-container .tab-content {
   max-width: 780px;
 }

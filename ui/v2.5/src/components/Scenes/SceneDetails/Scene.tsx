@@ -208,7 +208,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
   const [incrementLike] = useSceneIncrementLike();
   const { burst: burstHearts, layer: heartLayer } = useHeartBurst();
 
-  function incrementLikeCount(e?: React.MouseEvent<HTMLButtonElement>) {
+  function incrementLikeCount(e?: React.MouseEvent<HTMLElement>) {
     incrementLike({ variables: { id: scene.id } });
     if (e) {
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();

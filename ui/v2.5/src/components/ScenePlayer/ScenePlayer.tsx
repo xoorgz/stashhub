@@ -505,7 +505,7 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
 
     // delay before second play event after a play event to adjust for video player issues
     const DELAY_FOR_SECOND_PLAY_MS = 1000;
-    const playingTimer = useRef<number>();
+    const playingTimer = useRef<ReturnType<typeof setTimeout>>();
 
     useEffect(() => {
       const player = getPlayer();

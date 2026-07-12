@@ -20,6 +20,10 @@ const client = getClient();
 export interface BuildQueueOpts {
   targetCount?: number;
   exclude?: Set<string>;
+  // Endless-feed recycle pass: skip the exclusions that deliberately shrink
+  // the candidate pool (recently-played, skip-learning) so the whole library
+  // is reshuffled once fresh material runs out. Buckets still apply.
+  recycle?: boolean;
 }
 
 let cachedHottestTagId: { name: string; id: string | null } | null = null;
@@ -94,6 +98,98 @@ async function fetchBucket(opts: BucketOpts): Promise<string[]> {
   );
 }
 
+/** Same query as fetchBucket, but keeps the whole scene so we can score it. */
+async function fetchSlim(
+  opts: BucketOpts
+): Promise<GQL.SlimSceneDataFragment[]> {
+  return withTimeout(
+    client
+      .query<GQL.FindScenesQuery, GQL.FindScenesQueryVariables>({
+        query: GQL.FindScenesDocument,
+        variables: { filter: opts.filter, scene_filter: opts.sceneFilter },
+      })
+      .then((r) => r.data.findScenes.scenes as GQL.SlimSceneDataFragment[])
+      .catch((e) => {
+        console.warn("[feed] slim fetch failed", e);
+        return [] as GQL.SlimSceneDataFragment[];
+      }),
+    30_000,
+    [] as GQL.SlimSceneDataFragment[]
+  );
+}
+
+const TITLE_STOPWORDS = new Set([
+  "with", "from", "this", "that", "your", "have", "when", "then", "they",
+  "them", "want", "wants", "gets", "gives", "goes", "into", "over", "onto",
+  "part", "scene", "video", "full", "free", "porn", "hd", "and", "the", "for",
+  "her", "his", "you", "she", "him", "not", "but", "all", "get", "got",
+]);
+
+/** Title words worth matching on. Bracketed tag suffixes are stripped: a lot of
+ *  the library carries legacy "-[tag, tag]" filenames and they would otherwise
+ *  drown out the real words. */
+function titleWords(title?: string | null): string[] {
+  if (!title) return [];
+  return Array.from(
+    new Set(
+      title
+        .toLowerCase()
+        .replace(/\[[^\]]*\]/g, " ")
+        .split(/[^a-z0-9]+/)
+        .filter((w) => w.length >= 4 && !TITLE_STOPWORDS.has(w))
+    )
+  );
+}
+
+function topKeys(m: Map<string, number>, n: number): string[] {
+  return Array.from(m.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n)
+    .map(([k]) => k);
+}
+
+const SCENE_SKIPS_KEY = "feed.skips.scenes";
+
+type SceneSkipEntry = { c: number; m: number; t: number };
+
+/** Returns sceneId -> probability of dropping a draw, 0 to skipMaxSuppress.
+ *
+ *  Severity comes from the fewest seconds ever watched, so a scene bounced
+ *  instantly is punished far harder than one dropped at nine seconds. Repeat
+ *  skips compound. Everything then decays on a half-life, so a scene the user
+ *  has cooled on gradually works its way back into rotation on its own.
+ */
+function makeSkipDemotion(
+  settings: AlgorithmSettings,
+  recycle?: boolean
+): (id: string) => number {
+  if (recycle || !settings.skipDemoteEnabled) return () => 0;
+
+  let map: Record<string, SceneSkipEntry>;
+  try {
+    map = JSON.parse(localStorage.getItem(SCENE_SKIPS_KEY) || "{}");
+  } catch {
+    return () => 0;
+  }
+
+  const now = Date.now();
+  const halfLifeMs = Math.max(1, settings.skipHalfLifeDays) * 86_400_000;
+  const max = Math.min(0.95, Math.max(0, settings.skipMaxSuppress / 100));
+
+  return (id: string) => {
+    const e = map[id];
+    if (!e || !e.c) return 0;
+    const threshold = Math.max(1, settings.skipThresholdSec);
+    const severity = Math.min(
+      1,
+      Math.max(0.05, 1 - Math.min(e.m, threshold) / threshold)
+    );
+    const strength = 1 - Math.exp(-severity * e.c);
+    const decay = Math.pow(0.5, (now - e.t) / halfLifeMs);
+    return max * strength * decay;
+  };
+}
+
 interface BucketSpec {
   name: string;
   weight: number;
@@ -103,6 +199,7 @@ interface BucketSpec {
 export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   const targetCount = opts.targetCount ?? 30;
   const exclude = new Set(opts.exclude ?? []);
+  const recycle = opts.recycle ?? false;
   const settings = loadAlgorithmSettings();
 
   const seed = `random_${Math.floor(Math.random() * 1e9)}`;
@@ -133,32 +230,81 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   const boostTagIds: string[] = [];
   const boostWeight = 0;
 
-  // Wrap a bucket's sceneFilter in the strict-chip tag constraint, if any.
-  // Uses AND so the bucket's own tag filter (hottest, watched, favored)
-  // composes correctly instead of clobbering.
+  // Built-in attribute filters from the top bar: CC restricts to scenes with
+  // captions, Toy to scenes with a funscript (interactive). Independent of the
+  // tag chips and of each other.
+  let ccActive = false;
+  let toyActive = false;
+  try {
+    ccActive = localStorage.getItem("feed.filter.cc") === "1";
+    toyActive = localStorage.getItem("feed.filter.toy") === "1";
+  } catch {
+    /* ignore */
+  }
+
+  // Wrap a bucket's sceneFilter in the active constraints. Tag chips go through
+  // AND so the bucket's own tag filter composes; interactive/captions are
+  // unique top-level fields and just set directly.
   const withStrict = (sf: GQL.SceneFilterType): GQL.SceneFilterType => {
-    if (strictTagIds.length === 0) return sf;
-    return {
-      ...sf,
-      AND: {
-        ...(sf.AND ?? {}),
-        tags: {
-          value: strictTagIds,
-          modifier: GQL.CriterionModifier.Includes,
+    let out: GQL.SceneFilterType = { ...sf };
+    if (toyActive) out.interactive = true;
+    if (ccActive)
+      out.captions = { value: "", modifier: GQL.CriterionModifier.NotNull };
+    if (strictTagIds.length > 0) {
+      out = {
+        ...out,
+        AND: {
+          ...(out.AND ?? {}),
+          tags: {
+            value: strictTagIds,
+            modifier: GQL.CriterionModifier.Includes,
+          },
         },
-      },
-    };
+      };
+    }
+    return out;
   };
   // Wrap the module-level fetchBucket so every bucket below picks up the
   // strict constraint without touching their call sites individually.
   const fetchBucketStrict = (opts: BucketOpts) =>
     fetchBucket({ ...opts, sceneFilter: withStrict(opts.sceneFilter) });
+  const fetchSlimStrict = (opts: BucketOpts) =>
+    fetchSlim({ ...opts, sceneFilter: withStrict(opts.sceneFilter) });
+
+  // Fetch each bucket in proportion to the share it is supposed to contribute.
+  // Fixed per-bucket fractions meant a heavy bucket could run out of ids and
+  // silently hand its slots to whatever still had some, so the weights the user
+  // set never actually landed.
+  const activeWeights: number[] = [];
+  const countWeight = (on: boolean, weight: number) => {
+    if (on && weight > 0) activeWeights.push(weight);
+  };
+  countWeight(settings.hottestEnabled, settings.hottestWeight);
+  countWeight(settings.likedEnabled, settings.likedWeight);
+  countWeight(settings.topWatchedEnabled, settings.topWatchedWeight);
+  countWeight(settings.topOCountEnabled, settings.topOCountWeight);
+  countWeight(settings.watchedTagsEnabled, settings.watchedTagsWeight);
+  countWeight(
+    settings.favoredTagsEnabled && settings.favoredTagIds.length > 0,
+    settings.favoredTagsWeight
+  );
+  countWeight(settings.affinityEnabled, settings.affinityWeight);
+  countWeight(settings.topRatedEnabled, settings.topRatedWeight);
+  countWeight(settings.staleEnabled, settings.staleWeight);
+  countWeight(true, settings.randomWeight);
+  const totalWeight = activeWeights.reduce((a, b) => a + b, 0);
+  const pageFor = (weight: number) =>
+    Math.max(
+      8,
+      Math.ceil(targetCount * (totalWeight > 0 ? weight / totalWeight : 0) * over)
+    );
 
   // Recently-played exclude: fetch IDs of scenes whose last_played_at is
   // within the configured window and add them to the exclude set. Done as a
   // separate query rather than per-bucket filters because GQL Int/Time filters
   // don't compose with OR and we want to keep never-played scenes (NULL).
   if (
+    !recycle &&
     settings.excludeRecentlyPlayed &&
     settings.excludeRecentlyPlayedDays > 0
   ) {
@@ -193,13 +339,13 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   // from poisoning forever, the storage layer drops entries older than 30d.
   const SKIPPED_TAGS_KEY = "feed.skips.tags";
   const SKIP_TAG_TOP_N = 10;
-  // A tag needs at least this many skips before it's used to filter,
-  // otherwise a single mis-swipe blocks an entire tag.
-  const SKIP_TAG_MIN_COUNT = 3;
+  const SKIP_TAG_MIN_COUNT = Math.max(1, settings.tagSkipMinCount);
   type SkippedTagEntry = { count: number; lastAt: number };
   let topSkipTagIds: string[] = [];
   try {
-    const raw = localStorage.getItem(SKIPPED_TAGS_KEY);
+    const raw = settings.tagSkipEnabled
+      ? localStorage.getItem(SKIPPED_TAGS_KEY)
+      : null;
     if (raw) {
       const map = JSON.parse(raw) as Record<string, SkippedTagEntry>;
       const entries = Object.entries(map)
@@ -212,7 +358,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   } catch {
     /* ignore */
   }
-  if (topSkipTagIds.length > 0) {
+  if (!recycle && topSkipTagIds.length > 0) {
     const skippy = await fetchBucket({
       filter: { per_page: 1000, page: 1 },
       sceneFilter: {
@@ -241,7 +387,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
         const tagId =
           settings.hottestTagId || (await getHottestTagId(settings.hottestTagName));
         if (!tagId) return { name: "hottest", weight: settings.hottestWeight, ids: [] };
-        const perPage = Math.max(5, Math.ceil(targetCount * 0.6 * over));
+        const perPage = pageFor(settings.hottestWeight);
         const ids = await fetchBucketStrict({
           filter: { per_page: perPage, page: 1, sort: seed },
           sceneFilter: {
@@ -262,7 +408,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   if (settings.likedEnabled && settings.likedWeight > 0) {
     fetches.push(
       (async () => {
-        const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
+        const perPage = pageFor(settings.likedWeight);
         const ids = await fetchBucketStrict({
           filter: {
             per_page: perPage,
@@ -289,7 +435,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   if (settings.topWatchedEnabled && settings.topWatchedWeight > 0) {
     fetches.push(
       (async () => {
-        const perPage = Math.max(5, Math.ceil(targetCount * 0.5 * over));
+        const perPage = pageFor(settings.topWatchedWeight);
         const ids = await fetchBucketStrict({
           filter: {
             per_page: perPage,
@@ -361,7 +507,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
           .slice(0, 8)
           .map(([id]) => id);
 
-        const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
+        const perPage = pageFor(settings.watchedTagsWeight);
         const ids = await fetchBucketStrict({
           filter: { per_page: perPage, page: 1, sort: seed },
           sceneFilter: {
@@ -387,7 +533,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   ) {
     fetches.push(
       (async () => {
-        const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
+        const perPage = pageFor(settings.favoredTagsWeight);
         const ids = await fetchBucketStrict({
           filter: { per_page: perPage, page: 1, sort: seed },
           sceneFilter: {
@@ -402,12 +548,163 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
+  // Affinity. An evolving map of what you have actually been spending time on
+  // lately. Profile the scenes you recently watched for real, pull candidates
+  // by each signal (performer, tag, title word), then score every candidate by
+  // how much of the profile it hits, so a scene sharing a performer AND two
+  // tags beats one sharing a single tag. Re-profiled on every build, so it
+  // drifts as your taste drifts.
+  if (settings.affinityEnabled && settings.affinityWeight > 0) {
+    fetches.push(
+      (async () => {
+        const empty = {
+          name: "affinity",
+          weight: settings.affinityWeight,
+          ids: [] as string[],
+        };
+        const cutoff = new Date(
+          Date.now() - settings.affinityRecentDays * 86400_000
+        )
+          .toISOString()
+          .slice(0, 10);
+
+        // Profile is deliberately NOT strict-filtered: what you watched is what
+        // you watched, even if a CC/Toy chip is narrowing the feed right now.
+        const recent = await fetchSlim({
+          filter: {
+            per_page: Math.max(5, settings.affinityLookback),
+            page: 1,
+            sort: "last_played_at",
+            direction: GQL.SortDirectionEnum.Desc,
+          },
+          sceneFilter: {
+            last_played_at: {
+              value: cutoff,
+              modifier: GQL.CriterionModifier.GreaterThan,
+            },
+            play_duration: {
+              value: settings.affinityMinSec,
+              value2: 999999,
+              modifier: GQL.CriterionModifier.Between,
+            },
+          },
+        });
+        if (!recent.length) return empty;
+
+        // Every signal is weighted by how long you actually watched that scene.
+        const perfScore = new Map<string, number>();
+        const tagScore = new Map<string, number>();
+        const wordScore = new Map<string, number>();
+        for (const sc of recent) {
+          const secs = Math.max(1, sc.play_duration ?? 1);
+          for (const p of sc.performers ?? [])
+            perfScore.set(p.id, (perfScore.get(p.id) ?? 0) + secs);
+          for (const t of sc.tags ?? [])
+            tagScore.set(t.id, (tagScore.get(t.id) ?? 0) + secs);
+          for (const word of titleWords(sc.title))
+            wordScore.set(word, (wordScore.get(word) ?? 0) + secs);
+        }
+        const topPerf = topKeys(perfScore, 5);
+        const topTags = topKeys(tagScore, 8);
+        const topWords = topKeys(wordScore, 4);
+        if (!topPerf.length && !topTags.length && !topWords.length) return empty;
+
+        // Candidates DO respect the active chips/filters.
+        const pool = Math.max(40, targetCount * 4);
+        const queries: Array<Promise<GQL.SlimSceneDataFragment[]>> = [];
+        if (topPerf.length) {
+          queries.push(
+            fetchSlimStrict({
+              filter: { per_page: pool, page: 1, sort: seed },
+              sceneFilter: {
+                performers: {
+                  value: topPerf,
+                  modifier: GQL.CriterionModifier.Includes,
+                },
+              },
+            })
+          );
+        }
+        if (topTags.length) {
+          queries.push(
+            fetchSlimStrict({
+              filter: { per_page: pool, page: 1, sort: seed },
+              sceneFilter: {
+                tags: {
+                  value: topTags,
+                  modifier: GQL.CriterionModifier.Includes,
+                },
+              },
+            })
+          );
+        }
+        for (const word of topWords) {
+          queries.push(
+            fetchSlimStrict({
+              filter: { per_page: Math.ceil(pool / 2), page: 1, sort: seed },
+              sceneFilter: {
+                title: {
+                  value: word,
+                  modifier: GQL.CriterionModifier.Includes,
+                },
+              },
+            })
+          );
+        }
+
+        const profiled = new Set(recent.map((s) => s.id));
+        const candidates = new Map<string, GQL.SlimSceneDataFragment>();
+        for (const batch of await Promise.all(queries)) {
+          for (const sc of batch) {
+            if (profiled.has(sc.id)) continue; // don't replay the profile itself
+            candidates.set(sc.id, sc);
+          }
+        }
+        if (!candidates.size) return empty;
+
+        // Normalise each signal so one mega-watched performer can't drown out
+        // everything else. Performer > tag > title word.
+        const norm = (m: Map<string, number>) => {
+          const max = Math.max(1, ...Array.from(m.values()));
+          return (k: string) => (m.get(k) ?? 0) / max;
+        };
+        const perfN = norm(perfScore);
+        const tagN = norm(tagScore);
+        const wordN = norm(wordScore);
+
+        const scored: Array<{ id: string; score: number }> = [];
+        for (const sc of Array.from(candidates.values())) {
+          let score = 0;
+          for (const p of sc.performers ?? []) score += 3 * perfN(p.id);
+          for (const t of sc.tags ?? []) score += 1.5 * tagN(t.id);
+          for (const word of titleWords(sc.title)) score += wordN(word);
+          if (score > 0) scored.push({ id: sc.id, score });
+        }
+        scored.sort((a, b) => b.score - a.score);
+        console.info(
+          "[feed] affinity: profiled",
+          recent.length,
+          "recent scenes ->",
+          topPerf.length,
+          "performers,",
+          topTags.length,
+          "tags,",
+          topWords.length,
+          "words ->",
+          scored.length,
+          "ranked candidates"
+        );
+        return { ...empty, ids: scored.map((s) => s.id) };
+      })()
+    );
+  }
+
   // Top O-Count. Fetch top N by o_counter desc among scenes that meet the
   // minimum, then shuffle.
   if (settings.topOCountEnabled && settings.topOCountWeight > 0) {
     fetches.push(
       (async () => {
-        const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
+        const perPage = pageFor(settings.topOCountWeight);
         const ids = await fetchBucketStrict({
           filter: {
             per_page: perPage,
@@ -434,7 +731,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
 
   // Top rated
   if (settings.topRatedEnabled && settings.topRatedWeight > 0) {
-    const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
+    const perPage = pageFor(settings.topRatedWeight);
     fetches.push(
       fetchBucketStrict({
         filter: { per_page: perPage, page: 1, sort: seed },
@@ -452,7 +749,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
 
   // Stale: last_played_at older than the configured window.
   if (settings.staleEnabled && settings.staleWeight > 0) {
-    const perPage = Math.max(5, Math.ceil(targetCount * 0.4 * over));
+    const perPage = pageFor(settings.staleWeight);
     const cutoff = new Date(
       Date.now() - settings.staleMinDays * 86400_000
     )
@@ -474,7 +771,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
 
   // Random.
   if (settings.randomWeight > 0) {
-    const perPage = Math.max(5, Math.ceil(targetCount * 0.3 * over));
+    const perPage = pageFor(settings.randomWeight);
     fetches.push(
       fetchBucketStrict({
         filter: { per_page: perPage, page: 1, sort: seed },
@@ -512,29 +809,50 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     buckets.map((b) => `${b.name}(w=${b.weight},n=${b.ids.length})`).join(", ") || "none"
   );
 
-  // Weighted draw without replacement.
+  // Weighted draw without replacement. When the bucket we picked offers an id
+  // another bucket already supplied, keep pulling from that same bucket instead
+  // of burning the draw: buckets overlap heavily (a scene can be liked AND top
+  // rated AND random), and dropping those draws quietly robbed the heavier
+  // buckets of the share their weight promised.
+  const demotion = makeSkipDemotion(settings, recycle);
+  let demoted = 0;
   const out: string[] = [];
   const seen = new Set<string>();
-  while (out.length < targetCount && buckets.some((b) => b.ids.length)) {
-    const totalW = buckets.reduce(
-      (s, b) => s + (b.ids.length ? b.weight : 0),
-      0
-    );
-    if (!totalW) break;
+  while (out.length < targetCount) {
+    const live = buckets.filter((b) => b.ids.length > 0);
+    if (!live.length) break;
+    const totalW = live.reduce((s, b) => s + b.weight, 0);
+    if (totalW <= 0) break;
+
     let r = Math.random() * totalW;
-    for (const b of buckets) {
-      if (!b.ids.length) continue;
+    let chosen = live[live.length - 1];
+    for (const b of live) {
       r -= b.weight;
       if (r <= 0) {
-        const id = b.ids.shift();
-        if (id && !seen.has(id)) {
-          out.push(id);
-          seen.add(id);
-        }
+        chosen = b;
         break;
       }
     }
+
+    let picked: string | undefined;
+    while (chosen.ids.length) {
+      const id = chosen.ids.shift()!;
+      if (seen.has(id)) continue;
+      // Demote scenes the user bounces off. Probabilistic, not a ban: the
+      // scene keeps its place in the pool and simply loses most of its draws.
+      if (Math.random() < demotion(id)) {
+        demoted++;
+        continue;
+      }
+      picked = id;
+      break;
+    }
+    if (picked) {
+      out.push(picked);
+      seen.add(picked);
+    }
   }
+  if (demoted) console.info("[feed] skip-demoted", demoted, "draws");
 
   // Fallback: unfiltered random.
   if (out.length === 0) {
@@ -558,9 +876,13 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   return out;
 }
 
+// The FindScenes query returns fewer fields than SceneDataFragment, so the feed
+// works off the query's own row type rather than lying about what it has.
+export type FeedScene = GQL.FindScenesQuery["findScenes"]["scenes"][number];
+
 export async function fetchSceneDetails(
   ids: string[]
-): Promise<GQL.SceneDataFragment[]> {
+): Promise<FeedScene[]> {
   const numericIds = ids
     .map((x) => parseInt(x, 10))
     .filter((n) => Number.isFinite(n) && n > 0);
@@ -587,10 +909,10 @@ export async function fetchSceneDetails(
       })
       .catch((e) => {
         console.warn("[feed] detail fetch failed", e);
-        return [] as GQL.SceneDataFragment[];
+        return [] as FeedScene[];
       }),
     30_000,
-    [] as GQL.SceneDataFragment[]
+    [] as FeedScene[]
   );
 }
 

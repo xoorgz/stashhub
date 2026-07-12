@@ -9,8 +9,8 @@ import { useIntl } from "react-intl";
 interface ICountButtonProps {
   value: number;
   icon: React.ReactNode;
-  onIncrement?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
-  onValueClicked?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
+  onIncrement?: (e?: React.MouseEvent<HTMLElement>) => void;
+  onValueClicked?: (e?: React.MouseEvent<HTMLElement>) => void;
   title?: string;
   countTitle?: string;
 }

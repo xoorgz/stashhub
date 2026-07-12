@@ -38,6 +38,7 @@
     "apollo-upload-client": "^18.0.1",
     "base64-blob": "^1.4.1",
     "bootstrap": "^4.6.2",
+    "buttplug": "3.2.2",
     "classnames": "^2.3.2",
     "crypto-js": "^4.2.0",
     "event-target-polyfill": "^0.0.4",
