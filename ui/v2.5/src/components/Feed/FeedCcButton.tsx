@@ -37,6 +37,7 @@ function writeGenMap(m: Record<string, GenEntry>) {
 
 interface Props {
   sceneId: string;
+  sceneTitle?: string;
   hasCaptions: boolean;
   captionsOn: boolean;
   onToggle: () => void;
@@ -47,6 +48,7 @@ interface Props {
 
 export const FeedCcButton: React.FC<Props> = ({
   sceneId,
+  sceneTitle,
   hasCaptions,
   captionsOn,
   onToggle,
@@ -161,6 +163,9 @@ export const FeedCcButton: React.FC<Props> = ({
           variables: {
             plugin_id: "ai-subtitler",
             task_name: "Generate captions: this scene",
+            // Shown in the task queue instead of the generic task name, so a
+            // queue of these is legible by scene rather than N identical rows.
+            description: `Generate captions: ${sceneTitle || `scene ${sceneId}`}`,
             args_map: { scene_id: sceneId },
           },
         });

@@ -1386,6 +1386,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
           <FeedCcButton
             sceneId={scene.id}
+            sceneTitle={title}
             hasCaptions={(scene.captions?.length ?? 0) > 0}
             captionsOn={captionsOn}
             onToggle={onToggleCaptions}

@@ -2,10 +2,16 @@ mutation ReloadPlugins {
   reloadPlugins
 }
 
-mutation RunPluginTask($plugin_id: ID!, $task_name: String!, $args_map: Map) {
+mutation RunPluginTask(
+  $plugin_id: ID!
+  $task_name: String!
+  $description: String
+  $args_map: Map
+) {
   runPluginTask(
     plugin_id: $plugin_id
     task_name: $task_name
+    description: $description
     args_map: $args_map
   )
 }
