@@ -1,3 +1,8 @@
+### stashhub v1.4.41
+
+* Feed CC button now tracks the real generation job: it shows a red retry state when captions genuinely fail, instead of spinning silently.
+* Caption jobs from the feed wait for the transcriber to be free instead of being dropped, and failed scenes are retried nightly.
+
 ### stashhub v1.4.40
 
 * Feed is now endless: when fresh scenes run out it reshuffles the whole library through the same algorithm instead of stopping.

@@ -440,6 +440,7 @@
 .feed-cc-toggle.captions-off { opacity: 0.55; }
 .feed-cc-toggle.captions-on { color: var(--feed-hubs); }
 .feed-cc-toggle.is-generating { cursor: progress; }
+.feed-cc-toggle.generation-failed { color: #ff5a5a; opacity: 0.9; }
 
 /* Handy interactive sync toggle. Mirrors the CC button states: off is muted,
    synced is hub-purple, busy pulses the icon. */
