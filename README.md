@@ -20,14 +20,14 @@ is untouched.
 
 ## Features
 
-📱 **TikTok-style vertical feed.** Snap-scroll your library. Tap to play, double-tap for fullscreen.<br><br>
-🎛️ **Configurable recommendation algorithm.** Five weighted buckets, reshuffled every open.<br><br>
-❤️ **First-class likes.** Heart button persists straight to the database.<br><br>
-🔔 **Live notification bell.** Counts for new scenes, unorganized scenes, and performers without an image.<br><br>
-🧭 **Sidebar navigation.** Persistent left rail, top-right bar for quick links.<br><br>
-🎨 **Modern dark theme.** Hub-purple accent baked into the binary.<br><br>
-🗓️ **Smart date display.** Relative dates with the absolute on hover. Format configurable.<br><br>
-🔕 **Toast toggles.** Per-notice enable / disable.<br><br>
+📱 **TikTok-style vertical feed.** Snap-scroll your library. Tap to play, double-tap for fullscreen.<br>
+🎛️ **Configurable recommendation algorithm.** Five weighted buckets, reshuffled every open.<br>
+❤️ **First-class likes.** Heart button persists straight to the database.<br>
+🔔 **Live notification bell.** Counts for new scenes, unorganized scenes, and performers without an image.<br>
+🧭 **Sidebar navigation.** Persistent left rail, top-right bar for quick links.<br>
+🎨 **Modern dark theme.** Hub-purple accent baked into the binary.<br>
+🗓️ **Smart date display.** Relative dates with the absolute on hover. Format configurable.<br>
+🔕 **Toast toggles.** Per-notice enable / disable.<br>
 🔐 **No phone-home.** No update check, no telemetry, no donate button.
 
 ## Technical details
