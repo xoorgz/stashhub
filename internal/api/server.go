@@ -109,7 +109,15 @@ func Initialize() (*Server, error) {
 		Server: http.Server{
 			Addr:      address,
 			Handler:   r,
-			TLSConfig: tlsConfig,
+			TLSConfig:         tlsConfig,
+			// Clean up stalled connections so a slow mobile client or a
+			// half-closed Range request never piles up an unbounded set of
+			// goroutines. WriteTimeout is deliberately NOT set: scene
+			// streams can last minutes, and the http.Server doc says
+			// WriteTimeout spans the entire write including streaming.
+			ReadTimeout:       30 * time.Second,
+			ReadHeaderTimeout: 10 * time.Second,
+			IdleTimeout:       120 * time.Second,
 			// disable http/2 support by default
 			// when http/2 is enabled, we are unable to hijack and close
 			// the connection/request. This is necessary to stop running
