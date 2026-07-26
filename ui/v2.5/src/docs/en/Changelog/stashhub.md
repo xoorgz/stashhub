@@ -3,6 +3,7 @@
 * Feed CC button now tracks the real generation job: it shows a red retry state when captions genuinely fail, instead of spinning silently.
 * Caption jobs from the feed wait for the transcriber to be free instead of being dropped, and failed scenes are retried nightly.
 * Server: HTTP timeouts (Read/ReadHeader/Idle) prevent slow clients from leaking goroutines. nginx upstream keepalive pool makes poster-heavy pages skip per-image TCP handshakes.
+* Blocked from search engines: robots.txt, noindex/nofollow meta and header on every response, even the login redirect. Added a proper og:image/title/description for link previews.
 
 ### stashhub v1.4.40
 

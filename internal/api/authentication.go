@@ -26,7 +26,16 @@ const (
 
 func allowUnauthenticated(r *http.Request) bool {
 	// #2715 - allow access to UI files
-	return strings.HasPrefix(r.URL.Path, loginEndpoint) || r.URL.Path == logoutEndpoint || r.URL.Path == "/css" || strings.HasPrefix(r.URL.Path, "/assets")
+	// robots.txt and og-image.png must also be reachable without a session:
+	// crawlers and link-preview bots (Discord/Slack/iMessage) never carry
+	// the session cookie, so without this bypass they get a 401 instead of
+	// the file, silently breaking both the crawl block and the OG preview.
+	return strings.HasPrefix(r.URL.Path, loginEndpoint) ||
+		r.URL.Path == logoutEndpoint ||
+		r.URL.Path == "/css" ||
+		strings.HasPrefix(r.URL.Path, "/assets") ||
+		r.URL.Path == "/robots.txt" ||
+		r.URL.Path == "/og-image.png"
 }
 
 func authenticateHandler() func(http.Handler) http.Handler {

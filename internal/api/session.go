@@ -37,6 +37,11 @@ func serveLoginPage(w http.ResponseWriter, r *http.Request, returnURL string, lo
 	prefix := getProxyPrefix(r)
 	loginPage = strings.ReplaceAll(loginPage, "/%BASE_URL%", prefix)
 
+	// og:image/og:url need an absolute URL; reuse the same base URL
+	// BaseURLMiddleware already computed, same as the main index.html.
+	baseURL, _ := r.Context().Value(BaseURLCtxKey).(string)
+	loginPage = strings.ReplaceAll(loginPage, "%OG_URL%", baseURL)
+
 	templ, err := template.New("Login").Parse(loginPage)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error: %s", err), http.StatusInternalServerError)

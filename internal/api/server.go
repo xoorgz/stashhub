@@ -129,6 +129,12 @@ func Initialize() (*Server, error) {
 
 	r.Use(middleware.Heartbeat("/healthz"))
 	r.Use(cors.AllowAll().Handler)
+	// Ahead of authenticateHandler deliberately: that middleware returns
+	// early (401, or a redirect to /login) without calling next() for most
+	// unauthenticated requests, which would otherwise skip this and leave
+	// X-Robots-Tag off exactly the responses (redirects) most likely to be
+	// hit by a crawler first.
+	r.Use(SecurityHeadersMiddleware)
 	r.Use(authenticateHandler())
 	visitedPluginHandler := mgr.SessionStore.VisitedPluginHandler()
 	r.Use(visitedPluginHandler)
@@ -141,7 +147,6 @@ func Initialize() (*Server, error) {
 		})
 		r.Use(httplog.RequestLogger(httpLogger))
 	}
-	r.Use(SecurityHeadersMiddleware)
 	r.Use(middleware.Compress(4))
 	r.Use(middleware.StripSlashes)
 	r.Use(BaseURLMiddleware)
@@ -280,6 +285,12 @@ func Initialize() (*Server, error) {
 			prefix := getProxyPrefix(r)
 			indexHtml = strings.ReplaceAll(indexHtml, "%COLOR%", themeColor)
 			indexHtml = strings.Replace(indexHtml, `<base href="/"`, fmt.Sprintf(`<base href="%s/"`, prefix), 1)
+
+			// og:image/og:url need an absolute URL; reuse the same base URL
+			// BaseURLMiddleware already computed (scheme + host + prefix, or
+			// the configured external host) rather than guessing our own.
+			baseURL, _ := r.Context().Value(BaseURLCtxKey).(string)
+			indexHtml = strings.ReplaceAll(indexHtml, "%OG_URL%", baseURL)
 
 			utils.ServeStaticContent(w, r, []byte(indexHtml))
 		} else {
@@ -604,6 +615,11 @@ func setPageSecurityHeaders(w http.ResponseWriter, r *http.Request, plugins []*p
 func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		// Belt-and-braces alongside the <meta name="robots"> tag and
+		// robots.txt: a header-level opt-out survives even for responses
+		// that never render the HTML (e.g. a crawler fetching an asset
+		// directly), so search engines have no path to index this instance.
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 
 		next.ServeHTTP(w, r)
 	}
