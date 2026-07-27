@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import * as GQL from "src/core/generated-graphql";
 import { getClient } from "src/core/StashService";
@@ -50,6 +50,21 @@ const REFILL_AT = 5;
 const HEART_COLORS = ["#ff3b6b", "#ff1744", "#ff5070", "#ff7090", "#ff2d55", "#ff6086"];
 
 type Scene = FeedScene;
+
+// The endless feed recycles scenes, so the same scene id can legitimately sit
+// in the queue more than once. Keying on the array index disambiguated that but
+// made every key shift whenever the queue was trimmed from the front, which
+// remounted every tile (including the one playing). A per-slot serial is stable
+// for the life of the entry, so trimming leaves the surviving tiles untouched.
+type QueuedScene = Scene & { __uid: number };
+let sceneUid = 0;
+const withUid = (s: Scene): QueuedScene => ({ ...s, __uid: ++sceneUid });
+
+// How many watched tiles to keep above the active one before trimming, and the
+// minimum excess required to bother. Trimming in batches keeps the scroll
+// compensation rare rather than firing on every single swipe.
+const KEEP_BEHIND = 12;
+const TRIM_CHUNK = 8;
 
 interface HeartParticle {
   id: number;
@@ -784,9 +799,13 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
     const tryPlay = () => {
       if (!v.paused) return;
-      const rect = v.getBoundingClientRect();
-      const inView = rect.top < window.innerHeight && rect.bottom > 0;
-      if (!inView) return;
+      // Only the tile the feed has marked active may start decoding. The old
+      // test was "any part of this element is on screen", which is true for a
+      // 1px sliver, so every primed neighbour that fired canplay started
+      // playing too. A fast fling could leave several videos decoding at once:
+      // that is what cooked the phone and exhausted the device's video
+      // decoders, leaving later tiles stuck on a black frame.
+      if (itemRef.current?.dataset.active !== "1") return;
       v.play().catch(() => {});
     };
     const onCanPlay = () => {
@@ -1470,7 +1489,10 @@ export const Feed: React.FC = () => {
   const loadingMoreRef = useRef(false);
   const currentVisibleRef = useRef<HTMLDivElement | null>(null);
 
-  const [scenes, setScenes] = useState<Scene[]>([]);
+  const [scenes, setScenes] = useState<QueuedScene[]>([]);
+  // Pixels removed from above the viewport by a trim, applied to scrollTop
+  // before the browser paints so the view never jumps.
+  const pendingTrimRef = useRef(0);
   const [loadedIds] = useState<Set<string>>(() => new Set());
   const [feedState, setFeedState] = useState<"loading" | "ready" | "empty">("loading");
   const [reloadKey, setReloadKey] = useState(0);
@@ -1590,7 +1612,9 @@ export const Feed: React.FC = () => {
         });
         const fresh = r.data.findScenes.scenes[0];
         if (!fresh) return;
-        setScenes((prev) => prev.map((s) => (s.id === fresh.id ? fresh : s)));
+        setScenes((prev) =>
+          prev.map((s) => (s.id === fresh.id ? { ...fresh, __uid: s.__uid } : s))
+        );
       } catch {
         /* swallow */
       }
@@ -1662,7 +1686,7 @@ export const Feed: React.FC = () => {
       }
 
       details.forEach((s) => loadedIds.add(s.id));
-      setScenes(details);
+      setScenes(details.map(withUid));
       setFeedState(details.length ? "ready" : "empty");
 
       // After paint, jump-scroll to the saved scene
@@ -1750,11 +1774,24 @@ export const Feed: React.FC = () => {
         details = await fetchSceneDetails(ids);
       }
       details.forEach((s) => loadedIds.add(s.id));
-      setScenes((prev) => [...prev, ...details]);
+      setScenes((prev) => [...prev, ...details.map(withUid)]);
     } finally {
       loadingMoreRef.current = false;
     }
   }, [loadedIds]);
+
+  // Trimming removes tiles above the viewport, which would otherwise yank the
+  // content up under the user. Rewind the scroller by exactly the height that
+  // went away, in a layout effect so it lands before the browser paints and the
+  // swap is invisible. Every tile is one viewport tall, so the scroll position
+  // stays snapped.
+  useLayoutEffect(() => {
+    const px = pendingTrimRef.current;
+    if (!px) return;
+    pendingTrimRef.current = 0;
+    const track = trackRef.current;
+    if (track) track.scrollTop = Math.max(0, track.scrollTop - px);
+  }, [scenes]);
 
   // IntersectionObserver: play/pause + lazy src + load more + meta show
   useEffect(() => {
@@ -1791,7 +1828,13 @@ export const Feed: React.FC = () => {
       if (idx === -1) return;
       const isDesktop = typeof window.matchMedia === "function"
         && window.matchMedia("(hover: hover)").matches;
-      const aheadAggressive = isDesktop ? 3 : 2;
+      // Phones cap how many hardware video decoders exist at once (often well
+      // under ten) and every extra preload="auto" is another concurrent stream
+      // that may spin up its own server-side transcode. Four simultaneous
+      // full buffers starved the tile actually being watched, so it stalled on
+      // black while the phone heated up decoding the ones around it. One ahead
+      // on mobile still means the next swipe lands on a buffered video.
+      const aheadAggressive = isDesktop ? 3 : 1;
       // Prime the previous tile too (preload="auto") so ArrowUp / swipe-back
       // lands on a buffered video with no rebuffer pause, symmetric with ahead.
       const behindAggressive = 1;
@@ -1811,19 +1854,31 @@ export const Feed: React.FC = () => {
           try { v.load(); } catch { /* ignore */ }
         }
       }
-      // Cap live streams: tear down tiles well outside the window so a long
-      // fast fling can't leave dozens of open transcodes. Removing src ends
-      // the upstream request; the poster stays and src re-attaches from
-      // data-src on swipe-back. Keeps concurrent loads bounded regardless of
-      // scroll speed or distance.
-      const teardown = aheadSrcOnly + 2;
+      // One sweep enforcing both invariants over every other tile:
+      //
+      //   1. Exactly one video decodes. The observer pauses tiles as they drop
+      //      below 0.3, but a fast fling can coalesce those callbacks, so this
+      //      is the backstop that guarantees it.
+      //   2. Only a small window holds a src at all. The old teardown kept
+      //      idx±5 (eleven elements) while priming just five, and skipped any
+      //      tile that was still playing, so exactly the runaway videos it was
+      //      meant to catch were the ones it let through. Dropping src ends the
+      //      upstream request and frees the decoder; the poster stays and src
+      //      re-attaches from data-src on swipe-back.
+      const keepBehind = behindAggressive + 1;
+      const keepAhead = aheadSrcOnly + 1;
       for (let i = 0; i < items.length; i++) {
-        if (i >= idx - teardown && i <= idx + teardown) continue;
+        if (i === idx) continue;
         const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
-        if (!v || !v.src || !v.paused) continue;
-        v.removeAttribute("src");
-        v.preload = "none";
-        try { v.load(); } catch { /* ignore */ }
+        if (!v) continue;
+        if (!v.paused) v.pause();
+        if (i < idx - keepBehind || i > idx + keepAhead) {
+          if (v.src) {
+            v.removeAttribute("src");
+            v.preload = "none";
+            try { v.load(); } catch { /* ignore */ }
+          }
+        }
       }
     }
 
@@ -1837,6 +1892,13 @@ export const Feed: React.FC = () => {
     const activate = (item: HTMLDivElement) => {
       const video = item.querySelector<HTMLVideoElement>("video.feed-video");
       if (!video) return;
+      // Single source of truth for "which tile may decode". FeedItem's canplay
+      // recovery refuses to play unless its own tile carries this flag, so no
+      // matter how fast the user flings, only one video is ever decoding.
+      track.querySelectorAll<HTMLDivElement>(".feed-item[data-active]").forEach((el) => {
+        if (el !== item) delete el.dataset.active;
+      });
+      item.dataset.active = "1";
       // Active video gets bandwidth priority: give it its src + preload="auto"
       // and start it BEFORE priming neighbours, so prefetch never competes with
       // the tile you're actually watching over a limited connection.
@@ -1865,6 +1927,20 @@ export const Feed: React.FC = () => {
       const items = track.querySelectorAll(".feed-item");
       const idx = Array.from(items).indexOf(item);
       if (items.length - idx <= REFILL_AT) loadMore();
+      // The queue only ever grew, so a long session ended up with hundreds of
+      // viewport-tall tiles in the DOM, each carrying its own <video> and
+      // poster. Drop the ones far above the active tile; the layout effect
+      // rewinds scrollTop by exactly the height removed, so nothing moves.
+      // Runs only here, once the tile has been settled on for 120ms, never
+      // mid-fling.
+      const excess = idx - KEEP_BEHIND;
+      if (excess >= TRIM_CHUNK) {
+        const itemH = item.offsetHeight;
+        if (itemH > 0) {
+          pendingTrimRef.current += excess * itemH;
+          setScenes((prev) => prev.slice(excess));
+        }
+      }
     };
 
     const io = new IntersectionObserver(
@@ -1894,6 +1970,9 @@ export const Feed: React.FC = () => {
             }, 120);
           } else if (entry.intersectionRatio < 0.3) {
             video.pause();
+            // Drop the decode permit as soon as the tile leaves, so a late
+            // canplay on a scrolled-past video can't restart it behind us.
+            if (item.dataset.active) delete item.dataset.active;
             if (pendingItem === item) pendingItem = null;
           }
         });
@@ -2074,12 +2153,9 @@ export const Feed: React.FC = () => {
   return (
     <div className="feed-root">
       <div className="feed-track" ref={trackRef}>
-        {scenes.map((s, i) => (
+        {scenes.map((s) => (
           <FeedItem
-            // Endless feed recycles scenes, so the same id can legitimately
-            // appear more than once. Keying on id alone collides and the
-            // repeated tiles never mount, which dead-ends the scroll.
-            key={`${s.id}-${i}`}
+            key={s.__uid}
             scene={s}
             muted={muted}
             onToggleMute={toggleMute}

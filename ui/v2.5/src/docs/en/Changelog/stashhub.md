@@ -4,6 +4,9 @@
 * Caption jobs from the feed wait for the transcriber to be free instead of being dropped, and failed scenes are retried nightly.
 * Server: HTTP timeouts (Read/ReadHeader/Idle) prevent slow clients from leaking goroutines. nginx upstream keepalive pool makes poster-heavy pages skip per-image TCP handshakes.
 * Blocked from search engines: robots.txt, noindex/nofollow meta and header on every response, even the login redirect. Added a proper og:image/title/description for link previews.
+* Feed: only one video decodes at a time. Neighbours that finished buffering used to start playing too, which exhausted the phone's video decoders and left later tiles black.
+* Feed: fewer videos hold a stream at once, and mobile prefetches one ahead instead of three, so the tile you are watching is not starved of bandwidth.
+* Feed: the queue no longer grows without limit while scrolling, so long sessions stay as fast as the first minute.
 
 ### stashhub v1.4.40
 
