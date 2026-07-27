@@ -799,13 +799,24 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
     const tryPlay = () => {
       if (!v.paused) return;
-      // Only the tile the feed has marked active may start decoding. The old
-      // test was "any part of this element is on screen", which is true for a
-      // 1px sliver, so every primed neighbour that fired canplay started
-      // playing too. A fast fling could leave several videos decoding at once:
-      // that is what cooked the phone and exhausted the device's video
-      // decoders, leaving later tiles stuck on a black frame.
-      if (itemRef.current?.dataset.active !== "1") return;
+      const item = itemRef.current;
+      if (!item) return;
+      // Normally the feed marks exactly one tile active and only that tile may
+      // decode. The old test was "any part of this element is on screen", true
+      // for a 1px sliver, so every primed neighbour that fired canplay started
+      // decoding too and several videos played at once.
+      //
+      // Geometry is the fallback when the marker is missing, because a fast
+      // fling can skip the settle that would have set it, and without a
+      // fallback such a tile would sit on its loader forever. Requiring the
+      // tile to cover most of the viewport keeps the guarantee intact: only one
+      // tile can ever satisfy that.
+      if (item.dataset.active !== "1") {
+        const r = item.getBoundingClientRect();
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        const visible = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+        if (visible < vh * 0.7) return;
+      }
       v.play().catch(() => {});
     };
     const onCanPlay = () => {
@@ -1828,24 +1839,30 @@ export const Feed: React.FC = () => {
       if (idx === -1) return;
       const isDesktop = typeof window.matchMedia === "function"
         && window.matchMedia("(hover: hover)").matches;
-      // Phones cap how many hardware video decoders exist at once (often well
-      // under ten) and every extra preload="auto" is another concurrent stream
-      // that may spin up its own server-side transcode. Four simultaneous
-      // full buffers starved the tile actually being watched, so it stalled on
-      // black while the phone heated up decoding the ones around it. One ahead
-      // on mobile still means the next swipe lands on a buffered video.
-      const aheadAggressive = isDesktop ? 3 : 1;
-      // Prime the previous tile too (preload="auto") so ArrowUp / swipe-back
-      // lands on a buffered video with no rebuffer pause, symmetric with ahead.
-      const behindAggressive = 1;
-      const aheadSrcOnly = aheadAggressive + 1;
-      const start = Math.max(0, idx - behindAggressive);
-      const end = Math.min(items.length - 1, idx + aheadSrcOnly);
+      // Two separate budgets, because they cost very different things:
+      //
+      //   preload="auto" is a full download and competes for the phone's
+      //   bandwidth with the video actually playing, so keep it tiny.
+      //
+      //   src + preload="metadata" is a few KB of container header. It costs
+      //   almost nothing, holds no decoder, and means a tile that gets swiped
+      //   onto starts from a warm connection instead of cold. It can be much
+      //   wider, and making it narrow is what put a loading spinner on every
+      //   fast swipe.
+      const autoAhead = isDesktop ? 3 : 1;
+      // Mobile skips preload="auto" behind: that tile was just watched, and
+      // re-downloading it steals bandwidth from the one playing now. It keeps
+      // its src, so swiping back is still warm.
+      const autoBehind = isDesktop ? 1 : 0;
+      const srcAhead = isDesktop ? 6 : 5;
+      const srcBehind = 2;
+      const start = Math.max(0, idx - srcBehind);
+      const end = Math.min(items.length - 1, idx + srcAhead);
       for (let i = start; i <= end; i++) {
         const it = items[i];
         const v = it.querySelector<HTMLVideoElement>("video.feed-video");
         if (!v) continue;
-        const aggressive = i >= idx - behindAggressive && i <= idx + aheadAggressive;
+        const aggressive = i >= idx - autoBehind && i <= idx + autoAhead;
         const desiredPreload = aggressive ? "auto" : "metadata";
         if (v.preload !== desiredPreload) v.preload = desiredPreload;
         const src = v.dataset.src;
@@ -1859,14 +1876,14 @@ export const Feed: React.FC = () => {
       //   1. Exactly one video decodes. The observer pauses tiles as they drop
       //      below 0.3, but a fast fling can coalesce those callbacks, so this
       //      is the backstop that guarantees it.
-      //   2. Only a small window holds a src at all. The old teardown kept
-      //      idx±5 (eleven elements) while priming just five, and skipped any
-      //      tile that was still playing, so exactly the runaway videos it was
-      //      meant to catch were the ones it let through. Dropping src ends the
-      //      upstream request and frees the decoder; the poster stays and src
-      //      re-attaches from data-src on swipe-back.
-      const keepBehind = behindAggressive + 1;
-      const keepAhead = aheadSrcOnly + 1;
+      //   2. Tiles far outside the window drop their src entirely, so a long
+      //      fling can't leave a trail of open streams behind it. The old
+      //      teardown skipped any tile that was still playing, so exactly the
+      //      runaway videos it was meant to catch were the ones it let through.
+      //      The window sits one past the prime window so priming and teardown
+      //      can never fight over the same tile.
+      const keepBehind = srcBehind + 1;
+      const keepAhead = srcAhead + 1;
       for (let i = 0; i < items.length; i++) {
         if (i === idx) continue;
         const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
@@ -1902,11 +1919,14 @@ export const Feed: React.FC = () => {
       // Active video gets bandwidth priority: give it its src + preload="auto"
       // and start it BEFORE priming neighbours, so prefetch never competes with
       // the tile you're actually watching over a limited connection.
+      // preload goes first: a torn-down tile carries preload="none", and
+      // calling load() while that is still set tells the browser to fetch
+      // nothing, so the element sat there doing no work.
+      video.preload = "auto";
       if (video.dataset.src && !video.src) {
         video.src = video.dataset.src;
         try { video.load(); } catch { /* ignore */ }
       }
-      video.preload = "auto";
       video.muted = muted;
       video.play().catch(() => {});
       // Funscript upload lives in FeedItem, which owns the per-scene interactive
