@@ -7,6 +7,9 @@
 * Feed: only one video decodes at a time. Neighbours that finished buffering used to start playing too, which exhausted the phone's video decoders and left later tiles black.
 * Feed: fewer videos hold a stream at once, and mobile prefetches one ahead instead of three, so the tile you are watching is not starved of bandwidth.
 * Feed: the queue no longer grows without limit while scrolling, so long sessions stay as fast as the first minute.
+* Checkboxes show their tick again. It was drawn with a pseudo-element on the input, which browsers are not required to render.
+* Check rows have proper spacing and no stray indent; the box and its label sit together instead of drifting apart.
+* Typing in the tag picker is no longer laggy: every keystroke used to remount the whole dropdown and every selected chip.
 
 ### stashhub v1.4.40
 
