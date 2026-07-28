@@ -71,6 +71,7 @@ const _TagSelect: React.FC<TagSelectProps> = (props) => {
     !configuration?.interface.disableDropdownCreate.tag ?? true;
 
   const exclude = useMemo(() => props.excludeIds ?? [], [props.excludeIds]);
+  const hoverPlacement = props.hoverPlacement;
 
   async function loadTags(input: string): Promise<Option[]> {
     const filter = new ListFilterModel(GQL.FilterMode.Tags);
@@ -92,85 +93,82 @@ const _TagSelect: React.FC<TagSelectProps> = (props) => {
     }));
   }
 
-  const TagOption: React.FC<OptionProps<Option, boolean>> = (optionProps) => {
-    let thisOptionProps = optionProps;
+  // These three are wrapped in useMemo so their component identity is stable
+  // across renders. They used to be re-created on every render, so react-select
+  // saw a brand new component type on each keystroke and unmounted/remounted
+  // every dropdown row and every selected chip, each row re-mounting a
+  // TagPopover. That churn is what made typing feel laggy and the dropdown
+  // flicker while you typed.
+  const TagOption = useMemo(
+    () =>
+      function TagOption(optionProps: OptionProps<Option, boolean>) {
+        const { object } = optionProps.data;
+        const { name } = object;
 
-    const { object } = optionProps.data;
+        // if name does not match the input value but an alias does, show the alias
+        const { inputValue } = optionProps.selectProps;
+        let alias: string | undefined = "";
+        if (!name.toLowerCase().includes(inputValue.toLowerCase())) {
+          alias = object.aliases?.find((a) =>
+            a.toLowerCase().includes(inputValue.toLowerCase())
+          );
+        }
 
-    let { name } = object;
+        const thisOptionProps = {
+          ...optionProps,
+          children: (
+            <TagPopover id={object.id} placement={hoverPlacement ?? "right"}>
+              <span className="react-select-image-option">
+                <span>{name}</span>
+                {alias && <span className="alias">&nbsp;({alias})</span>}
+              </span>
+            </TagPopover>
+          ),
+        };
 
-    // if name does not match the input value but an alias does, show the alias
-    const { inputValue } = optionProps.selectProps;
-    let alias: string | undefined = "";
-    if (!name.toLowerCase().includes(inputValue.toLowerCase())) {
-      alias = object.aliases?.find((a) =>
-        a.toLowerCase().includes(inputValue.toLowerCase())
-      );
-    }
+        return <reactSelectComponents.Option {...thisOptionProps} />;
+      },
+    [hoverPlacement]
+  );
 
-    thisOptionProps = {
-      ...optionProps,
-      children: (
-        <TagPopover id={object.id} placement={props.hoverPlacement ?? "right"}>
-          <span className="react-select-image-option">
-            {/* the following code causes re-rendering issues when selecting tags */}
-            {/* <TagPopover
-              id={object.id}
-              placement={props.hoverPlacement}
-              target={targetRef}
-            >
-              <a
-                href={`/tags/${object.id}`}
-                target="_blank"
-                rel="noreferrer"
-                className="tag-select-image-link"
-              >
-                <img
-                  className="tag-select-image"
-                  src={object.image_path ?? ""}
-                  loading="lazy"
-                />
-              </a>
-            </TagPopover> */}
-            <span>{name}</span>
-            {alias && <span className="alias">&nbsp;({alias})</span>}
-          </span>
-        </TagPopover>
-      ),
-    };
+  const TagMultiValueLabel = useMemo(
+    () =>
+      function TagMultiValueLabel(
+        optionProps: MultiValueGenericProps<Option, boolean>
+      ) {
+        const thisOptionProps = {
+          ...optionProps,
+          children: optionProps.data.object.name,
+        };
 
-    return <reactSelectComponents.Option {...thisOptionProps} />;
-  };
+        return <reactSelectComponents.MultiValueLabel {...thisOptionProps} />;
+      },
+    []
+  );
 
-  const TagMultiValueLabel: React.FC<
-    MultiValueGenericProps<Option, boolean>
-  > = (optionProps) => {
-    let thisOptionProps = optionProps;
+  const TagValueLabel = useMemo(
+    () =>
+      function TagValueLabel(optionProps: SingleValueProps<Option, boolean>) {
+        const thisOptionProps = {
+          ...optionProps,
+          children: <>{optionProps.data.object.name}</>,
+        };
 
-    const { object } = optionProps.data;
+        return <reactSelectComponents.SingleValue {...thisOptionProps} />;
+      },
+    []
+  );
 
-    thisOptionProps = {
-      ...optionProps,
-      children: object.name,
-    };
-
-    return <reactSelectComponents.MultiValueLabel {...thisOptionProps} />;
-  };
-
-  const TagValueLabel: React.FC<SingleValueProps<Option, boolean>> = (
-    optionProps
-  ) => {
-    let thisOptionProps = optionProps;
-
-    const { object } = optionProps.data;
-
-    thisOptionProps = {
-      ...optionProps,
-      children: <>{object.name}</>,
-    };
-
-    return <reactSelectComponents.SingleValue {...thisOptionProps} />;
-  };
+  // The components object itself must also be stable, otherwise react-select
+  // re-registers its renderers on every render regardless of the above.
+  const selectComponents = useMemo(
+    () => ({
+      Option: TagOption,
+      MultiValueLabel: TagMultiValueLabel,
+      SingleValue: TagValueLabel,
+    }),
+    [TagOption, TagMultiValueLabel, TagValueLabel]
+  );
 
   const onCreate = async (name: string) => {
     const result = await createTag({
@@ -223,11 +221,7 @@ const _TagSelect: React.FC<TagSelectProps> = (props) => {
       loadOptions={loadTags}
       getNamedObject={getNamedObject}
       isValidNewOption={isValidNewOption}
-      components={{
-        Option: TagOption,
-        MultiValueLabel: TagMultiValueLabel,
-        SingleValue: TagValueLabel,
-      }}
+      components={selectComponents}
       isMulti={props.isMulti ?? false}
       creatable={props.creatable ?? defaultCreatable}
       onCreate={onCreate}

@@ -1568,40 +1568,70 @@ body .form-check-input[type="checkbox"] {
   appearance: none;
   width: 16px;
   height: 16px;
-  background: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 4px;
   cursor: pointer;
-  position: relative;
   vertical-align: middle;
   margin: 0;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  flex-shrink: 0;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 body input[type="checkbox"]:hover,
 body .form-check-input[type="checkbox"]:hover {
   border-color: var(--color-hubs, #df73ff);
 }
+/* The tick is a background image, not a ::after. An <input> is a replaced
+   element, so pseudo-elements on it are not guaranteed to render and did not
+   here, which is why a checked box was a plain purple square with no mark.
+   A background SVG is what Bootstrap itself uses, and it survives any
+   position/layout changes made by the surrounding component. */
 body input[type="checkbox"]:checked,
 body .form-check-input[type="checkbox"]:checked {
-  background: var(--color-hubs, #df73ff);
+  background-color: var(--color-hubs, #df73ff);
   border-color: var(--color-hubs, #df73ff);
-}
-body input[type="checkbox"]:checked::after,
-body .form-check-input[type="checkbox"]:checked::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 0px;
-  width: 5px;
-  height: 10px;
-  border: solid #000;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='3.5' d='m5 10 3.5 3.5L15 7'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 76% 76%;
 }
 body input[type="checkbox"]:focus,
 body .form-check-input[type="checkbox"]:focus {
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-hubs, #df73ff) 25%, transparent);
+}
+
+/* Bootstrap lays a .form-check out by absolutely positioning the input into
+   the row's own 1.25rem padding-left. The restyle above zeroes the input's
+   margin, which breaks that contract: the box drops back into normal flow and
+   the reserved padding is left over as an empty indent, with nothing
+   separating box from label. Lay the row out explicitly instead of relying on
+   the negative margin. Applies to radios too, so they don't get yanked out of
+   the container by the negative margin they still carry. */
+body .form-check:not(.form-check-inline) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 0;
+}
+body .form-check:not(.form-check-inline) .form-check-input {
+  position: static;
+  margin: 0;
+  flex-shrink: 0;
+}
+body .form-check-inline {
+  gap: 8px;
+}
+body .form-check-inline .form-check-input {
+  margin-right: 0;
+}
+/* Stacked checks had no breathing room between them. */
+body .form-check + .form-check {
+  margin-top: 6px;
+}
+body .form-check .form-check-label {
+  margin-bottom: 0;
+  cursor: pointer;
 }
 
 /* === Tables ===
