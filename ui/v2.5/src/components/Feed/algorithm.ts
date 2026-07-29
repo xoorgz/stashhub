@@ -190,6 +190,27 @@ function makeSkipDemotion(
   };
 }
 
+// A fixed sort key (like_count, play_duration, o_counter) always returns the
+// same head of the ranking, so requesting exactly the slots we need meant the
+// pool was identical every session and the shuffle below only reordered the
+// same handful of scenes. That is why the feed opened with the same videos
+// each time. Over-fetch a wider band and sample from it: "your top liked" is
+// still true, but which of them you see changes on every build.
+const RANKED_POOL_FACTOR = 6;
+const RANKED_POOL_MAX = 200;
+
+function rankedPool(perPage: number): number {
+  return Math.min(RANKED_POOL_MAX, Math.max(perPage, perPage * RANKED_POOL_FACTOR));
+}
+
+function shuffleInPlace<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 interface BucketSpec {
   name: string;
   weight: number;
@@ -411,7 +432,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
         const perPage = pageFor(settings.likedWeight);
         const ids = await fetchBucketStrict({
           filter: {
-            per_page: perPage,
+            per_page: rankedPool(perPage),
             page: 1,
             sort: "like_count",
             direction: GQL.SortDirectionEnum.Desc,
@@ -419,11 +440,11 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
           sceneFilter: {},
         });
         // Fisher-Yates shuffle on the descending-by-likes window.
-        for (let i = ids.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [ids[i], ids[j]] = [ids[j], ids[i]];
-        }
-        return { name: "liked", weight: settings.likedWeight, ids };
+        return {
+          name: "liked",
+          weight: settings.likedWeight,
+          ids: shuffleInPlace(ids).slice(0, perPage),
+        };
       })()
     );
   }
@@ -438,7 +459,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
         const perPage = pageFor(settings.topWatchedWeight);
         const ids = await fetchBucketStrict({
           filter: {
-            per_page: perPage,
+            per_page: rankedPool(perPage),
             page: 1,
             sort: "play_duration",
             direction: GQL.SortDirectionEnum.Desc,
@@ -451,11 +472,11 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
             },
           },
         });
-        for (let i = ids.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [ids[i], ids[j]] = [ids[j], ids[i]];
-        }
-        return { name: "topWatched", weight: settings.topWatchedWeight, ids };
+        return {
+          name: "topWatched",
+          weight: settings.topWatchedWeight,
+          ids: shuffleInPlace(ids).slice(0, perPage),
+        };
       })()
     );
   }
@@ -707,7 +728,7 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
         const perPage = pageFor(settings.topOCountWeight);
         const ids = await fetchBucketStrict({
           filter: {
-            per_page: perPage,
+            per_page: rankedPool(perPage),
             page: 1,
             sort: "o_counter",
             direction: GQL.SortDirectionEnum.Desc,
@@ -720,11 +741,11 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
             },
           },
         });
-        for (let i = ids.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [ids[i], ids[j]] = [ids[j], ids[i]];
-        }
-        return { name: "topOCount", weight: settings.topOCountWeight, ids };
+        return {
+          name: "topOCount",
+          weight: settings.topOCountWeight,
+          ids: shuffleInPlace(ids).slice(0, perPage),
+        };
       })()
     );
   }

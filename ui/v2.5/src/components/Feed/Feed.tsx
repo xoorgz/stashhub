@@ -36,6 +36,9 @@ import "./Feed.scss";
 
 const VIEWED_KEY = "feed.viewedIds";
 const VIEWED_LIMIT = 500;
+// How many just-served scenes to hold back when a new cycle starts, so nothing
+// repeats right at the boundary.
+const RECYCLE_KEEP = 25;
 const LIKES_KEY = "feed.likes";
 const LIKE_THRESHOLD = 5;
 const MUTED_KEY = "feed.muted";
@@ -112,6 +115,26 @@ function getViewed(): Set<string> {
     return new Set();
   }
 }
+/** Begin a fresh pass over the library.
+ *
+ *  Once the viewed history covered every eligible scene, the de-duplicated
+ *  build returned nothing and EVERY refill fell through to the recycle path.
+ *  That path only holds back the last few tiles, so the feed ended up drawing
+ *  forever from a tiny pool: the same videos coming round again and again.
+ *  Resetting the history to a short tail lets the next full cycle de-duplicate
+ *  normally, so you get a complete pass through the library before anything
+ *  repeats. */
+function startNewViewedCycle(keep: string[]) {
+  try {
+    localStorage.setItem(
+      VIEWED_KEY,
+      JSON.stringify(keep.slice(-RECYCLE_KEEP))
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 function markViewed(id: string) {
   try {
     const arr: string[] = JSON.parse(localStorage.getItem(VIEWED_KEY) || "[]");
@@ -1657,15 +1680,17 @@ export const Feed: React.FC = () => {
     (async () => {
       const viewed = getViewed();
       // Deep link in: pretty form /feed/:id wins; legacy /?scene=ID for
-      // backward compat with anything already shared. Both override the
-      // persisted CURRENT_KEY for this initial load.
+      // backward compat with anything already shared.
       let urlScene = "";
       try {
         const m = window.location.pathname.match(/^\/feed\/(\d+)/);
         if (m) urlScene = m[1];
         else urlScene = new URLSearchParams(window.location.search).get("scene") || "";
       } catch { /* ignore */ }
-      const savedId = urlScene || localStorage.getItem(CURRENT_KEY) || "";
+      // Deep link only. The feed deliberately does NOT remember where you were:
+      // resuming on the last scene made every open replay the same tail, which
+      // is half of why the feed felt like it looped. A fresh queue every time.
+      const savedId = urlScene;
 
       // Build the queue with the saved id excluded; it is prepended below.
       const exclude = new Set(viewed);
@@ -1676,6 +1701,9 @@ export const Feed: React.FC = () => {
       // Nothing fresh left (everything viewed / recently-played)? Recycle so
       // the feed still opens with a reshuffled library instead of empty.
       if (ids.length === 0) {
+        // Same reasoning as the refill path: start a clean cycle so the feed
+        // de-duplicates properly again instead of recycling every single time.
+        startNewViewedCycle(Array.from(viewed));
         ids = await buildQueue({
           targetCount: QUEUE_TARGET,
           exclude: savedId ? new Set([savedId]) : new Set(),
@@ -1690,11 +1718,6 @@ export const Feed: React.FC = () => {
       if (cancelled) return;
       debug += ` | fetchSceneDetails(${finalIds.length})→${details.length}`;
       setDebugInfo(debug);
-
-      // Clear the saved id if its scene is no longer present in the response.
-      if (savedId && !details.some((s) => s.id === savedId)) {
-        try { localStorage.removeItem(CURRENT_KEY); } catch { /* ignore */ }
-      }
 
       details.forEach((s) => loadedIds.add(s.id));
       setScenes(details.map(withUid));
@@ -1727,7 +1750,6 @@ export const Feed: React.FC = () => {
   // Persist the active scene id
   const persistCurrent = useCallback((sceneId: string | undefined) => {
     if (!sceneId) return;
-    try { localStorage.setItem(CURRENT_KEY, sceneId); } catch { /* ignore */ }
     // Reflect the current scene in the URL as /feed/:id. pushState gives a real
     // history entry (back/forward step through videos) and updates the address
     // bar reliably, iOS Safari included. Only fire on an actual scene change.
@@ -1778,9 +1800,14 @@ export const Feed: React.FC = () => {
       // algorithm, holding back only the last few tiles so nothing repeats
       // immediately. This makes the feed swipe forever instead of dead-ending.
       if (details.length === 0) {
-        const recent = new Set(Array.from(loadedIds).slice(-REFILL_AT * 2));
+        const recentList = Array.from(loadedIds).slice(-RECYCLE_KEEP);
+        const recent = new Set(recentList);
         loadedIds.clear();
         recent.forEach((id) => loadedIds.add(id));
+        // Reset the viewed history as well. Without this the very next refill
+        // lands here again, because `viewed` still covers the whole library,
+        // and the feed just keeps re-drawing the same small recycled pool.
+        startNewViewedCycle(recentList);
         ids = await buildQueue({ targetCount: 20, exclude: recent, recycle: true });
         details = await fetchSceneDetails(ids);
       }
@@ -2201,6 +2228,8 @@ export const Feed: React.FC = () => {
               type="button"
               className="feed-empty-retry"
               onClick={() => {
+                // Nothing is persisted any more; drop any value left behind
+                // by an older build so it can never resurface.
                 try { localStorage.removeItem(CURRENT_KEY); } catch { /* ignore */ }
                 setReloadKey((k) => k + 1);
               }}
