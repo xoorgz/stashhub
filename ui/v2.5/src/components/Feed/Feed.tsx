@@ -33,7 +33,13 @@ import {
   useButtplug,
   loadInteractiveConfig,
 } from "src/hooks/Interactive/buttplug";
-import { loadFastModeConfig, FAST_MODE_EVENT } from "src/hooks/FastMode/fastMode";
+import {
+  loadFastModeConfig,
+  saveFastModeConfig,
+  fastModeFromConfigUi,
+  FAST_MODE_EVENT,
+} from "src/hooks/FastMode/fastMode";
+import { ConfigurationContext } from "src/hooks/Config";
 import "./Feed.scss";
 
 const VIEWED_KEY = "feed.viewedIds";
@@ -1602,9 +1608,15 @@ export const Feed: React.FC = () => {
   const [interactiveOn, setInteractiveOn] = useState<boolean>(
     () => sessionStorage.getItem(INTERACTIVE_KEY) !== "0"
   );
-  // Global fast-mode setting (Settings > Fast Mode), off by default. Read
-  // live so flipping it in Settings applies to the feed immediately without
-  // a reload.
+  // Global fast-mode setting (Settings > Fast Mode), off by default.
+  // localStorage is only ever populated once the Settings panel has been
+  // opened in this browser, so it cannot be the sole source: a setting
+  // flipped any other way (a direct DB write, another device) would never
+  // reach a feed session that started fresh. ConfigurationContext already
+  // holds the full server config at app boot, so that is the source of
+  // truth; localStorage is kept only as the instant-first-paint value and
+  // the same-tab change channel via FAST_MODE_EVENT.
+  const { configuration } = React.useContext(ConfigurationContext);
   const [fastModeEnabled, setFastModeEnabled] = useState<boolean>(
     () => loadFastModeConfig().enabled
   );
@@ -1615,6 +1627,12 @@ export const Feed: React.FC = () => {
     window.addEventListener(FAST_MODE_EVENT, onChange);
     return () => window.removeEventListener(FAST_MODE_EVENT, onChange);
   }, []);
+  useEffect(() => {
+    const server = fastModeFromConfigUi(configuration?.ui);
+    if (!server) return;
+    setFastModeEnabled(server.enabled);
+    saveFastModeConfig(server); // mirror so a later mount starts correct offline too
+  }, [configuration]);
   const {
     state: interactiveState,
     initialised: interactiveInitialised,

@@ -7,26 +7,14 @@ import {
   loadFastModeConfig,
   saveFastModeConfig,
   FastModeConfig,
-  DEFAULT_FAST_MODE_CONFIG,
   FAST_MODE_UI_KEY,
+  fastModeFromConfigUi,
 } from "src/hooks/FastMode/fastMode";
 import "./SettingsAlgorithmPanel.scss";
 
 // Same DB-mirror pattern as Interactive toys: config lives in the server UI
 // blob under ui.stashhub.fastMode, mirrored to localStorage so the feed can
 // read it synchronously.
-const FAST_MODE_UI_PATH = ["stashhub", "fastMode"] as const;
-
-function sanitizeFastMode(input: unknown): FastModeConfig | null {
-  if (!input || typeof input !== "object") return null;
-  const r = input as Record<string, unknown>;
-  return {
-    enabled:
-      typeof r.enabled === "boolean"
-        ? r.enabled
-        : DEFAULT_FAST_MODE_CONFIG.enabled,
-  };
-}
 
 async function loadFastModeFromServer(): Promise<FastModeConfig | null> {
   try {
@@ -34,12 +22,7 @@ async function loadFastModeFromServer(): Promise<FastModeConfig | null> {
       query: GQL.ConfigurationDocument,
       fetchPolicy: "cache-first",
     });
-    let node: unknown = r.data?.configuration?.ui ?? {};
-    for (const part of FAST_MODE_UI_PATH) {
-      if (!node || typeof node !== "object") return null;
-      node = (node as Record<string, unknown>)[part];
-    }
-    return sanitizeFastMode(node);
+    return fastModeFromConfigUi(r.data?.configuration?.ui ?? {});
   } catch {
     return null;
   }

@@ -43,3 +43,27 @@ export function saveFastModeConfig(c: FastModeConfig) {
 }
 
 export { CONFIG_KEY as FAST_MODE_UI_KEY };
+export const FAST_MODE_UI_PATH = ["stashhub", "fastMode"] as const;
+
+export function sanitizeFastMode(input: unknown): FastModeConfig | null {
+  if (!input || typeof input !== "object") return null;
+  const r = input as Record<string, unknown>;
+  return {
+    enabled:
+      typeof r.enabled === "boolean" ? r.enabled : DEFAULT_FAST_MODE_CONFIG.enabled,
+  };
+}
+
+/** Pull stashhub.fastMode out of the app-wide Configuration.ui blob (the same
+ *  object ConfigurationContext already holds at boot, no extra query needed).
+ *  Used so a setting flipped by any means (Settings panel, a direct DB write,
+ *  another tab) reaches the feed on first render instead of only after the
+ *  Settings panel happens to have synced it into localStorage. */
+export function fastModeFromConfigUi(ui: unknown): FastModeConfig | null {
+  let node: unknown = ui;
+  for (const part of FAST_MODE_UI_PATH) {
+    if (!node || typeof node !== "object") return null;
+    node = (node as Record<string, unknown>)[part];
+  }
+  return sanitizeFastMode(node);
+}
