@@ -1,3 +1,9 @@
+### stashhub v1.4.42
+
+* Fast mode: streams a pre-generated 720p copy of each scene so the feed starts instantly and never buffers. Off by default, toggle in Settings.
+* Feed: per-scene HQ button switches to full quality mid-playback without losing position.
+* Fast mode falls back to the normal stream for any scene not yet pre-generated.
+
 ### stashhub v1.4.41
 
 * Feed CC button now tracks the real generation job: it shows a red retry state when captions genuinely fail, instead of spinning silently.

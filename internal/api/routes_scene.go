@@ -59,6 +59,7 @@ func (rs sceneRoutes) Routes() chi.Router {
 
 		// streaming endpoints
 		r.Get("/stream", rs.StreamDirect)
+		r.Get("/stream.fast", rs.StreamFast)
 		r.Get("/stream.mp4", rs.StreamMp4)
 		r.Get("/stream.webm", rs.StreamWebM)
 		r.Get("/stream.mkv", rs.StreamMKV)
@@ -96,6 +97,15 @@ func (rs sceneRoutes) StreamDirect(w http.ResponseWriter, r *http.Request) {
 		SceneCoverGetter: rs.sceneFinder,
 	}
 	ss.StreamSceneDirect(scene, w, r)
+}
+
+func (rs sceneRoutes) StreamFast(w http.ResponseWriter, r *http.Request) {
+	scene := r.Context().Value(sceneKey).(*models.Scene)
+	ss := manager.SceneServer{
+		TxnManager:       rs.txnManager,
+		SceneCoverGetter: rs.sceneFinder,
+	}
+	ss.StreamSceneFast(scene, w, r)
 }
 
 func (rs sceneRoutes) StreamMp4(w http.ResponseWriter, r *http.Request) {

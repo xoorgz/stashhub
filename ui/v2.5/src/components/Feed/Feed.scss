@@ -442,6 +442,11 @@
 .feed-cc-toggle.is-generating { cursor: progress; }
 .feed-cc-toggle.generation-failed { color: #ff5a5a; opacity: 0.9; }
 
+/* Fast-mode toggle: filled bolt + hub-purple while playing the fast copy,
+   outline + dimmed once the user has bumped this scene to full quality. */
+.feed-fastmode-toggle { color: var(--feed-hubs); }
+.feed-fastmode-toggle.is-hq { opacity: 0.6; color: inherit; }
+
 /* Handy interactive sync toggle. Mirrors the CC button states: off is muted,
    synced is hub-purple, busy pulses the icon. */
 .feed-interactive-toggle { opacity: 0.55; }

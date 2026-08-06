@@ -150,6 +150,25 @@ export const InteractiveGenerateIcon: React.FC = () => (
   </svg>
 );
 
+/** Lightning bolt: fast-mode indicator. Filled when this tile is playing the
+    small/fast-start copy, outline when the user has bumped it to full
+    quality for this scene. */
+export const FastModeIcon: React.FC<{ filled?: boolean }> = ({ filled }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width="20"
+    height="20"
+    fill={filled ? "currentColor" : "none"}
+    stroke="currentColor"
+    strokeWidth={filled ? 0 : 1.8}
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />
+  </svg>
+);
+
 /** TikTok-style forward arrow (open scene) */
 export const OpenSceneIcon: React.FC = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="20" height="20">

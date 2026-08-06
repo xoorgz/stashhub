@@ -20,6 +20,7 @@ import {
   MuteOffIcon,
   MuteOnIcon,
   OpenSceneIcon,
+  FastModeIcon,
 } from "./icons";
 import { FeedCcButton } from "./FeedCcButton";
 import { FeedInteractiveButton } from "./FeedInteractiveButton";
@@ -32,6 +33,7 @@ import {
   useButtplug,
   loadInteractiveConfig,
 } from "src/hooks/Interactive/buttplug";
+import { loadFastModeConfig, FAST_MODE_EVENT } from "src/hooks/FastMode/fastMode";
 import "./Feed.scss";
 
 const VIEWED_KEY = "feed.viewedIds";
@@ -413,6 +415,7 @@ const FeedTitleTags: React.FC<{
 
 interface FeedItemProps {
   scene: Scene;
+  fastModeEnabled: boolean;
   muted: boolean;
   onToggleMute: () => void;
   captionsOn: boolean;
@@ -428,6 +431,7 @@ interface FeedItemProps {
 
 const FeedItem: React.FC<FeedItemProps> = ({
   scene,
+  fastModeEnabled,
   muted,
   onToggleMute,
   captionsOn,
@@ -498,11 +502,49 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, []);
 
-  const previewSrc = useMemo(
+  // Fast mode streams a pre-generated small/fast-start copy instead of the
+  // original file (see hooks/FastMode/fastMode.ts). A scene the user
+  // explicitly bumped to full quality (below) stays there until they swipe
+  // away, regardless of the global setting.
+  const [hqOverride, setHqOverride] = useState(false);
+  const useFast = fastModeEnabled && !hqOverride;
+  const fullSrc = useMemo(
     () => relativize(scene.paths.stream || scene.paths.preview),
     [scene.paths.stream, scene.paths.preview]
   );
+  const fastSrc = useMemo(() => {
+    // GetStreamURL always ends the path in exactly "/stream" before the query
+    // string (apikey), so this swap is safe and never touches stream.mp4 /
+    // .webm / .m3u8 etc, which are unrelated endpoints.
+    if (!fullSrc || !scene.paths.stream) return fullSrc;
+    return fullSrc.replace(/\/stream(?=$|[?#])/, "/stream.fast");
+  }, [fullSrc, scene.paths.stream]);
+  const previewSrc = useFast ? fastSrc : fullSrc;
   const posterSrc = useMemo(() => relativize(scene.paths.screenshot), [scene.paths.screenshot]);
+
+  // Swap the live <video> source when the effective mode changes (global
+  // setting flips, or the user hits the per-scene HQ toggle), preserving
+  // playback position and play state instead of restarting the scene.
+  const prevUseFastRef = useRef(useFast);
+  useEffect(() => {
+    if (prevUseFastRef.current === useFast) return;
+    prevUseFastRef.current = useFast;
+    const v = videoRef.current;
+    if (!v || !v.src) return; // nothing loaded yet, the normal src assignment will pick this up
+    const nextSrc = useFast ? fastSrc : fullSrc;
+    if (!nextSrc) return;
+    const wasPlaying = !v.paused;
+    const resumeAt = v.currentTime;
+    const onLoaded = () => {
+      v.currentTime = resumeAt;
+      if (wasPlaying) v.play().catch(() => {});
+      v.removeEventListener("loadedmetadata", onLoaded);
+    };
+    v.addEventListener("loadedmetadata", onLoaded);
+    v.src = nextSrc;
+    v.dataset.src = nextSrc;
+    v.load();
+  }, [useFast, fastSrc, fullSrc]);
 
   // Set the wrap aspect-ratio from the video's intrinsic dimensions so the
   // CSS height: 100% rule scales it to viewport height regardless of source
@@ -1437,6 +1479,24 @@ const FeedItem: React.FC<FeedItemProps> = ({
             {muted ? <MuteOffIcon /> : <MuteOnIcon />}
           </button>
 
+          {fastModeEnabled && (
+            <button
+              type="button"
+              className={`feed-action feed-fastmode-toggle${useFast ? "" : " is-hq"}`}
+              title={
+                useFast
+                  ? "Playing fast mode. Tap for full quality."
+                  : "Full quality for this video. Tap to go back to fast mode."
+              }
+              onClick={(e) => {
+                e.preventDefault();
+                setHqOverride((v) => !v);
+              }}
+            >
+              <FastModeIcon filled={useFast} />
+            </button>
+          )}
+
           <FeedCcButton
             sceneId={scene.id}
             sceneTitle={title}
@@ -1542,6 +1602,19 @@ export const Feed: React.FC = () => {
   const [interactiveOn, setInteractiveOn] = useState<boolean>(
     () => sessionStorage.getItem(INTERACTIVE_KEY) !== "0"
   );
+  // Global fast-mode setting (Settings > Fast Mode), off by default. Read
+  // live so flipping it in Settings applies to the feed immediately without
+  // a reload.
+  const [fastModeEnabled, setFastModeEnabled] = useState<boolean>(
+    () => loadFastModeConfig().enabled
+  );
+  useEffect(() => {
+    function onChange() {
+      setFastModeEnabled(loadFastModeConfig().enabled);
+    }
+    window.addEventListener(FAST_MODE_EVENT, onChange);
+    return () => window.removeEventListener(FAST_MODE_EVENT, onChange);
+  }, []);
   const {
     state: interactiveState,
     initialised: interactiveInitialised,
@@ -2204,6 +2277,7 @@ export const Feed: React.FC = () => {
           <FeedItem
             key={s.__uid}
             scene={s}
+            fastModeEnabled={fastModeEnabled}
             muted={muted}
             onToggleMute={toggleMute}
             captionsOn={captionsOn}

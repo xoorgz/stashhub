@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/static"
@@ -14,6 +17,12 @@ import (
 	"github.com/stashapp/stash/pkg/txn"
 	"github.com/stashapp/stash/pkg/utils"
 )
+
+// fastModeDir holds pre-generated small/fast-start copies of scenes, built by
+// an external sidecar script rather than stash itself. Kept as a package var
+// (not config) since generating the copies is left to that script; stash's
+// job is only to serve whichever one exists.
+const fastModeDir = "/srv/stash/data/generated/fastmode"
 
 func KillRunningStreams(scene *models.Scene, fileNamingAlgo models.HashAlgorithm) {
 	instance.ReadLockManager.Cancel(scene.Path)
@@ -54,6 +63,26 @@ func (s *SceneServer) StreamSceneDirect(scene *models.Scene, w http.ResponseWrit
 	// returned context here.
 	_ = GetInstance().ReadLockManager.ReadLock(streamRequestCtx, filepath)
 	http.ServeFile(w, r, filepath)
+}
+
+// StreamSceneFast serves the pre-generated fast-mode copy (small, fast-start,
+// 720p) when one exists for this scene, so the feed can play instantly without
+// waiting on the original file or a live transcode. Falls back to the normal
+// direct stream when no fast copy has been generated yet, so toggling the
+// feature on is never a dead end while generation is still catching up.
+func (s *SceneServer) StreamSceneFast(scene *models.Scene, w http.ResponseWriter, r *http.Request) {
+	if scene.Path == "" {
+		http.Error(w, http.StatusText(404), 404)
+		return
+	}
+
+	fastPath := filepath.Join(fastModeDir, strconv.Itoa(scene.ID)+".mp4")
+	if info, err := os.Stat(fastPath); err == nil && !info.IsDir() {
+		http.ServeFile(w, r, fastPath)
+		return
+	}
+
+	s.StreamSceneDirect(scene, w, r)
 }
 
 func (s *SceneServer) ServeScreenshot(scene *models.Scene, w http.ResponseWriter, r *http.Request) {

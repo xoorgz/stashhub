@@ -10,6 +10,7 @@ import { SettingsConfigurationPanel } from "./SettingsSystemPanel";
 import { SettingsNotificationsPanel } from "./SettingsNotificationsPanel";
 import { SettingsAlgorithmPanel } from "./SettingsAlgorithmPanel";
 import { SettingsInteractivePanel } from "./SettingsInteractivePanel";
+import { SettingsFastModePanel } from "./SettingsFastModePanel";
 import { SettingsNoticesPanel } from "./SettingsNoticesPanel";
 import { SettingsInterfacePanel } from "./SettingsInterfacePanel/SettingsInterfacePanel";
 import { SettingsLogsPanel } from "./SettingsLogsPanel";
@@ -79,6 +80,11 @@ const SettingTabs: React.FC<{ tab: TabKey }> = ({ tab }) => {
             <Nav.Item>
               <LinkContainer to="/settings?tab=interactive">
                 <Nav.Link eventKey="interactive">Interactive Toys</Nav.Link>
+              </LinkContainer>
+            </Nav.Item>
+            <Nav.Item>
+              <LinkContainer to="/settings?tab=fastmode">
+                <Nav.Link eventKey="fastmode">Fast Mode</Nav.Link>
               </LinkContainer>
             </Nav.Item>
             <Nav.Item>
@@ -205,6 +211,9 @@ const SettingTabs: React.FC<{ tab: TabKey }> = ({ tab }) => {
             </Tab.Pane>
             <Tab.Pane eventKey="interactive" unmountOnExit>
               <SettingsInteractivePanel />
+            </Tab.Pane>
+            <Tab.Pane eventKey="fastmode" unmountOnExit>
+              <SettingsFastModePanel />
             </Tab.Pane>
             <Tab.Pane eventKey="notices" unmountOnExit>
               <SettingsNoticesPanel />
