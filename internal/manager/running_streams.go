@@ -18,11 +18,21 @@ import (
 	"github.com/stashapp/stash/pkg/utils"
 )
 
-// fastModeDir holds pre-generated small/fast-start copies of scenes, built by
-// an external sidecar script rather than stash itself. Kept as a package var
-// (not config) since generating the copies is left to that script; stash's
-// job is only to serve whichever one exists.
-const fastModeDir = "/srv/stash/data/generated/fastmode"
+// fastModeSubDir sits under the configured generated directory and holds
+// pre-generated small/fast-start copies of scenes, built by an external
+// sidecar script rather than stash itself. Stash only serves whichever
+// copy exists.
+const fastModeSubDir = "fastmode"
+
+// fastModeDir resolves against the instance's generated path, so it follows
+// whatever the install is configured to use.
+func fastModeDir() string {
+	generated := config.GetInstance().GetGeneratedPath()
+	if generated == "" {
+		return ""
+	}
+	return filepath.Join(generated, fastModeSubDir)
+}
 
 func KillRunningStreams(scene *models.Scene, fileNamingAlgo models.HashAlgorithm) {
 	instance.ReadLockManager.Cancel(scene.Path)
@@ -76,10 +86,12 @@ func (s *SceneServer) StreamSceneFast(scene *models.Scene, w http.ResponseWriter
 		return
 	}
 
-	fastPath := filepath.Join(fastModeDir, strconv.Itoa(scene.ID)+".mp4")
-	if info, err := os.Stat(fastPath); err == nil && !info.IsDir() {
-		http.ServeFile(w, r, fastPath)
-		return
+	if dir := fastModeDir(); dir != "" {
+		fastPath := filepath.Join(dir, strconv.Itoa(scene.ID)+".mp4")
+		if info, err := os.Stat(fastPath); err == nil && !info.IsDir() {
+			http.ServeFile(w, r, fastPath)
+			return
+		}
 	}
 
 	s.StreamSceneDirect(scene, w, r)
