@@ -62,8 +62,6 @@ NOTE: The `make` command in OpenBSD will be `gmake`. For example, `make pre-ui` 
 * `make phasher` - Builds the `phasher` binary
 * `make build` - Builds both the `stash` and `phasher` binaries, alias for `make stash phasher`
 * `make build-release` - Builds release versions (debug information removed) of both the `stash` and `phasher` binaries, alias for `make flags-release flags-pie build`
-* `make docker-build` - Locally builds and tags a complete 'stash/build' docker image
-* `make docker-cuda-build` - Locally builds and tags a complete 'stash/cuda-build' docker image
 * `make validate` - Runs all of the tests and checks required to submit a PR
 * `make lint` - Runs `golangci-lint` on the backend
 * `make it` - Runs all unit and integration tests
@@ -122,7 +120,7 @@ Simply run `make` or `make release`, or equivalently:
 
 ## Cross-compiling
 
-This project uses a modification of the [CI-GoReleaser](https://github.com/bep/dockerfiles/tree/master/ci-goreleaser) Docker container for cross-compilation, defined in `docker/compiler/Dockerfile`.
+This project uses a modification of the [CI-GoReleaser](https://github.com/bep/dockerfiles/tree/master/ci-goreleaser) Docker container for cross-compilation, pulled as a published image.
 
 To cross-compile the app yourself:
 

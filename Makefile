@@ -394,16 +394,6 @@ validate-backend: lint it
 .PHONY: validate
 validate: validate-ui validate-backend
 
-# locally builds and tags a 'stash/build' docker image
-.PHONY: docker-build
-docker-build: build-info
-	docker build --build-arg GITHASH=$(GITHASH) --build-arg STASH_VERSION=$(STASH_VERSION) -t stash/build -f docker/build/x86_64/Dockerfile .
-
-# locally builds and tags a 'stash/cuda-build' docker image
-.PHONY: docker-cuda-build
-docker-cuda-build: build-info
-	docker build --build-arg GITHASH=$(GITHASH) --build-arg STASH_VERSION=$(STASH_VERSION) -t stash/cuda-build -f docker/build/x86_64/Dockerfile-CUDA .
-
 # start the build container - for cross compilation
 # this is adapted from the github actions build.yml file
 .PHONY: start-compiler-container

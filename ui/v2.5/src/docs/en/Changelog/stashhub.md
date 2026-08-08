@@ -8,6 +8,8 @@
 * Fast mode toggle takes the accent colour while active.
 * Feed: prefetch waits for the current video to start, so it no longer competes with it.
 * Feed: mobile keeps four videos loaded instead of eight, which stops the phone running hot.
+* Update fonts.
+* Drop Docker build and publish files, stashhub ships no images.
 
 ### stashhub v1.4.41
 
@@ -105,8 +107,8 @@
 
 ### stashhub v1.4.23
 
-* Feed captions rendered in a React overlay so iOS accessibility caption prefs can't override the styling. Flat 50% bg, Netflix Sans Bold, real padding.
-* Netflix Sans @font-face moved into the main bundle so caption fonts load on every route.
+* Feed captions rendered in a React overlay so iOS accessibility caption prefs can't override the styling. Flat 50% bg, StashHub Subtitles Bold, real padding.
+* StashHub Subtitles @font-face moved into the main bundle so caption fonts load on every route.
 
 ### stashhub v1.4.22
 
@@ -191,12 +193,12 @@
 
 ### stashhub v1.4.3
 
-* Caption font: Netflix Sans Light/Medium/Bold bundled, cues at 18 px Bold.
+* Caption font: StashHub Subtitles Light/Medium/Bold bundled, cues at 18 px Bold.
 * ScenePlayer captions always default-on, prefer user's language else first available.
 
 ### stashhub v1.4.2
 
-* Caption styling: 22 px, Netflix Sans Medium with `@font-face` slot at /fonts/NetflixSans-Medium.woff2.
+* Caption styling: 22 px, StashHub Subtitles Medium with `@font-face` slot at /fonts/StashHubSubtitles-Medium.woff2.
 
 ### stashhub v1.4.1
 
@@ -206,7 +208,7 @@
 ### stashhub v1.4.0
 
 * Captions: feed renders sidecar VTT/SRT, CC button next to mute, ON by default per tab.
-* Cue styling: 50% black bg, white text, Netflix Sans stack with sane fallbacks.
+* Cue styling: 50% black bg, white text, StashHub Subtitles stack with sane fallbacks.
 * Resolution + codec mini-tags after title (1080p, HEVC, Dolby etc), dark bg, slight radius.
 
 ### stashhub v1.3.9
