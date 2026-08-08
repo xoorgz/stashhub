@@ -16,7 +16,7 @@ is untouched.
 🎛️ **Configurable recommendation algorithm**<br>
 ❤️ **Per-scene likes**
 
-<img width="1440" height="900" alt="image" src="https://github.com/user-attachments/assets/a911f8c5-acf4-4d8d-9a89-4c3097ca70ab" />
+<img width="1440" height="900" alt="stashhub vertical feed" src="docs/img/feed.png" />
 
 ## Features
 
