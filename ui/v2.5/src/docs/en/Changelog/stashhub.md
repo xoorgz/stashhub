@@ -3,6 +3,11 @@
 * Fast mode: streams a pre-generated 720p copy of each scene so the feed starts instantly and never buffers. Off by default, toggle in Settings.
 * Feed: per-scene HQ button switches to full quality mid-playback without losing position.
 * Fast mode falls back to the normal stream for any scene not yet pre-generated.
+* Fast mode applies immediately in the feed, even if the Settings panel was never opened.
+* Fast mode: resolution and codec badges describe the copy playing, not the source file.
+* Fast mode toggle takes the accent colour while active.
+* Feed: prefetch waits for the current video to start, so it no longer competes with it.
+* Feed: mobile keeps four videos loaded instead of eight, which stops the phone running hot.
 
 ### stashhub v1.4.41
 
