@@ -444,8 +444,13 @@
 
 /* Fast-mode toggle: filled bolt + hub-purple while playing the fast copy,
    outline + dimmed once the user has bumped this scene to full quality. */
-.feed-fastmode-toggle { color: var(--feed-hubs); }
-.feed-fastmode-toggle.is-hq { opacity: 0.6; color: inherit; }
+/* Compound with .feed-action (not just .feed-fastmode-toggle alone): the base
+   .feed-action color rule is a single-class selector of equal specificity
+   defined later in this file, so a single-class override here would lose the
+   cascade regardless of what color it names. Two classes together outrank it
+   irrespective of source order, same pattern as .feed-cc-toggle.captions-on. */
+.feed-action.feed-fastmode-toggle { color: var(--feed-hubs); }
+.feed-action.feed-fastmode-toggle.is-hq { opacity: 0.6; color: inherit; }
 
 /* Handy interactive sync toggle. Mirrors the CC button states: off is muted,
    synced is hub-purple, busy pulses the icon. */

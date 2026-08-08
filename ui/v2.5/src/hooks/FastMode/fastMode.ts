@@ -23,6 +23,12 @@ export const DEFAULT_FAST_MODE_CONFIG: FastModeConfig = {
   enabled: false,
 };
 
+// The encode parameters stash-fastmode.sh actually produces. Single source of
+// truth so the feed's displayed resolution/codec badge can describe what is
+// really playing instead of the original file's metadata.
+export const FAST_MODE_MAX_HEIGHT = 720;
+export const FAST_MODE_VIDEO_CODEC = "h264";
+
 export function loadFastModeConfig(): FastModeConfig {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);

@@ -38,6 +38,8 @@ import {
   saveFastModeConfig,
   fastModeFromConfigUi,
   FAST_MODE_EVENT,
+  FAST_MODE_MAX_HEIGHT,
+  FAST_MODE_VIDEO_CODEC,
 } from "src/hooks/FastMode/fastMode";
 import { ConfigurationContext } from "src/hooks/Config";
 import "./Feed.scss";
@@ -1409,7 +1411,25 @@ const FeedItem: React.FC<FeedItemProps> = ({
             <div className="feed-meta">
               <div className="feed-title">
                 <span className="feed-title-text">{title}</span>
-                <FeedTitleTags file={scene.files?.[0]} />
+                <FeedTitleTags
+                  file={
+                    useFast
+                      ? {
+                          // What fast mode actually encodes to, not the source
+                          // file's metadata: the fast copy is always h264 with
+                          // plain stereo AAC (re-encoded, so no Dolby/DTS
+                          // badge), capped at 720p (never upscaled past the
+                          // source height).
+                          height: Math.min(
+                            FAST_MODE_MAX_HEIGHT,
+                            scene.files?.[0]?.height || FAST_MODE_MAX_HEIGHT
+                          ),
+                          video_codec: FAST_MODE_VIDEO_CODEC,
+                          audio_codec: undefined,
+                        }
+                      : scene.files?.[0]
+                  }
+                />
               </div>
               {tags.length > 0 && (
                 <div className="feed-tags">
@@ -1962,18 +1982,21 @@ export const Feed: React.FC = () => {
       //   preload="auto" is a full download and competes for the phone's
       //   bandwidth with the video actually playing, so keep it tiny.
       //
-      //   src + preload="metadata" is a few KB of container header. It costs
-      //   almost nothing, holds no decoder, and means a tile that gets swiped
-      //   onto starts from a warm connection instead of cold. It can be much
-      //   wider, and making it narrow is what put a loading spinner on every
-      //   fast swipe.
-      const autoAhead = isDesktop ? 3 : 1;
+      //   src + preload="metadata" is a few KB of container header, so it is
+      //   cheap on bandwidth and keeps a swiped-onto tile warm. It is not free
+      //   on iOS though: every element holding a src holds a media pipeline,
+      //   so this window stays modest on mobile even though the bytes are tiny.
+      const autoAhead = isDesktop ? 2 : 1;
       // Mobile skips preload="auto" behind: that tile was just watched, and
       // re-downloading it steals bandwidth from the one playing now. It keeps
       // its src, so swiping back is still warm.
       const autoBehind = isDesktop ? 1 : 0;
-      const srcAhead = isDesktop ? 6 : 5;
-      const srcBehind = 2;
+      // The earlier claim that a src costs "almost nothing" holds on desktop
+      // but not on iOS, where every element with a src holds a media pipeline.
+      // Eight of them is what made the phone run hot and stalled first play.
+      // Fast copies start on the first packet, so a deep window buys little.
+      const srcAhead = isDesktop ? 4 : 2;
+      const srcBehind = isDesktop ? 2 : 1;
       const start = Math.max(0, idx - srcBehind);
       const end = Math.min(items.length - 1, idx + srcAhead);
       for (let i = start; i <= end; i++) {
@@ -2050,12 +2073,16 @@ export const Feed: React.FC = () => {
       // Funscript upload lives in FeedItem, which owns the per-scene interactive
       // state. It used to be duplicated here against identifiers that do not
       // exist in this scope, which threw and killed everything below it.
-      // Prefetch neighbours a beat later, and only if this is still the tile the
-      // user settled on, so a fast skip-through never kicks off loads for tiles
-      // already scrolled past.
-      window.setTimeout(() => {
+      // Prefetch neighbours only once this tile is actually playing, and only
+      // if it is still the tile the user settled on, so a fast skip-through
+      // never kicks off loads for tiles already scrolled past. The old fixed
+      // 600ms timer fired while a cold video was still buffering, so the
+      // prefetch burst competed with the one video the user was waiting on.
+      const primeNeighbours = () => {
         if (currentVisibleRef.current === item) ensureNeighborSrcs(item);
-      }, 600);
+      };
+      if (!video.paused && video.readyState >= 3) primeNeighbours();
+      else video.addEventListener("playing", primeNeighbours, { once: true });
       const id = item.dataset.sceneId;
       if (id) {
         markViewed(id);
