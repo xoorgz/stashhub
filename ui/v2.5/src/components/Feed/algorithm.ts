@@ -227,11 +227,11 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   const over = 3; // over-fetch so post-exclude there's still material
 
   // Filter chips: an active chip restricts the queue to scenes carrying
-  // any of its tag IDs. The user's mental model is "show me tongue stuff"
-  // — boost-weighted mode where unrelated scenes still appeared was
-  // confusing. So active chips always behave strictly: every bucket's
-  // findScenes call gets wrapped in AND { tags: includes union }. With
-  // single-select in the UI there's at most one active chip's tag list.
+  // any of its tag IDs. A chip reads as "only show me this", so boost
+  // weighting, where unrelated scenes still appeared, was confusing.
+  // Active chips behave strictly instead: every bucket's findScenes call
+  // gets wrapped in AND { tags: includes union }. With single-select in
+  // the UI there's at most one active chip's tag list.
   let strictTagIds: string[] = [];
   try {
     const rawActive = localStorage.getItem("feed.filterChips.active");
