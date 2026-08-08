@@ -61,5 +61,3 @@ node_modules
 dist
 .DS_Store
 /.local*
-# local deploy notes with real host/domain specifics (repo is public)
-/CLAUDE.md
