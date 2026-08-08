@@ -1,25 +1,25 @@
-/* TikTok Sans — bundled woff2 files served from /fonts (CSP-safe, no external CDN) */
+/* StashHub Sans — bundled woff2 files served from /fonts (CSP-safe, no external CDN) */
 
 @font-face {
-  font-family: "TikTok Sans";
+  font-family: "StashHub Sans";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/fonts/TikTokSans-400.woff2") format("woff2");
+  src: url("/fonts/StashHubSans-400.woff2") format("woff2");
 }
 @font-face {
-  font-family: "TikTok Sans";
+  font-family: "StashHub Sans";
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url("/fonts/TikTokSans-500.woff2") format("woff2");
+  src: url("/fonts/StashHubSans-500.woff2") format("woff2");
 }
 @font-face {
-  font-family: "TikTok Sans";
+  font-family: "StashHub Sans";
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url("/fonts/TikTokSans-700.woff2") format("woff2");
+  src: url("/fonts/StashHubSans-700.woff2") format("woff2");
 }
 
 /* Apply globally — without nuking icon fonts (Font Awesome, video.js, etc.) */
@@ -31,7 +31,7 @@ select,
 textarea,
 .btn,
 h1, h2, h3, h4, h5, h6 {
-  font-family: "TikTok Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont,
+  font-family: "StashHub Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, sans-serif;
 }
 
@@ -44,7 +44,7 @@ h1, h2, h3, h4, h5, h6 {
   font-family: revert !important;
 }
 
-/* Headings/titles default to medium weight (TikTok Sans 500) */
+/* Headings/titles default to medium weight (StashHub Sans 500) */
 h1, h2, h3, h4, h5, h6,
 .card-section-title,
 .scene-header,

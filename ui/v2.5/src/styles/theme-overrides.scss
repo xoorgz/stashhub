@@ -1042,7 +1042,7 @@ body .marker-card .card-section {
 *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 999px; }
 *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
 
-/* === TikTok Sans on body chrome === */
+/* === StashHub Sans on body chrome === */
 html, body,
 body div, body p, body a, body span, body li, body td, body th,
 body input, body select, body textarea, body button, body label,
@@ -1052,7 +1052,7 @@ body .scene-header, body .scene-header-container,
 body .top-nav, body .navbar-nav, body .nav-link, body .nav-tabs,
 body .modal-content, body .card, body .grid-card, body .scene-card,
 body .form-control, body .dropdown-menu, body .toast {
-  font-family: 'TikTok Sans', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family: 'StashHub Sans', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
 /* === Scene player: round actual visible elements + scrubber strip === */
@@ -1078,7 +1078,7 @@ body .form-control, body .dropdown-menu, body .toast {
 
 /* === Keep icon fonts intact ===
    video.js controls render unicode glyphs in the 'VideoJS' font; if we let
-   them inherit from body (TikTok Sans) the code-points are missing and
+   them inherit from body (StashHub Sans) the code-points are missing and
    render as boxes. Pin to the right family for every variant we've seen. */
 .vjs-icon-placeholder,
 .vjs-icon-placeholder::before,
@@ -1120,7 +1120,7 @@ body #scene-edit-details .edit-buttons {
 .material-icons { font-family: 'Material Icons' !important; }
 .material-symbols-outlined { font-family: 'Material Symbols Outlined' !important; }
 
-/* Everything else inside the player keeps its own font. don't force TikTok Sans. */
+/* Everything else inside the player keeps its own font. don't force StashHub Sans. */
 .video-js,
 .video-js * { font-family: revert !important; }
 
