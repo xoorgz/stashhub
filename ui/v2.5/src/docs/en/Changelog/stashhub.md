@@ -10,6 +10,7 @@
 * Feed: mobile keeps four videos loaded instead of eight, which stops the phone running hot.
 * Update fonts.
 * Drop Docker build and publish files, stashhub ships no images.
+* Drop upstream contribution templates, CI workflows, test data and unused readme assets.
 
 ### stashhub v1.4.41
 
