@@ -1,3 +1,7 @@
+### stashhub v1.4.43
+
+* Drop upstream contribution templates, CI workflows, test data and unused readme assets.
+
 ### stashhub v1.4.42
 
 * Fast mode: streams a pre-generated 720p copy of each scene so the feed starts instantly and never buffers. Off by default, toggle in Settings.
@@ -10,7 +14,6 @@
 * Feed: mobile keeps four videos loaded instead of eight, which stops the phone running hot.
 * Update fonts.
 * Drop Docker build and publish files, stashhub ships no images.
-* Drop upstream contribution templates, CI workflows, test data and unused readme assets.
 
 ### stashhub v1.4.41
 
