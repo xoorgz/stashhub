@@ -18,10 +18,8 @@ import (
 	"github.com/stashapp/stash/pkg/utils"
 )
 
-// fastModeSubDir sits under the configured generated directory and holds
-// pre-generated small/fast-start copies of scenes, built by an external
-// sidecar script rather than stash itself. Stash only serves whichever
-// copy exists.
+// fastModeSubDir holds pre-generated fast-start copies, built by an external
+// sidecar script rather than stash. Stash only serves whichever copy exists.
 const fastModeSubDir = "fastmode"
 
 // fastModeDir resolves against the instance's generated path, so it follows
@@ -75,11 +73,8 @@ func (s *SceneServer) StreamSceneDirect(scene *models.Scene, w http.ResponseWrit
 	http.ServeFile(w, r, filepath)
 }
 
-// StreamSceneFast serves the pre-generated fast-mode copy (small, fast-start,
-// 720p) when one exists for this scene, so the feed can play instantly without
-// waiting on the original file or a live transcode. Falls back to the normal
-// direct stream when no fast copy has been generated yet, so toggling the
-// feature on is never a dead end while generation is still catching up.
+// StreamSceneFast serves the pre-generated 720p fast-start copy when one exists,
+// falling back to the direct stream so the feature is never a dead end.
 func (s *SceneServer) StreamSceneFast(scene *models.Scene, w http.ResponseWriter, r *http.Request) {
 	if scene.Path == "" {
 		http.Error(w, http.StatusText(404), 404)

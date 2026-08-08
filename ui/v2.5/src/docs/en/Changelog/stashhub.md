@@ -94,7 +94,7 @@
 
 ### stashhub v1.4.26
 
-* SQLite: bump page cache to 256 MB, mmap the DB, route temp B-trees to RAM. UI queries are dramatically faster on a 66 MB DB that previously fit in 2 MB of cache.
+* SQLite: bump page cache to 256 MB, mmap the DB, route temp B-trees to RAM. UI queries are dramatically faster on any library that previously fit in 2 MB of cache.
 
 ### stashhub v1.4.25
 

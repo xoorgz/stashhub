@@ -64,11 +64,8 @@ const HEART_COLORS = ["#ff3b6b", "#ff1744", "#ff5070", "#ff7090", "#ff2d55", "#f
 
 type Scene = FeedScene;
 
-// The endless feed recycles scenes, so the same scene id can legitimately sit
-// in the queue more than once. Keying on the array index disambiguated that but
-// made every key shift whenever the queue was trimmed from the front, which
-// remounted every tile (including the one playing). A per-slot serial is stable
-// for the life of the entry, so trimming leaves the surviving tiles untouched.
+// A scene id can legitimately repeat in the queue, so tiles key on a per-slot
+// serial that survives trimming rather than on the array index.
 type QueuedScene = Scene & { __uid: number };
 let sceneUid = 0;
 const withUid = (s: Scene): QueuedScene => ({ ...s, __uid: ++sceneUid });
@@ -125,15 +122,8 @@ function getViewed(): Set<string> {
     return new Set();
   }
 }
-/** Begin a fresh pass over the library.
- *
- *  Once the viewed history covered every eligible scene, the de-duplicated
- *  build returned nothing and EVERY refill fell through to the recycle path.
- *  That path only holds back the last few tiles, so the feed ended up drawing
- *  forever from a tiny pool: the same videos coming round again and again.
- *  Resetting the history to a short tail lets the next full cycle de-duplicate
- *  normally, so you get a complete pass through the library before anything
- *  repeats. */
+/** Begin a fresh pass over the library. Trimming the viewed history to a short
+ *  tail lets the next cycle de-duplicate instead of recycling a tiny pool. */
 function startNewViewedCycle(keep: string[]) {
   try {
     localStorage.setItem(
@@ -486,10 +476,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const { status: buttplugStatus, deviceName: buttplugDeviceName } =
     useButtplug();
 
-  // Show the same centred chip on keyboard seek (ArrowLeft / ArrowRight)
-  // as on edge-tap. Feed dispatches `feed-pulse-trigger` on the active
-  // .feed-item with detail "back" or "fwd"; we just mirror it into local
-  // pulse state with the same 600 ms auto-clear timer.
+  // Mirror Feed's `feed-pulse-trigger` into pulse state, so a keyboard seek
+  // shows the same centred chip as an edge-tap.
   useEffect(() => {
     const item = itemRef.current;
     if (!item) return;
@@ -510,10 +498,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, []);
 
-  // Fast mode streams a pre-generated small/fast-start copy instead of the
-  // original file (see hooks/FastMode/fastMode.ts). A scene the user
-  // explicitly bumped to full quality (below) stays there until they swipe
-  // away, regardless of the global setting.
+  // Fast mode streams a pre-generated small/fast-start copy. A per-scene HQ
+  // override beats the global setting until the user swipes away.
   const [hqOverride, setHqOverride] = useState(false);
   const useFast = fastModeEnabled && !hqOverride;
   const fullSrc = useMemo(
@@ -586,10 +572,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     return () => v.removeEventListener("timeupdate", onUpdate);
   }, []);
 
-  // Seek on the progress bar. Touch is intent-aware: a horizontal drag scrubs,
-  // a vertical drag is left to the browser so the feed still scrolls, and a tap
-  // seeks. Scrubbing on touchstart used to hijack any swipe starting near the
-  // bottom edge, both seeking by accident and blocking the swipe.
+  // Seek on the progress bar. Touch waits for the gesture to declare itself, so
+  // a vertical swipe that starts on the bar still scrolls the feed.
   useEffect(() => {
     const p = progressRef.current;
     const v = videoRef.current;
@@ -690,10 +674,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, []);
 
-  // Double-click to fullscreen, desktop only. On touch devices a quick
-  // double-tap on the edge of the video accidentally triggered fullscreen
-  // when the user actually wanted edge-tap seek. Gate on `hover: hover`
-  // which is true on pointer devices and false on touch-only ones.
+  // Double-click to fullscreen. Gated on `hover: hover` so a double-tap on a
+  // touch-only device stays edge-tap seek.
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -712,14 +694,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     if (videoRef.current) videoRef.current.muted = muted;
   }, [muted]);
 
-  // Captions: we render cues ourselves in a React overlay so iOS
-  // accessibility caption prefs (rounded bg, thin font, no padding)
-  // can't override our styling. Keep track 0 in "hidden" mode whenever it
-  // exists (not gated on captionsOn): the browser parses its cues and fires
-  // cuechange so activeCue below is always current, but paints nothing. That
-  // way flipping captions on shows the CURRENT cue instantly instead of waiting
-  // for the next cuechange, which was the "CC does nothing / needs multiple
-  // clicks" bug. The overlay's visibility is gated on captionsOn, not the track.
+  // Cues render in a React overlay so iOS accessibility caption prefs cannot
+  // restyle them. Track 0 stays "hidden" so cues parse without being painted.
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !v.textTracks) return;
@@ -737,11 +713,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [scene.captions?.length]);
 
-  // Active cue text for the React-rendered overlay. Hidden tracks still
-  // fire cuechange and expose activeCues, so we just mirror whatever's
-  // active into local state. Tracked continuously (not gated on captionsOn) so
-  // toggling captions on can render the current cue with no delay; the overlay
-  // itself is gated on captionsOn at render time.
+  // Active cue text for the overlay. Hidden tracks still fire cuechange, so
+  // tracking continuously lets a captions toggle paint the current cue at once.
   const [activeCue, setActiveCue] = useState<string>("");
   useEffect(() => {
     const v = videoRef.current;
@@ -785,11 +758,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [scene.id, scene.captions?.length]);
 
-  // Read cue start-times from the first caption track and render them
-  // as small ticks on the progress bar (one per spoken utterance).
-  // VTT loads asynchronously; the tracks list fires addtrack and the
-  // individual TextTrack fires load + cuechange when cues parse. Read
-  // on each of those so we catch the cues regardless of timing.
+  // Cue start-times drive the progress-bar ticks. VTT parses asynchronously, so
+  // read on addtrack, load and cuechange alike to catch them whenever they land.
   const [cueStarts, setCueStarts] = useState<number[]>([]);
   useEffect(() => {
     const v = videoRef.current;
@@ -831,33 +801,23 @@ const FeedItem: React.FC<FeedItemProps> = ({
     return () => detach.forEach((d) => d());
   }, [scene.id, scene.captions?.length]);
 
-  // Robust load/play + buffering UI: handle slow initial buffering and "stuck"
-  // states. The IO handler calls play() the moment a tile crosses the
-  // visibility threshold, but if src was only just assigned the play() promise
-  // rejects and the tile sits on its poster. Re-trigger play() on every canplay,
-  // and surface a centered loader + buffered % so the user sees progress.
+  // The IO handler's play() rejects when src was only just assigned, leaving the
+  // tile on its poster, so retry on every canplay and show a buffering loader.
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     let stuckTimer: number | null = null;
     let loaderTimer: number | null = null;
     let waitingSince = 0;
-    // Track user-initiated seeks. The browser fires `waiting` while it
-    // buffers the new position, which used to trip the stuck-load
-    // recovery, which then v.load()'d the element and reset currentTime
-    // to 0. Result: scrubbing snapped back to the start. While `seeking`
-    // is true, we treat the wait as expected and skip the recovery.
+    // A seek fires `waiting` too. Skip stuck-load recovery while it is in
+    // flight, since its v.load() would reset currentTime to 0.
     let seeking = false;
     const onSeeking = () => { seeking = true; };
     const onSeeked = () => { seeking = false; };
     const showLoader = () => {
       if (loaderTimer != null) return;
-      // Defer 250ms so a quick load doesn't flash a loader frame. At the
-      // deadline, only commit to "loading" if the video is genuinely stuck:
-      // either paused, or its readyState is below HAVE_FUTURE_DATA (3), i.e.
-      // the browser doesn't have enough buffered to keep playing forward.
-      // Brief mid-playback network hiccups stop firing waiting/stalled by then
-      // and we leave the UI alone.
+      // Defer 250ms so a quick load never flashes a loader frame, then commit
+      // only if the video is paused or below HAVE_FUTURE_DATA (3).
       loaderTimer = window.setTimeout(() => {
         if (v.paused || v.readyState < 3) setLoading(true);
         loaderTimer = null;
@@ -874,16 +834,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
       if (!v.paused) return;
       const item = itemRef.current;
       if (!item) return;
-      // Normally the feed marks exactly one tile active and only that tile may
-      // decode. The old test was "any part of this element is on screen", true
-      // for a 1px sliver, so every primed neighbour that fired canplay started
-      // decoding too and several videos played at once.
-      //
-      // Geometry is the fallback when the marker is missing, because a fast
-      // fling can skip the settle that would have set it, and without a
-      // fallback such a tile would sit on its loader forever. Requiring the
-      // tile to cover most of the viewport keeps the guarantee intact: only one
-      // tile can ever satisfy that.
+      // Only the tile marked active may decode. Covering most of the viewport is
+      // the fallback when a fast fling skipped the settle that sets the marker.
       if (item.dataset.active !== "1") {
         const r = item.getBoundingClientRect();
         const vh = window.innerHeight || document.documentElement.clientHeight;
@@ -896,14 +848,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
       hideLoader();
       tryPlay();
     };
-    // Cap how aggressively we retry load() while stuck on a transcoded
-    // stream. Each retry calls v.load(), which resets the element back
-    // to the poster and triggers a fresh transcode session; doing it
-    // every 3 s indefinitely thrashes ffmpeg on long / HEVC sources
-    // where startup naturally takes 5-10 s, producing the "poster to
-    // black to poster" flicker the user reported in v1.3.6. After
-    // MAX_LOAD_ATTEMPTS retries we leave the poster pulsing and wait
-    // patiently for `canplay` / `playing` to fire on its own.
+    // Cap the load() retries: each one starts a fresh transcode session, and
+    // long or HEVC sources legitimately need 5-10 s to produce a first frame.
     const MAX_LOAD_ATTEMPTS = 3;
     let loadAttempts = 0;
     const onWaiting = () => {
@@ -941,10 +887,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const onLoadStart = () => {
       if (v.paused && v.readyState < 3) showLoader();
     };
-    // Hard guarantee: any time the element transitions out of paused into
-    // playing, the loader is off. This covers cases where `waiting` fires
-    // alongside `playing` (Chrome occasionally emits waiting on segment
-    // boundaries for transcoded streams).
+    // Chrome can emit `waiting` alongside `playing` on transcoded segment
+    // boundaries, so clear the loader on play as well.
     const onPlay = () => hideLoader();
     v.addEventListener("canplay", onCanPlay);
     v.addEventListener("loadeddata", onCanPlay);
@@ -1069,10 +1013,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [interactiveOn, buttplugStatus, funscriptReady, scene.id]);
 
-  // Register a play with Stash after 3s of continuous playback + track real
-  // watched seconds and flush to sceneSaveActivity every 10s (and on
-  // pause/end/unmount). This is what the Top Watched + Watched Tags buckets
-  // feed on, without it, Stash never learns how much time you actually spent.
+  // Register a play after 3s and flush watched seconds every 10s. The Top
+  // Watched and Watched Tags buckets have no other source for this.
   const playTimerRef = useRef<number | null>(null);
   const playRegisteredRef = useRef(false);
   const watchedSinceLastFlushRef = useRef(0);
@@ -1415,11 +1357,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                   file={
                     useFast
                       ? {
-                          // What fast mode actually encodes to, not the source
-                          // file's metadata: the fast copy is always h264 with
-                          // plain stereo AAC (re-encoded, so no Dolby/DTS
-                          // badge), capped at 720p (never upscaled past the
-                          // source height).
+                          // Badge what fast mode encodes, not the source file:
+                          // h264, plain stereo AAC, capped at 720p.
                           height: Math.min(
                             FAST_MODE_MAX_HEIGHT,
                             scene.files?.[0]?.height || FAST_MODE_MAX_HEIGHT
@@ -1547,10 +1486,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
             title="Fullscreen (double-click video for video-only fullscreen)"
             onClick={(e) => {
               e.preventDefault();
-              // Try document-fullscreen first (desktop, modern Android).
               // iOS Safari rejects requestFullscreen on non-video elements, so
-              // fall back to the video's webkitEnterFullscreen, which is the
-              // only fullscreen path iOS actually exposes.
+              // fall back to the video's webkitEnterFullscreen.
               const docEl = document.documentElement as HTMLElement & {
                 webkitRequestFullscreen?: () => Promise<void> | void;
                 mozRequestFullScreen?: () => Promise<void> | void;
@@ -1628,14 +1565,8 @@ export const Feed: React.FC = () => {
   const [interactiveOn, setInteractiveOn] = useState<boolean>(
     () => sessionStorage.getItem(INTERACTIVE_KEY) !== "0"
   );
-  // Global fast-mode setting (Settings > Fast Mode), off by default.
-  // localStorage is only ever populated once the Settings panel has been
-  // opened in this browser, so it cannot be the sole source: a setting
-  // flipped any other way (a direct DB write, another device) would never
-  // reach a feed session that started fresh. ConfigurationContext already
-  // holds the full server config at app boot, so that is the source of
-  // truth; localStorage is kept only as the instant-first-paint value and
-  // the same-tab change channel via FAST_MODE_EVENT.
+  // ConfigurationContext is the source of truth for the global fast-mode
+  // setting; localStorage only supplies first paint and the same-tab channel.
   const { configuration } = React.useContext(ConfigurationContext);
   const [fastModeEnabled, setFastModeEnabled] = useState<boolean>(
     () => loadFastModeConfig().enabled
@@ -1683,11 +1614,8 @@ export const Feed: React.FC = () => {
   const [drops, setDrops] = useState<DropParticle[]>([]);
   const dropIdRef = useRef(0);
 
-  // Filter chips. Chip defs live in Stash's server-side UI config and the
-  // UI for choosing/toggling them lives in the FeedChipIsland (top-right).
-  // Here we only need to (a) keep the algorithm.settings localStorage blob
-  // in sync from the server so buildQueue picks up the latest chip set, and
-  // (b) rebuild the queue any time the chip-active state changes.
+  // Mirror the server's chip defs into the algorithm.settings blob buildQueue
+  // reads, and rebuild the queue whenever the active chip changes.
   useEffect(() => {
     let cancelled = false;
     function mirrorServerChips(server: FilterChip[]) {
@@ -1736,11 +1664,8 @@ export const Feed: React.FC = () => {
     };
   }, []);
 
-  // FeedCcButton dispatches "stashhub:scene-captions-appeared" when its
-  // background poll (or click defensive check) detects new captions on a
-  // scene. Refetch that scene bypassing Apollo's cache so the <track>
-  // nodes actually appear; cache-first would just hand back the stale
-  // captions=null record the feed loaded with.
+  // Refetch past Apollo's cache when FeedCcButton reports new captions, since
+  // cache-first would hand back the stale captions=null record.
   useEffect(() => {
     async function onCaptionsAppeared(e: Event) {
       const id = (e as CustomEvent<{ sceneId: string }>).detail?.sceneId;
@@ -1905,11 +1830,8 @@ export const Feed: React.FC = () => {
       const exclude = new Set([...viewed, ...loadedIds]);
       let ids = await buildQueue({ targetCount: 20, exclude });
       let details = await fetchSceneDetails(ids);
-      // Endless feed: once every eligible scene has been served this session
-      // (or recently-played has eaten the library) the dedup build returns
-      // nothing. Recycle: reshuffle the whole library through the same
-      // algorithm, holding back only the last few tiles so nothing repeats
-      // immediately. This makes the feed swipe forever instead of dead-ending.
+      // Endless feed: when the dedup build returns nothing, reshuffle the whole
+      // library and hold back only the last few tiles.
       if (details.length === 0) {
         const recentList = Array.from(loadedIds).slice(-RECYCLE_KEEP);
         const recent = new Set(recentList);
@@ -1929,11 +1851,8 @@ export const Feed: React.FC = () => {
     }
   }, [loadedIds]);
 
-  // Trimming removes tiles above the viewport, which would otherwise yank the
-  // content up under the user. Rewind the scroller by exactly the height that
-  // went away, in a layout effect so it lands before the browser paints and the
-  // swap is invisible. Every tile is one viewport tall, so the scroll position
-  // stays snapped.
+  // Rewind the scroller by exactly the height trimming removed, in a layout
+  // effect so it lands before paint and the content never yanks upward.
   useLayoutEffect(() => {
     const px = pendingTrimRef.current;
     if (!px) return;
@@ -1965,36 +1884,20 @@ export const Feed: React.FC = () => {
     }
 
     function ensureNeighborSrcs(activeItem: HTMLDivElement) {
-      // Prime active + N ahead with preload="auto" so a swipe-down has no
-      // buffer pause. N is bumped on desktop because we can spare the
-      // bandwidth there; on mobile we stay conservative. v1.3.0's extra
-      // fetch()-based Range pre-warm is gone: it raced Stash's live
-      // transcoder for the same scene and occasionally left tiles stuck
-      // on a black frame when the abort cancelled an in-flight session
-      // before the <video> element had taken over.
+      // Prime active + N ahead with preload="auto" so a swipe-down has no buffer
+      // pause. N is larger on desktop, where the bandwidth is there to spare.
       const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
       const idx = items.indexOf(activeItem);
       if (idx === -1) return;
       const isDesktop = typeof window.matchMedia === "function"
         && window.matchMedia("(hover: hover)").matches;
-      // Two separate budgets, because they cost very different things:
-      //
-      //   preload="auto" is a full download and competes for the phone's
-      //   bandwidth with the video actually playing, so keep it tiny.
-      //
-      //   src + preload="metadata" is a few KB of container header, so it is
-      //   cheap on bandwidth and keeps a swiped-onto tile warm. It is not free
-      //   on iOS though: every element holding a src holds a media pipeline,
-      //   so this window stays modest on mobile even though the bytes are tiny.
+      // Two budgets: preload="auto" is a full download so keep it tiny, and a
+      // bare src is a few KB but still holds a media pipeline per element on iOS.
       const autoAhead = isDesktop ? 2 : 1;
       // Mobile skips preload="auto" behind: that tile was just watched, and
       // re-downloading it steals bandwidth from the one playing now. It keeps
       // its src, so swiping back is still warm.
       const autoBehind = isDesktop ? 1 : 0;
-      // The earlier claim that a src costs "almost nothing" holds on desktop
-      // but not on iOS, where every element with a src holds a media pipeline.
-      // Eight of them is what made the phone run hot and stalled first play.
-      // Fast copies start on the first packet, so a deep window buys little.
       const srcAhead = isDesktop ? 4 : 2;
       const srcBehind = isDesktop ? 2 : 1;
       const start = Math.max(0, idx - srcBehind);
@@ -2012,17 +1915,8 @@ export const Feed: React.FC = () => {
           try { v.load(); } catch { /* ignore */ }
         }
       }
-      // One sweep enforcing both invariants over every other tile:
-      //
-      //   1. Exactly one video decodes. The observer pauses tiles as they drop
-      //      below 0.3, but a fast fling can coalesce those callbacks, so this
-      //      is the backstop that guarantees it.
-      //   2. Tiles far outside the window drop their src entirely, so a long
-      //      fling can't leave a trail of open streams behind it. The old
-      //      teardown skipped any tile that was still playing, so exactly the
-      //      runaway videos it was meant to catch were the ones it let through.
-      //      The window sits one past the prime window so priming and teardown
-      //      can never fight over the same tile.
+      // Backstop sweep: a fast fling can coalesce the observer callbacks. The
+      // teardown window sits one past the prime window so they cannot fight.
       const keepBehind = srcBehind + 1;
       const keepAhead = srcAhead + 1;
       for (let i = 0; i < items.length; i++) {
@@ -2040,10 +1934,8 @@ export const Feed: React.FC = () => {
       }
     }
 
-    // Only the tile the user *settles* on (highly visible for >~120ms) gets
-    // played and its transcode primed. Fast-skipping past tiles never starts
-    // a play() or a transcode, so there's no black-pause-play thrash and only
-    // the landed tile loads. Skipped tiles show their posters (always drawn).
+    // Only a tile settled on for >~120ms plays and primes its transcode, so
+    // fast-skipping loads nothing and skipped tiles just show their posters.
     let settleTimer: number | null = null;
     let pendingItem: HTMLDivElement | null = null;
     let primeRaf: number | null = null;
@@ -2057,12 +1949,8 @@ export const Feed: React.FC = () => {
         if (el !== item) delete el.dataset.active;
       });
       item.dataset.active = "1";
-      // Active video gets bandwidth priority: give it its src + preload="auto"
-      // and start it BEFORE priming neighbours, so prefetch never competes with
-      // the tile you're actually watching over a limited connection.
-      // preload goes first: a torn-down tile carries preload="none", and
-      // calling load() while that is still set tells the browser to fetch
-      // nothing, so the element sat there doing no work.
+      // Start the active video before priming neighbours. preload goes first: a
+      // torn-down tile carries preload="none", which makes load() fetch nothing.
       video.preload = "auto";
       if (video.dataset.src && !video.src) {
         video.src = video.dataset.src;
@@ -2070,14 +1958,8 @@ export const Feed: React.FC = () => {
       }
       video.muted = muted;
       video.play().catch(() => {});
-      // Funscript upload lives in FeedItem, which owns the per-scene interactive
-      // state. It used to be duplicated here against identifiers that do not
-      // exist in this scope, which threw and killed everything below it.
-      // Prefetch neighbours only once this tile is actually playing, and only
-      // if it is still the tile the user settled on, so a fast skip-through
-      // never kicks off loads for tiles already scrolled past. The old fixed
-      // 600ms timer fired while a cold video was still buffering, so the
-      // prefetch burst competed with the one video the user was waiting on.
+      // Prefetch neighbours only once this tile plays and is still the settled
+      // one, so the burst never competes with a cold video or a skipped-past tile.
       const primeNeighbours = () => {
         if (currentVisibleRef.current === item) ensureNeighborSrcs(item);
       };
@@ -2092,12 +1974,8 @@ export const Feed: React.FC = () => {
       const items = track.querySelectorAll(".feed-item");
       const idx = Array.from(items).indexOf(item);
       if (items.length - idx <= REFILL_AT) loadMore();
-      // The queue only ever grew, so a long session ended up with hundreds of
-      // viewport-tall tiles in the DOM, each carrying its own <video> and
-      // poster. Drop the ones far above the active tile; the layout effect
-      // rewinds scrollTop by exactly the height removed, so nothing moves.
-      // Runs only here, once the tile has been settled on for 120ms, never
-      // mid-fling.
+      // Drop tiles far above the active one, each holds a <video> and a poster.
+      // Only runs on a settled tile, never mid-fling.
       const excess = idx - KEEP_BEHIND;
       if (excess >= TRIM_CHUNK) {
         const itemH = item.offsetHeight;
@@ -2117,10 +1995,8 @@ export const Feed: React.FC = () => {
           if (entry.intersectionRatio >= 0.7) {
             pendingItem = item;
             currentVisibleRef.current = item; // immediate for keyboard/persist reads
-            // Prime upcoming tiles right away (throttled to one rAF), so even a
-            // fast swipe that never "settles" still lands on a buffered video.
-            // ensureNeighborSrcs bounds the aggressive window and tears down far
-            // tiles, so this can't pile up transcodes on the server.
+            // Prime upcoming tiles at once, throttled to one rAF, so a swipe
+            // that never settles still lands on a buffered video.
             if (primeRaf == null) {
               primeRaf = window.requestAnimationFrame(() => {
                 primeRaf = null;
@@ -2153,12 +2029,8 @@ export const Feed: React.FC = () => {
     };
   }, [scenes, muted, loadMore, persistCurrent]);
 
-  // Keyboard nav
-  // Custom snap-slide animation for arrow / j-k navigation. Browser
-  // behavior:"smooth" runs ~300 ms; this is ~220 ms ease-out-cubic so
-  // the page lands on the next tile faster and feels like a TikTok swipe.
-  // Cancels any in-flight slide so quick double-presses chain instead of
-  // queueing up.
+  // Keyboard nav. A ~220 ms ease-out-cubic slide, quicker than the browser's
+  // ~300 ms smooth scroll, cancelling any in-flight slide so presses chain.
   const slideRafRef = useRef<number | null>(null);
   const fastSlide = useCallback((track: HTMLElement, target: number) => {
     if (slideRafRef.current != null) {
@@ -2168,10 +2040,8 @@ export const Feed: React.FC = () => {
     const startTop = track.scrollTop;
     const dist = target - startTop;
     if (dist === 0) return;
-    // scroll-snap-type: mandatory re-snaps every frame and makes our
-    // animated scrollTop jump to the destination instantly. Disable
-    // snap for the duration of the animation; restore at the end so
-    // touch/wheel snapping keeps working.
+    // scroll-snap-type: mandatory re-snaps every frame and would teleport the
+    // animated scrollTop, so disable snap for the duration and restore after.
     const prevSnap = track.style.scrollSnapType;
     track.style.scrollSnapType = "none";
     const duration = 220;

@@ -1,14 +1,5 @@
-// Fast-mode playback: stream a pre-generated small/fast-start copy (720p,
-// capped bitrate) instead of the original file, so the feed never waits on a
-// large source or a slow live transcode. Copies are built out-of-band into
-// /srv/stash/data/generated/fastmode/{sceneId}.mp4; the server serves them
-// from GET /scene/:id/stream.fast, falling back to the normal stream for any
-// scene that has not been generated yet.
-//
-// Same load/save shape as Interactive/buttplug.ts: DB-backed via
-// configureUISetting so the choice follows the account, mirrored to
-// localStorage so components can read it synchronously without waiting on a
-// query.
+// Fast mode streams a pre-generated 720p copy via GET /scene/:id/stream.fast.
+// Same shape as Interactive/buttplug.ts: DB-backed, mirrored to localStorage.
 
 const CONFIG_KEY = "stashhub.fastMode";
 export const FAST_MODE_EVENT = "stashhub:fast-mode-changed";
@@ -60,11 +51,8 @@ export function sanitizeFastMode(input: unknown): FastModeConfig | null {
   };
 }
 
-/** Pull stashhub.fastMode out of the app-wide Configuration.ui blob (the same
- *  object ConfigurationContext already holds at boot, no extra query needed).
- *  Used so a setting flipped by any means (Settings panel, a direct DB write,
- *  another tab) reaches the feed on first render instead of only after the
- *  Settings panel happens to have synced it into localStorage. */
+/** Pull stashhub.fastMode out of the Configuration.ui blob ConfigurationContext
+ *  already holds, so a setting flipped anywhere lands on first render. */
 export function fastModeFromConfigUi(ui: unknown): FastModeConfig | null {
   let node: unknown = ui;
   for (const part of FAST_MODE_UI_PATH) {

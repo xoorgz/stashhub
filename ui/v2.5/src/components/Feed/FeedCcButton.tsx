@@ -4,10 +4,8 @@ import { getClient } from "src/core/StashService";
 import { useToast } from "src/hooks/Toast";
 import { CcOnIcon, CcOffIcon, CcGenerateIcon } from "./icons";
 
-// localStorage Set of scene IDs whose caption-generation we have
-// triggered. Tracking it here means the user can close the tab,
-// reopen, and the button still shows the "generating" state until
-// the VTT actually lands.
+// localStorage set of scene IDs whose generation was triggered, so the
+// "generating" state survives a tab close until the VTT lands.
 const GEN_KEY = "feed.captions.generating";
 const FAILED_KEY = "feed.captions.failed";
 // Hard ceiling: if a generating entry has no job to track (older entry, or the
@@ -228,11 +226,8 @@ export const FeedCcButton: React.FC<Props> = ({
         setFailed(f);
         writeFailedMap(f);
       }
-      // Flip to the generating state NOW, before any network round-trip, so a
-      // single press registers instantly (spinner) and further presses are
-      // ignored. Without this the button looked dead until two awaited calls
-      // finished, so users mashed it and queued a pile of duplicate generate
-      // tasks that the serial job queue then chewed through one by one.
+      // Flip to generating before any network round-trip, so the press registers
+      // at once and repeat presses cannot queue duplicate generate tasks.
       const optimistic = { ...readGenMap(), [sceneId]: { at: Date.now() } };
       setGen(optimistic);
       writeGenMap(optimistic);

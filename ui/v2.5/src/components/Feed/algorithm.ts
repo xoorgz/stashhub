@@ -7,15 +7,7 @@ import {
 
 const client = getClient();
 
-/**
- * Buckets, draw order:
- *   hottest     scenes tagged with the configured tag
- *   liked       scenes with like_count > 0, ordered by like_count desc
- *   topOCount   scenes with o_counter >= threshold, ordered by o_counter desc
- *   topRated    scenes with rating100 >= threshold
- *   stale       scenes with last_played_at older than the configured window
- *   random      unfiltered random
- */
+/** Buckets, in draw order: hottest, liked, topOCount, topRated, stale, random. */
 
 export interface BuildQueueOpts {
   targetCount?: number;
@@ -153,12 +145,7 @@ const SCENE_SKIPS_KEY = "feed.skips.scenes";
 type SceneSkipEntry = { c: number; m: number; t: number };
 
 /** Returns sceneId -> probability of dropping a draw, 0 to skipMaxSuppress.
- *
- *  Severity comes from the fewest seconds ever watched, so a scene bounced
- *  instantly is punished far harder than one dropped at nine seconds. Repeat
- *  skips compound. Everything then decays on a half-life, so a scene the user
- *  has cooled on gradually works its way back into rotation on its own.
- */
+ *  Severity follows the fewest seconds ever watched and decays on a half-life. */
 function makeSkipDemotion(
   settings: AlgorithmSettings,
   recycle?: boolean
@@ -190,12 +177,8 @@ function makeSkipDemotion(
   };
 }
 
-// A fixed sort key (like_count, play_duration, o_counter) always returns the
-// same head of the ranking, so requesting exactly the slots we need meant the
-// pool was identical every session and the shuffle below only reordered the
-// same handful of scenes. That is why the feed opened with the same videos
-// each time. Over-fetch a wider band and sample from it: "your top liked" is
-// still true, but which of them you see changes on every build.
+// A fixed sort key returns the same head of the ranking every session, so
+// over-fetch a wider band and sample from it to keep the selection changing.
 const RANKED_POOL_FACTOR = 6;
 const RANKED_POOL_MAX = 200;
 
@@ -226,12 +209,8 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   const seed = `random_${Math.floor(Math.random() * 1e9)}`;
   const over = 3; // over-fetch so post-exclude there's still material
 
-  // Filter chips: an active chip restricts the queue to scenes carrying
-  // any of its tag IDs. A chip reads as "only show me this", so boost
-  // weighting, where unrelated scenes still appeared, was confusing.
-  // Active chips behave strictly instead: every bucket's findScenes call
-  // gets wrapped in AND { tags: includes union }. With single-select in
-  // the UI there's at most one active chip's tag list.
+  // An active chip reads as "only show me this", so it restricts strictly:
+  // every bucket's findScenes call is wrapped in AND { tags: includes union }.
   let strictTagIds: string[] = [];
   try {
     const rawActive = localStorage.getItem("feed.filterChips.active");
@@ -292,10 +271,8 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   const fetchSlimStrict = (opts: BucketOpts) =>
     fetchSlim({ ...opts, sceneFilter: withStrict(opts.sceneFilter) });
 
-  // Fetch each bucket in proportion to the share it is supposed to contribute.
-  // Fixed per-bucket fractions meant a heavy bucket could run out of ids and
-  // silently hand its slots to whatever still had some, so the weights the user
-  // set never actually landed.
+  // Fetch each bucket in proportion to the share it should contribute, so a
+  // bucket cannot run dry and silently hand its slots to another.
   const activeWeights: number[] = [];
   const countWeight = (on: boolean, weight: number) => {
     if (on && weight > 0) activeWeights.push(weight);
@@ -320,10 +297,8 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
       Math.ceil(targetCount * (totalWeight > 0 ? weight / totalWeight : 0) * over)
     );
 
-  // Recently-played exclude: fetch IDs of scenes whose last_played_at is
-  // within the configured window and add them to the exclude set. Done as a
-  // separate query rather than per-bucket filters because GQL Int/Time filters
-  // don't compose with OR and we want to keep never-played scenes (NULL).
+  // Recently-played exclude runs as its own query, not a per-bucket filter:
+  // GQL Int/Time filters don't compose with OR and NULL must stay eligible.
   if (
     !recycle &&
     settings.excludeRecentlyPlayed &&
@@ -353,11 +328,8 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
-  // Skip-learning: tags the user has dismissed under SKIP_THRESHOLD_SEC of
-  // playback accumulate counts in localStorage feed.skips.tags. Take the
-  // top N tags by count, fetch scenes that have those tags, add to the
-  // exclude set so they never enter the queue. Decay on read keeps this
-  // from poisoning forever, the storage layer drops entries older than 30d.
+  // Skip-learning: exclude scenes carrying the most-dismissed tags. Entries
+  // decay on read so a tag cannot poison the queue forever.
   const SKIPPED_TAGS_KEY = "feed.skips.tags";
   const SKIP_TAG_TOP_N = 10;
   const SKIP_TAG_MIN_COUNT = Math.max(1, settings.tagSkipMinCount);
@@ -449,10 +421,8 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
-  // Top Watched. Scenes whose accumulated play_duration is highest. The user
-  // spending real time on a scene is the strongest implicit "I like this"
-  // signal we have. Filtered by min seconds so 2-second mis-taps don't poison
-  // the ranking.
+  // Top Watched. Highest accumulated play_duration, the strongest implicit
+  // signal. A min-seconds floor keeps mis-taps out of the ranking.
   if (settings.topWatchedEnabled && settings.topWatchedWeight > 0) {
     fetches.push(
       (async () => {
@@ -481,10 +451,8 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
-  // Watched Tags. Look at the user's top-watched scenes, aggregate
-  // play_duration by tag, pick the top tags, then pull random scenes that have
-  // any of those tags. The "what categories do you actually spend time on"
-  // signal, uses your real behaviour rather than what you tagged as Favored.
+  // Watched Tags. Aggregate play_duration by tag over the top-watched scenes,
+  // then pull random scenes with those tags. Behaviour, not curation.
   if (settings.watchedTagsEnabled && settings.watchedTagsWeight > 0) {
     fetches.push(
       (async () => {
@@ -543,10 +511,8 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
-  // Favored Tags. Random scenes that have any tag in the user-curated
-  // favoredTagIds list. Configured under Settings → Feed Algorithm → Advanced
-  // → Favored Tags. List intentionally empty by default so nothing kink- or
-  // taste-specific ships in the repo.
+  // Favored Tags. Random scenes carrying any curated favoredTagIds tag. Empty
+  // by default so nothing taste-specific ships in the repo.
   if (
     settings.favoredTagsEnabled &&
     settings.favoredTagsWeight > 0 &&
@@ -569,12 +535,8 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
-  // Affinity. An evolving map of what you have actually been spending time on
-  // lately. Profile the scenes you recently watched for real, pull candidates
-  // by each signal (performer, tag, title word), then score every candidate by
-  // how much of the profile it hits, so a scene sharing a performer AND two
-  // tags beats one sharing a single tag. Re-profiled on every build, so it
-  // drifts as your taste drifts.
+  // Affinity. Profile recently watched scenes by performer, tag and title word,
+  // then rank candidates by how much of that profile they hit. Rebuilt each time.
   if (settings.affinityEnabled && settings.affinityWeight > 0) {
     fetches.push(
       (async () => {
@@ -830,11 +792,8 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     buckets.map((b) => `${b.name}(w=${b.weight},n=${b.ids.length})`).join(", ") || "none"
   );
 
-  // Weighted draw without replacement. When the bucket we picked offers an id
-  // another bucket already supplied, keep pulling from that same bucket instead
-  // of burning the draw: buckets overlap heavily (a scene can be liked AND top
-  // rated AND random), and dropping those draws quietly robbed the heavier
-  // buckets of the share their weight promised.
+  // Weighted draw without replacement. Buckets overlap heavily, so on a
+  // duplicate keep pulling from the same bucket rather than burning the draw.
   const demotion = makeSkipDemotion(settings, recycle);
   let demoted = 0;
   const out: string[] = [];

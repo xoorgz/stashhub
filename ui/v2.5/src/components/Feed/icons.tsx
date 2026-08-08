@@ -113,10 +113,8 @@ export const CcOffIcon: React.FC = () => (
   </svg>
 );
 
-// "Generate captions" prompt: the same filled CC pill as CcOnIcon
-// (so it reads as a closed-caption mark at a glance), with a clear
-// "+" badge in the top-right corner to signal that activation will
-// create something rather than just toggle visibility.
+// "Generate captions": the CcOnIcon pill plus a "+" badge, so it reads as
+// creating captions rather than toggling them.
 export const CcGenerateIcon: React.FC = () => (
   <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true" fill="currentColor">
     <path d="M3 7h13a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Zm4 4.5c-1.45 0-2.45 1.1-2.45 2.5s1 2.5 2.45 2.5c.85 0 1.55-.4 1.9-1.1l-1.1-.5c-.15.3-.4.5-.8.5-.6 0-.95-.5-.95-1.4s.35-1.4.95-1.4c.4 0 .65.2.8.5l1.1-.5c-.35-.7-1.05-1.1-1.9-1.1Zm6 0c-1.45 0-2.45 1.1-2.45 2.5s1 2.5 2.45 2.5c.85 0 1.55-.4 1.9-1.1l-1.1-.5c-.15.3-.4.5-.8.5-.6 0-.95-.5-.95-1.4s.35-1.4.95-1.4c.4 0 .65.2.8.5l1.1-.5c-.35-.7-1.05-1.1-1.9-1.1Z" />
@@ -136,8 +134,8 @@ export const InteractiveIcon: React.FC = () => (
   </svg>
 );
 
-/** Same sextoy icon with a small "+" badge in the top-right corner —
-    signals that clicking will generate a funscript rather than toggle sync. */
+/** Same sextoy icon with a small "+" badge in the top-right corner. Signals
+    that clicking will generate a funscript rather than toggle sync. */
 export const InteractiveGenerateIcon: React.FC = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width={18} height={18} aria-hidden="true">
     <path fill="currentColor" d="M35.35,55.39l-8,10c-.73.9-.8,2.26-.2,3.84a11.65,11.65,0,0,0,3.63,4.73c3.4,2.74,7.57,3.45,9.11,1.55l8.05-10A31.71,31.71,0,0,1,35.35,55.39Z"/>

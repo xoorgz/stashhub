@@ -1,11 +1,7 @@
 import React from "react";
 
-// Built-in icon set for filter chips. Names are stable identifiers stored
-// in the chip's iconName field; the rendered SVG is always white via
-// fill="currentColor" (or stroke="currentColor" on the few outline glyphs)
-// and inherits the chip button's text colour. Each icon supplies its own
-// viewBox so we can keep mixed-scale source artwork without sticking
-// everything into a 24x24 grid.
+// Built-in filter chip icons. `name` is the stable id stored in a chip's
+// iconName, and each icon keeps its own viewBox for mixed-scale artwork.
 
 interface IconDef {
   name: string;
