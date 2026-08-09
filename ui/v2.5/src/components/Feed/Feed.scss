@@ -249,16 +249,21 @@
   /* transparent so the poster backdrop shows through before the first frame
      decodes; the browser holds the last frame during mid-play buffering. */
   background: transparent;
-  /* Crossfade in once playback actually starts, so the poster still dissolves
-     into the first video frame instead of hard-cutting (the "flash"). */
+  /* No crossfade. The poster is the scene's first frame, so it is already the
+     picture the video opens on and there is nothing to dissolve between.
+     Fading also meant poster and video were both painted for a moment, and two
+     rounded layers composited together leak pale seams at the corners. */
   opacity: 0;
-  transition: opacity 0.28s ease;
   border-radius: inherit;
   /* prevent sub-pixel rendering leaks at curved corners */
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }
 .feed-video-wrap.is-revealed .feed-video { opacity: 1; }
+/* Drop the poster the instant the video is up. Leaving it painted underneath
+   is what let white show through at the rounded corners. The wrap is black, so
+   nothing pale can appear behind the frame either way. */
+.feed-video-wrap.is-revealed .feed-video-poster { opacity: 0; }
 @media (max-width: 640px) {
   .feed-video { object-fit: cover; }
   /* Match the mobile video's cover fit so the poster lines up with the frame. */

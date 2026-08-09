@@ -866,6 +866,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
       setRevealed(true);
       hideLoader();
     };
+    // The poster is hidden once revealed, so a tile whose source was released
+    // has to put it back. Otherwise scrolling away and returning shows black
+    // until the video reloads.
+    const onEmptied = () => setRevealed(false);
     // A real MediaError is different: nothing is in flight to protect, so a
     // reload is the only way back. Strictly capped, since a genuinely broken
     // file would otherwise spin forever.
@@ -898,6 +902,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     v.addEventListener("error", onError);
     v.addEventListener("loadstart", onLoadStart);
     v.addEventListener("play", onPlay);
+    v.addEventListener("emptied", onEmptied);
     return () => {
       v.removeEventListener("canplay", onCanPlay);
       v.removeEventListener("loadeddata", onCanPlay);
@@ -907,6 +912,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
       v.removeEventListener("error", onError);
       v.removeEventListener("loadstart", onLoadStart);
       v.removeEventListener("play", onPlay);
+      v.removeEventListener("emptied", onEmptied);
       if (loaderTimer != null) window.clearTimeout(loaderTimer);
     };
   }, [scene.id]);
