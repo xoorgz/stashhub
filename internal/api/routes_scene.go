@@ -69,6 +69,7 @@ func (rs sceneRoutes) Routes() chi.Router {
 		r.Get("/stream.mpd/{segment}_v.webm", rs.StreamDASHVideoSegment)
 		r.Get("/stream.mpd/{segment}_a.webm", rs.StreamDASHAudioSegment)
 
+		r.Get("/poster.fast", rs.PosterFast)
 		r.Get("/screenshot", rs.Screenshot)
 		r.Get("/preview", rs.Preview)
 		r.Get("/webp", rs.Webp)
@@ -106,6 +107,15 @@ func (rs sceneRoutes) StreamFast(w http.ResponseWriter, r *http.Request) {
 		SceneCoverGetter: rs.sceneFinder,
 	}
 	ss.StreamSceneFast(scene, w, r)
+}
+
+func (rs sceneRoutes) PosterFast(w http.ResponseWriter, r *http.Request) {
+	scene := r.Context().Value(sceneKey).(*models.Scene)
+	ss := manager.SceneServer{
+		TxnManager:       rs.txnManager,
+		SceneCoverGetter: rs.sceneFinder,
+	}
+	ss.ServeScenePosterFast(scene, w, r)
 }
 
 func (rs sceneRoutes) StreamMp4(w http.ResponseWriter, r *http.Request) {

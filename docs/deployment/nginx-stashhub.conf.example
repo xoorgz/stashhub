@@ -26,7 +26,7 @@ server {
     # keep them for a month: posters/previews then load instantly on re-scroll
     # with no revalidation round-trip. `private` keeps auth-gated media out of
     # any shared proxy cache.
-    location ~ ^/scene/\d+/(screenshot|webp|sprite|vtt|preview|marker) {
+    location ~ ^/scene/\d+/(poster\.fast|screenshot|webp|sprite|vtt|preview|marker) {
       proxy_pass http://127.0.0.1:9999;
       proxy_http_version 1.1;
       proxy_set_header Host $http_host;

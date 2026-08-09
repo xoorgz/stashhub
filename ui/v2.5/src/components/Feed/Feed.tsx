@@ -514,7 +514,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
     return fullSrc.replace(/\/stream(?=$|[?#])/, "/stream.fast");
   }, [fullSrc, scene.paths.stream]);
   const previewSrc = useFast ? fastSrc : fullSrc;
-  const posterSrc = useMemo(() => relativize(scene.paths.screenshot), [scene.paths.screenshot]);
+  // First frame rather than the normal cover, which is taken 20% in and makes
+  // the picture jump when playback starts. The route falls back to the cover
+  // for any scene without a still yet.
+  const posterSrc = useMemo(() => {
+    const shot = relativize(scene.paths.screenshot);
+    if (!shot) return shot;
+    return shot.replace(/\/screenshot(?=$|[?#])/, "/poster.fast");
+  }, [scene.paths.screenshot]);
 
   // Swap the live <video> source when the effective mode changes (global
   // setting flips, or the user hits the per-scene HQ toggle), preserving

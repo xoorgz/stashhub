@@ -92,6 +92,22 @@ func (s *SceneServer) StreamSceneFast(scene *models.Scene, w http.ResponseWriter
 	s.StreamSceneDirect(scene, w, r)
 }
 
+// ServeScenePosterFast serves the pre-generated first-frame still. The normal
+// cover is taken 20% into the video, so using it as a poster makes the picture
+// jump the moment playback starts. Falls back to the cover when no still exists.
+func (s *SceneServer) ServeScenePosterFast(scene *models.Scene, w http.ResponseWriter, r *http.Request) {
+	if dir := fastModeDir(); dir != "" {
+		posterPath := filepath.Join(dir, strconv.Itoa(scene.ID)+".jpg")
+		if info, err := os.Stat(posterPath); err == nil && !info.IsDir() {
+			w.Header().Set("Cache-Control", "private, max-age=2592000, immutable")
+			http.ServeFile(w, r, posterPath)
+			return
+		}
+	}
+
+	s.ServeScreenshot(scene, w, r)
+}
+
 func (s *SceneServer) ServeScreenshot(scene *models.Scene, w http.ResponseWriter, r *http.Request) {
 	var cover []byte
 	readTxnErr := txn.WithReadTxn(r.Context(), s.TxnManager, func(ctx context.Context) error {
