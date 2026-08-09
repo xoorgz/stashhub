@@ -25,8 +25,10 @@ type GenerateFeedPosterTask struct {
 }
 
 // Seconds to try, in order. Zero matches the opening frame exactly; the rest
-// are fallbacks for clips that fade in from black.
-var feedPosterOffsets = []float64{0, 1, 2, 4}
+// walk forward for clips that fade in or open on a long dark intro. A poster
+// is still written if every one is dark, since the scene itself is dark and
+// there is nothing better to show.
+var feedPosterOffsets = []float64{0, 1, 2, 4, 8, 15, 30}
 
 func (t *GenerateFeedPosterTask) GetDescription() string {
 	return fmt.Sprintf("Generating feed poster for %s", t.Scene.GetTitle())

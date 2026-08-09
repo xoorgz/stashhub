@@ -1885,12 +1885,12 @@ export const Feed: React.FC = () => {
       // Two budgets: preload="auto" is a full download so keep it tiny, and a
       // bare src is a few KB but still holds a media pipeline per element on iOS.
       const autoAhead = isDesktop ? 2 : 1;
-      // Mobile skips preload="auto" behind: that tile was just watched, and
-      // re-downloading it steals bandwidth from the one playing now. It keeps
-      // its src, so swiping back is still warm.
-      const autoBehind = isDesktop ? 1 : 0;
+      // One behind gets preload="auto" too. Stepping back up is as common as
+      // going down, especially on the keyboard, and the tile you just left is
+      // the one most likely to be asked for again.
+      const autoBehind = 1;
       const srcAhead = isDesktop ? 4 : 2;
-      const srcBehind = isDesktop ? 2 : 1;
+      const srcBehind = 2;
       const start = Math.max(0, idx - srcBehind);
       const end = Math.min(items.length - 1, idx + srcAhead);
       for (let i = start; i <= end; i++) {
@@ -1906,21 +1906,36 @@ export const Feed: React.FC = () => {
           try { v.load(); } catch { /* ignore */ }
         }
       }
-      // Backstop sweep: a fast fling can coalesce the observer callbacks. The
-      // teardown window sits one past the prime window so they cannot fight.
+      // Backstop sweep: a fast fling can coalesce the observer callbacks.
+      //
+      // Between the prime window and full teardown sits a retain zone: src is
+      // left in place with preload="none", so the element fetches nothing more
+      // but keeps what it already buffered. Dropping src calls load(), which
+      // throws that buffer away and aborts any request in flight, and stepping
+      // back onto the tile then re-downloads from zero. That is what made
+      // moving back and forth stall, visible in the log as requests cancelled
+      // at zero bytes. Only past the retain zone is src actually released,
+      // since every element holding one costs a media pipeline on iOS.
       const keepBehind = srcBehind + 1;
       const keepAhead = srcAhead + 1;
+      const retainBehind = isDesktop ? 6 : 4;
+      const retainAhead = isDesktop ? 6 : 4;
       for (let i = 0; i < items.length; i++) {
         if (i === idx) continue;
         const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
         if (!v) continue;
         if (!v.paused) v.pause();
-        if (i < idx - keepBehind || i > idx + keepAhead) {
+        const outsidePrime = i < idx - keepBehind || i > idx + keepAhead;
+        const outsideRetain = i < idx - retainBehind || i > idx + retainAhead;
+        if (outsideRetain) {
           if (v.src) {
             v.removeAttribute("src");
             v.preload = "none";
             try { v.load(); } catch { /* ignore */ }
           }
+        } else if (outsidePrime && v.src && v.preload !== "none") {
+          // Stop pulling more without discarding what is already there.
+          v.preload = "none";
         }
       }
     }
