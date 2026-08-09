@@ -32,6 +32,7 @@ type GenerateMetadataInput struct {
 	InteractiveHeatmapsSpeeds bool `json:"interactiveHeatmapsSpeeds"`
 	ClipPreviews              bool `json:"clipPreviews"`
 	ImageThumbnails           bool `json:"imageThumbnails"`
+	FeedPosters               bool `json:"feedPosters"`
 	// scene ids to generate for
 	SceneIDs []string `json:"sceneIDs"`
 	// marker ids to generate for
@@ -76,6 +77,7 @@ type totalsGenerate struct {
 	interactiveHeatmapSpeeds int64
 	clipPreviews             int64
 	imageThumbnails          int64
+	feedPosters              int64
 
 	tasks int
 }
@@ -180,6 +182,9 @@ func (j *GenerateJob) Execute(ctx context.Context, progress *job.Progress) error
 		}
 		if j.input.ImageThumbnails {
 			logMsg += fmt.Sprintf(" %d Image Thumbnails", totals.imageThumbnails)
+		}
+		if j.input.FeedPosters {
+			logMsg += fmt.Sprintf(" %d feed posters", totals.feedPosters)
 		}
 		if logMsg == "Generating" {
 			logMsg = "Nothing selected to generate"
@@ -476,6 +481,21 @@ func (j *GenerateJob) queueSceneJobs(ctx context.Context, g *generate.Generator,
 
 		if task.required() {
 			j.totals.interactiveHeatmapSpeeds++
+			j.totals.tasks++
+			queue <- task
+		}
+	}
+
+	if j.input.FeedPosters {
+		task := &GenerateFeedPosterTask{
+			repository: r,
+			Scene:      *scene,
+			Overwrite:  j.overwrite,
+			generator:  g,
+		}
+
+		if task.required() {
+			j.totals.feedPosters++
 			j.totals.tasks++
 			queue <- task
 		}

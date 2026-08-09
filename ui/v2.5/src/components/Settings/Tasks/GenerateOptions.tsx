@@ -153,6 +153,12 @@ export const GenerateOptions: React.FC<IGenerateOptions> = ({
             headingID="dialogs.scene_gen.interactive_heatmap_speed"
             onChange={(v) => setOptions({ interactiveHeatmapsSpeeds: v })}
           />
+          <BooleanSetting
+            id="feed-posters-task"
+            checked={options.feedPosters ?? false}
+            headingID="dialogs.scene_gen.feed_posters"
+            onChange={(v) => setOptions({ feedPosters: v })}
+          />
         </>
       )}
       {showImageOptions && (

@@ -14,6 +14,8 @@ input GenerateMetadataInput {
   interactiveHeatmapsSpeeds: Boolean
   imageThumbnails: Boolean
   clipPreviews: Boolean
+  "First-frame stills used as feed posters"
+  feedPosters: Boolean
 
   "scene ids to generate for"
   sceneIDs: [ID!]
@@ -51,6 +53,8 @@ type GenerateMetadataOptions {
   interactiveHeatmapsSpeeds: Boolean
   imageThumbnails: Boolean
   clipPreviews: Boolean
+  "First-frame stills used as feed posters"
+  feedPosters: Boolean
 }
 
 type GeneratePreviewOptions {

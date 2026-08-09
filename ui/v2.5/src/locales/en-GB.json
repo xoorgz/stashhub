@@ -939,6 +939,7 @@
     "scene_gen": {
       "clip_previews": "Image Clip Previews",
       "covers": "Scene covers",
+      "feed_posters": "Feed posters (first frame of each scene)",
       "force_transcodes": "Force Transcode generation",
       "force_transcodes_tooltip": "By default, transcodes are only generated when the video file is not supported in the browser. When enabled, transcodes will be generated even when the video file appears to be supported in the browser.",
       "image_previews": "Animated Image Previews",
