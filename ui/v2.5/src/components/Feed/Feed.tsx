@@ -806,14 +806,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    let stuckTimer: number | null = null;
     let loaderTimer: number | null = null;
-    let waitingSince = 0;
-    // A seek fires `waiting` too. Skip stuck-load recovery while it is in
-    // flight, since its v.load() would reset currentTime to 0.
-    let seeking = false;
-    const onSeeking = () => { seeking = true; };
-    const onSeeked = () => { seeking = false; };
     const showLoader = () => {
       if (loaderTimer != null) return;
       // Defer 250ms so a quick load never flashes a loader frame, then commit
@@ -848,41 +841,37 @@ const FeedItem: React.FC<FeedItemProps> = ({
       hideLoader();
       tryPlay();
     };
-    // Cap the load() retries: each one starts a fresh transcode session, and
-    // long or HEVC sources legitimately need 5-10 s to produce a first frame.
-    const MAX_LOAD_ATTEMPTS = 3;
-    let loadAttempts = 0;
+    // `waiting` means the browser is buffering, which is normal and recovers on
+    // its own. It must never trigger v.load(): that discards every byte already
+    // downloaded and restarts from zero, so a clip needing longer than the timer
+    // can never finish, each retry throwing away the last one's progress. It
+    // showed up as one scene refetched every 3 s forever, four of six requests
+    // cancelled at zero bytes, the phone burning battery on nothing.
     const onWaiting = () => {
-      waitingSince = performance.now();
       showLoader();
-      if (stuckTimer != null) window.clearTimeout(stuckTimer);
-      if (loadAttempts >= MAX_LOAD_ATTEMPTS) return;
-      stuckTimer = window.setTimeout(() => {
-        // Skip the recovery while the user is seeking; v.load() would
-        // reset currentTime to 0 and snap the scrubber to start.
-        if (seeking || v.seeking) return;
-        if (v.readyState < 3 && performance.now() - waitingSince >= 2900) {
-          if (loadAttempts >= MAX_LOAD_ATTEMPTS) return;
-          loadAttempts++;
-          try { v.load(); } catch { /* ignore */ }
-          tryPlay();
-        }
-      }, 3000);
     };
     const onPlaying = () => {
-      waitingSince = 0;
-      loadAttempts = 0;
+      errorRecoveries = 0;
       setRevealed(true);
       hideLoader();
-      if (stuckTimer != null) {
-        window.clearTimeout(stuckTimer);
-        stuckTimer = null;
-      }
     };
+    // A real MediaError is different: nothing is in flight to protect, so a
+    // reload is the only way back. Strictly capped, since a genuinely broken
+    // file would otherwise spin forever.
+    const MAX_ERROR_RECOVERIES = 2;
+    let errorRecoveries = 0;
     const onError = () => {
+      if (errorRecoveries >= MAX_ERROR_RECOVERIES) {
+        hideLoader();
+        return;
+      }
+      errorRecoveries++;
       showLoader();
-      try { v.load(); } catch { /* ignore */ }
-      window.setTimeout(tryPlay, 500);
+      window.setTimeout(() => {
+        if (v.seeking) return;
+        try { v.load(); } catch { /* ignore */ }
+        tryPlay();
+      }, 400 * errorRecoveries);
     };
     const onLoadStart = () => {
       if (v.paused && v.readyState < 3) showLoader();
@@ -898,8 +887,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     v.addEventListener("error", onError);
     v.addEventListener("loadstart", onLoadStart);
     v.addEventListener("play", onPlay);
-    v.addEventListener("seeking", onSeeking);
-    v.addEventListener("seeked", onSeeked);
     return () => {
       v.removeEventListener("canplay", onCanPlay);
       v.removeEventListener("loadeddata", onCanPlay);
@@ -909,9 +896,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
       v.removeEventListener("error", onError);
       v.removeEventListener("loadstart", onLoadStart);
       v.removeEventListener("play", onPlay);
-      v.removeEventListener("seeking", onSeeking);
-      v.removeEventListener("seeked", onSeeked);
-      if (stuckTimer != null) window.clearTimeout(stuckTimer);
       if (loaderTimer != null) window.clearTimeout(loaderTimer);
     };
   }, [scene.id]);
