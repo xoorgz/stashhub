@@ -1918,8 +1918,15 @@ export const Feed: React.FC = () => {
       // and the next scene is pulled down properly by the video cache.
       const autoAhead = 0;
       const autoBehind = 0;
-      const srcAhead = isDesktop ? 4 : 2;
-      const srcBehind = 2;
+      // Keep the number of elements holding a src small. preload="metadata" is
+      // only a hint and browsers routinely fetch megabytes for it, so a wide
+      // window means many downloads at once: seven tiles produced five
+      // concurrent transfers each taking 15 to 26 seconds, and the video being
+      // watched was just one more of them. One either side is enough, because
+      // the moov atom is at the front of every copy so a cold tile still opens
+      // on its first packet.
+      const srcAhead = 1;
+      const srcBehind = 1;
       const start = Math.max(0, idx - srcBehind);
       const end = Math.min(items.length - 1, idx + srcAhead);
       for (let i = start; i <= end; i++) {
@@ -1979,8 +1986,11 @@ export const Feed: React.FC = () => {
       const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
       const idx = items.indexOf(activeItem);
       if (idx === -1) return;
+      // Next scene only. The one playing is already being fetched by its video
+      // element, and precaching it too downloaded the same file twice over the
+      // same connection, competing with the playback it was meant to help.
       const urls: string[] = [];
-      for (let i = idx; i <= Math.min(items.length - 1, idx + 1); i++) {
+      for (let i = idx + 1; i <= Math.min(items.length - 1, idx + 1); i++) {
         const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
         const src = v?.dataset.src;
         if (src && /\/stream\.fast(?:$|[?#])/.test(src)) {
