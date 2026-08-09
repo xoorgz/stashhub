@@ -8,6 +8,7 @@
 * Settings: Clear cached videos button under Fast mode.
 * Feed: only the playing video downloads freely, so a neighbour can no longer saturate the connection.
 * Feed: poster clears the moment playback starts, no more pale seams at the corners.
+* Feed algorithm: ranked sources rotate which slice they draw from, so the same scenes stop recurring.
 
 ### stashhub v1.4.43
 

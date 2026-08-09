@@ -186,6 +186,13 @@ function rankedPool(perPage: number): number {
   return Math.min(RANKED_POOL_MAX, Math.max(perPage, perPage * RANKED_POOL_FACTOR));
 }
 
+// A fixed sort key returns the same head every time, so page 1 means the same
+// scenes every session however hard they are shuffled: order changes, the cast
+// does not. topWatched made it worse by feeding itself, since watching a scene
+// raises its play_duration and pins it near the top. Rotating the page moves
+// the pool instead, which is what a 2000 scene library needs.
+const RANKED_PAGES = 5;
+
 function shuffleInPlace<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -270,6 +277,23 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     fetchBucket({ ...opts, sceneFilter: withStrict(opts.sceneFilter) });
   const fetchSlimStrict = (opts: BucketOpts) =>
     fetchSlim({ ...opts, sceneFilter: withStrict(opts.sceneFilter) });
+
+  // Rotate which slice of a ranked bucket is drawn from. Deep pages run out
+  // when few scenes qualify, so fall back to the head rather than hand back an
+  // empty bucket and lose its share of the queue.
+  const fetchRanked = async (opts: BucketOpts, perPage: number) => {
+    const pool = rankedPool(perPage);
+    const page = 1 + Math.floor(Math.random() * RANKED_PAGES);
+    const ids = await fetchBucketStrict({
+      ...opts,
+      filter: { ...opts.filter, per_page: pool, page },
+    });
+    if (page === 1 || ids.length >= Math.min(perPage, 5)) return ids;
+    return fetchBucketStrict({
+      ...opts,
+      filter: { ...opts.filter, per_page: pool, page: 1 },
+    });
+  };
 
   // Fetch each bucket in proportion to the share it should contribute, so a
   // bucket cannot run dry and silently hand its slots to another.
@@ -402,15 +426,23 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     fetches.push(
       (async () => {
         const perPage = pageFor(settings.likedWeight);
-        const ids = await fetchBucketStrict({
-          filter: {
-            per_page: rankedPool(perPage),
-            page: 1,
-            sort: "like_count",
-            direction: GQL.SortDirectionEnum.Desc,
+        // Filtered to actually-liked scenes so rotating onto a deeper page
+        // still returns likes rather than sliding into unliked filler.
+        const ids = await fetchRanked(
+          {
+            filter: {
+              sort: "like_count",
+              direction: GQL.SortDirectionEnum.Desc,
+            },
+            sceneFilter: {
+              like_count: {
+                value: 0,
+                modifier: GQL.CriterionModifier.GreaterThan,
+              },
+            },
           },
-          sceneFilter: {},
-        });
+          perPage
+        );
         // Fisher-Yates shuffle on the descending-by-likes window.
         return {
           name: "liked",
@@ -427,21 +459,22 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     fetches.push(
       (async () => {
         const perPage = pageFor(settings.topWatchedWeight);
-        const ids = await fetchBucketStrict({
-          filter: {
-            per_page: rankedPool(perPage),
-            page: 1,
-            sort: "play_duration",
-            direction: GQL.SortDirectionEnum.Desc,
-          },
-          sceneFilter: {
-            play_duration: {
-              value: settings.topWatchedMinSec,
-              value2: 999999,
-              modifier: GQL.CriterionModifier.Between,
+        const ids = await fetchRanked(
+          {
+            filter: {
+              sort: "play_duration",
+              direction: GQL.SortDirectionEnum.Desc,
+            },
+            sceneFilter: {
+              play_duration: {
+                value: settings.topWatchedMinSec,
+                value2: 999999,
+                modifier: GQL.CriterionModifier.Between,
+              },
             },
           },
-        });
+          perPage
+        );
         return {
           name: "topWatched",
           weight: settings.topWatchedWeight,
@@ -688,21 +721,22 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     fetches.push(
       (async () => {
         const perPage = pageFor(settings.topOCountWeight);
-        const ids = await fetchBucketStrict({
-          filter: {
-            per_page: rankedPool(perPage),
-            page: 1,
-            sort: "o_counter",
-            direction: GQL.SortDirectionEnum.Desc,
-          },
-          sceneFilter: {
-            o_counter: {
-              value: settings.topOCountMin,
-              value2: 99999,
-              modifier: GQL.CriterionModifier.Between,
+        const ids = await fetchRanked(
+          {
+            filter: {
+              sort: "o_counter",
+              direction: GQL.SortDirectionEnum.Desc,
+            },
+            sceneFilter: {
+              o_counter: {
+                value: settings.topOCountMin,
+                value2: 99999,
+                modifier: GQL.CriterionModifier.Between,
+              },
             },
           },
-        });
+          perPage
+        );
         return {
           name: "topOCount",
           weight: settings.topOCountWeight,
