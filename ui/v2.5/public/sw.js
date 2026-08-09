@@ -116,8 +116,14 @@ async function precache(url) {
     });
     if (!res.ok) return;
 
+    // Scenes without a fast copy fall back to their original, which can be
+    // hundreds of megabytes. Abort rather than just returning, so the body
+    // stops arriving instead of streaming out in the background.
     const len = parseInt(res.headers.get("content-length") || "0", 10);
-    if (len > MAX_ENTRY_BYTES) return;
+    if (len > MAX_ENTRY_BYTES) {
+      controller.abort();
+      return;
+    }
 
     await cache.put(key, res.clone());
     await evictIfNeeded(cache);

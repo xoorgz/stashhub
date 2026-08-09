@@ -1902,11 +1902,16 @@ export const Feed: React.FC = () => {
         && window.matchMedia("(hover: hover)").matches;
       // Two budgets: preload="auto" is a full download so keep it tiny, and a
       // bare src is a few KB but still holds a media pipeline per element on iOS.
-      const autoAhead = isDesktop ? 2 : 1;
-      // One behind gets preload="auto" too. Stepping back up is as common as
-      // going down, especially on the keyboard, and the tile you just left is
-      // the one most likely to be asked for again.
-      const autoBehind = 1;
+      // Only the tile being watched may download without limit. preload="auto"
+      // is unbounded: the browser pulls the whole file, and a scene with no
+      // fast copy yet falls back to its original, which can be hundreds of
+      // megabytes. Two neighbours doing that put 177 MB in flight at once and
+      // starved the video actually playing, stalling it for twenty seconds on
+      // a 360 Mbit line. Neighbours get metadata only, a few KB of header;
+      // they still start instantly because the moov atom sits at the front,
+      // and the next scene is pulled down properly by the video cache.
+      const autoAhead = 0;
+      const autoBehind = 0;
       const srcAhead = isDesktop ? 4 : 2;
       const srcBehind = 2;
       const start = Math.max(0, idx - srcBehind);

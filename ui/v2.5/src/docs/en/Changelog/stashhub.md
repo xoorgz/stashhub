@@ -6,6 +6,7 @@
 * Tasks: new Feed posters option generates those stills.
 * Fast mode caches the current and next scene on the device, so seeking inside them needs no network.
 * Settings: Clear cached videos button under Fast mode.
+* Feed: only the playing video downloads freely, so a neighbour can no longer saturate the connection.
 
 ### stashhub v1.4.43
 
