@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Form } from "react-bootstrap";
+import { Button, Form } from "react-bootstrap";
 import { SettingSection } from "./SettingSection";
 import * as GQL from "src/core/generated-graphql";
 import { getClient } from "src/core/StashService";
@@ -10,6 +10,7 @@ import {
   FAST_MODE_UI_KEY,
   fastModeFromConfigUi,
 } from "src/hooks/FastMode/fastMode";
+import { purgeVideoCache } from "src/hooks/FastMode/videoCache";
 import "./SettingsAlgorithmPanel.scss";
 
 // Same DB-mirror pattern as Interactive toys: config lives in the server UI
@@ -60,6 +61,7 @@ async function saveFastModeToServer(c: FastModeConfig): Promise<void> {
 
 export const SettingsFastModePanel: React.FC = () => {
   const [cfg, setCfg] = useState<FastModeConfig>(() => loadFastModeConfig());
+  const [purging, setPurging] = useState(false);
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -120,6 +122,31 @@ export const SettingsFastModePanel: React.FC = () => {
               onChange={(e) => update({ enabled: e.target.checked })}
               label=""
             />
+          </div>
+        </div>
+
+        <div className="setting">
+          <div>
+            <h3>Clear cached videos</h3>
+            <div className="value">
+              The feed keeps the scene you are watching and the next one on the
+              device so seeking inside them needs no network. It holds a handful
+              at most and drops the oldest by itself. Clearing also switches the
+              cache off until the page is reloaded.
+            </div>
+          </div>
+          <div>
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                setPurging(true);
+                await purgeVideoCache();
+                setPurging(false);
+              }}
+              disabled={purging}
+            >
+              {purging ? "Clearing..." : "Clear"}
+            </Button>
           </div>
         </div>
       </SettingSection>

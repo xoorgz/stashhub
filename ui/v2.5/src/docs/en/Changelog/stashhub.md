@@ -1,3 +1,12 @@
+### stashhub v1.4.44
+
+* Feed: buffering no longer restarts the download, which could leave a scene reloading forever.
+* Feed: stepping between videos keeps what is already buffered instead of refetching it.
+* Feed poster is the scene's first frame, so the picture no longer jumps when playback starts.
+* Tasks: new Feed posters option generates those stills.
+* Fast mode caches the current and next scene on the device, so seeking inside them needs no network.
+* Settings: Clear cached videos button under Fast mode.
+
 ### stashhub v1.4.43
 
 * Drop upstream contribution templates, CI workflows, test data and unused readme assets.

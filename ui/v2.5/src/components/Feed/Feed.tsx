@@ -41,6 +41,10 @@ import {
   FAST_MODE_MAX_HEIGHT,
   FAST_MODE_VIDEO_CODEC,
 } from "src/hooks/FastMode/fastMode";
+import {
+  registerVideoCache,
+  precacheVideos,
+} from "src/hooks/FastMode/videoCache";
 import { ConfigurationContext } from "src/hooks/Config";
 import "./Feed.scss";
 
@@ -1575,6 +1579,20 @@ export const Feed: React.FC = () => {
     setFastModeEnabled(server.enabled);
     saveFastModeConfig(server); // mirror so a later mount starts correct offline too
   }, [configuration]);
+
+  // Only worth installing when fast mode is on: it caches the fast copies.
+  useEffect(() => {
+    if (!fastModeEnabled) return;
+    registerVideoCache();
+  }, [fastModeEnabled]);
+
+  // Read through a ref inside the observer effect, which deliberately does not
+  // depend on this: toggling fast mode should not tear down and rebuild the
+  // whole scroll observer.
+  const fastModeRef = useRef(fastModeEnabled);
+  useEffect(() => {
+    fastModeRef.current = fastModeEnabled;
+  }, [fastModeEnabled]);
   const {
     state: interactiveState,
     initialised: interactiveInitialised,
@@ -1940,6 +1958,27 @@ export const Feed: React.FC = () => {
       }
     }
 
+    // Ask the worker to hold the scene being watched plus the next one, and to
+    // abandon anything else. Whole files, so a seek inside them costs nothing.
+    // Driven from the settle path on purpose: flying past a hundred tiles must
+    // not queue a hundred downloads, and the list doubles as the cancel signal
+    // for whatever was wanted a moment ago.
+    function cacheAhead(activeItem: HTMLDivElement) {
+      if (!fastModeRef.current) return;
+      const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
+      const idx = items.indexOf(activeItem);
+      if (idx === -1) return;
+      const urls: string[] = [];
+      for (let i = idx; i <= Math.min(items.length - 1, idx + 1); i++) {
+        const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
+        const src = v?.dataset.src;
+        if (src && /\/stream\.fast(?:$|[?#])/.test(src)) {
+          urls.push(new URL(src, window.location.href).toString());
+        }
+      }
+      if (urls.length) precacheVideos(urls);
+    }
+
     // Only a tile settled on for >~120ms plays and primes its transcode, so
     // fast-skipping loads nothing and skipped tiles just show their posters.
     let settleTimer: number | null = null;
@@ -1967,7 +2006,9 @@ export const Feed: React.FC = () => {
       // Prefetch neighbours only once this tile plays and is still the settled
       // one, so the burst never competes with a cold video or a skipped-past tile.
       const primeNeighbours = () => {
-        if (currentVisibleRef.current === item) ensureNeighborSrcs(item);
+        if (currentVisibleRef.current !== item) return;
+        ensureNeighborSrcs(item);
+        cacheAhead(item);
       };
       if (!video.paused && video.readyState >= 3) primeNeighbours();
       else video.addEventListener("playing", primeNeighbours, { once: true });
