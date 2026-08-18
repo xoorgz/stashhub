@@ -9,6 +9,7 @@
 * Feed: only the playing video downloads freely, so a neighbour can no longer saturate the connection.
 * Feed: poster clears the moment playback starts, no more pale seams at the corners.
 * Feed algorithm: ranked sources rotate which slice they draw from, so the same scenes stop recurring.
+* Feed algorithm: new Unwatched source, newest first, with a play-time range under Advanced.
 
 ### stashhub v1.4.43
 

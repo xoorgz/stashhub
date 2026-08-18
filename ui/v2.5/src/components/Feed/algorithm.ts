@@ -746,6 +746,41 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
+  // Unwatched. Newest first so fresh additions surface, with the page rotated
+  // so it does not keep offering the same newest few. Both bounds at 0 means
+  // play_duration is exactly 0, which is every scene never played.
+  if (settings.unwatchedEnabled && settings.unwatchedWeight > 0) {
+    fetches.push(
+      (async () => {
+        const perPage = pageFor(settings.unwatchedWeight);
+        const min = Math.max(0, settings.unwatchedMinSec ?? 0);
+        const max = Math.max(min, settings.unwatchedMaxSec ?? 0);
+        const ids = await fetchRanked(
+          {
+            filter: {
+              sort: "created_at",
+              direction: GQL.SortDirectionEnum.Desc,
+            },
+            sceneFilter: {
+              play_duration: {
+                value: min,
+                value2: max,
+                modifier: GQL.CriterionModifier.Between,
+              },
+            },
+          },
+          perPage
+        );
+        console.info("[feed] unwatched:", ids.length, `played ${min}-${max}s`);
+        return {
+          name: "unwatched",
+          weight: settings.unwatchedWeight,
+          ids: shuffleInPlace(ids).slice(0, perPage),
+        };
+      })()
+    );
+  }
+
   // Top rated
   if (settings.topRatedEnabled && settings.topRatedWeight > 0) {
     const perPage = pageFor(settings.topRatedWeight);

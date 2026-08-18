@@ -41,6 +41,10 @@ export interface AlgorithmSettings {
   topOCountEnabled: boolean;
   topOCountWeight: number;
   topOCountMin: number;
+  unwatchedEnabled: boolean;
+  unwatchedWeight: number;
+  unwatchedMinSec: number;
+  unwatchedMaxSec: number;
   watchedTagsEnabled: boolean;
   watchedTagsWeight: number;
   watchedTagsLookback: number;
@@ -84,6 +88,12 @@ export const DEFAULT_ALGORITHM_SETTINGS: AlgorithmSettings = {
   topOCountEnabled: true,
   topOCountWeight: 3,
   topOCountMin: 1,
+  unwatchedEnabled: false,
+  unwatchedWeight: 4,
+  // Both zero means never played at all. Raising max opens it up to scenes
+  // barely sampled, e.g. 0 to 10 for ones you started and dropped.
+  unwatchedMinSec: 0,
+  unwatchedMaxSec: 0,
   watchedTagsEnabled: true,
   watchedTagsWeight: 4,
   watchedTagsLookback: 50,
@@ -230,6 +240,7 @@ function bucketShares(s: AlgorithmSettings): Record<string, number> {
   add("liked", s.likedEnabled, s.likedWeight);
   add("topWatched", s.topWatchedEnabled, s.topWatchedWeight);
   add("topOCount", s.topOCountEnabled, s.topOCountWeight);
+  add("unwatched", s.unwatchedEnabled, s.unwatchedWeight);
   add("watchedTags", s.watchedTagsEnabled, s.watchedTagsWeight);
   add(
     "favoredTags",
@@ -442,6 +453,20 @@ export const SettingsAlgorithmPanel: React.FC = () => {
           weight={s.topOCountWeight}
           onWeight={(v) => update("topOCountWeight", v)}
           share={shares.topOCount}
+        />
+
+        <Row
+          title="Unwatched"
+          description={
+            s.unwatchedMaxSec <= 0
+              ? "Scenes you have never played. Set a max play time under Advanced to include ones you barely started."
+              : `Scenes played between ${s.unwatchedMinSec}s and ${s.unwatchedMaxSec}s, newest first.`
+          }
+          enabled={s.unwatchedEnabled}
+          onToggle={(v) => update("unwatchedEnabled", v)}
+          weight={s.unwatchedWeight}
+          onWeight={(v) => update("unwatchedWeight", v)}
+          share={shares.unwatched}
         />
 
         <Row
@@ -881,6 +906,51 @@ export const SettingsAlgorithmPanel: React.FC = () => {
               onChange={(e) => {
                 const n = parseInt(e.target.value, 10);
                 if (Number.isFinite(n) && n >= 1 && n <= 1000) update("topOCountMin", n);
+              }}
+              style={{ width: 100 }}
+            />
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Unwatched play time</h3>
+            <div className="value">
+              Play-time range the Unwatched bucket accepts, in seconds. Both at
+              0 means never played at all. Raise the maximum to also include
+              scenes you started and dropped.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Form.Control
+              type="number"
+              min={0}
+              max={100000}
+              step={1}
+              value={s.unwatchedMinSec}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 0 && n <= 100000) {
+                  update("unwatchedMinSec", n);
+                  // A minimum above the maximum matches nothing, so carry the
+                  // maximum along rather than silently emptying the bucket.
+                  if (n > s.unwatchedMaxSec) update("unwatchedMaxSec", n);
+                }
+              }}
+              style={{ width: 100 }}
+            />
+            <span className="value">to</span>
+            <Form.Control
+              type="number"
+              min={0}
+              max={100000}
+              step={1}
+              value={s.unwatchedMaxSec}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n >= 0 && n <= 100000) {
+                  update("unwatchedMaxSec", n);
+                  if (n < s.unwatchedMinSec) update("unwatchedMinSec", n);
+                }
               }}
               style={{ width: 100 }}
             />
