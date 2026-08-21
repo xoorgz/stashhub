@@ -46,6 +46,7 @@ import {
   precacheVideos,
 } from "src/hooks/FastMode/videoCache";
 import { ConfigurationContext } from "src/hooks/Config";
+import { TITLE, TITLE_SEPARATOR } from "src/hooks/title";
 import "./Feed.scss";
 
 const VIEWED_KEY = "feed.viewedIds";
@@ -58,6 +59,20 @@ const LIKE_THRESHOLD = 5;
 const MUTED_KEY = "feed.muted";
 const CAPTIONS_KEY = "feed.captions";
 const CURRENT_KEY = "feed.currentSceneId";
+/** Display name for a scene. Shared so the browser tab and the on-screen
+ *  caption can never disagree about what is playing. */
+function sceneTitle(scene: {
+  id: string;
+  title?: string | null;
+  files?: Array<{ path?: string | null }> | null;
+}): string {
+  return (
+    scene.title ||
+    scene.files?.[0]?.path?.split("/").pop() ||
+    `Scene ${scene.id}`
+  );
+}
+
 const SKIPPED_TAGS_KEY = "feed.skips.tags";
 const SCENE_SKIPS_KEY = "feed.skips.scenes";
 const SCENE_SKIPS_MAX = 3000;
@@ -1235,10 +1250,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const performer = scene.performers?.[0];
   const performerImage = performer?.image_path ? relativize(performer.image_path) : "";
   const tags = scene.tags ?? [];
-  const title =
-    scene.title ||
-    scene.files?.[0]?.path?.split("/").pop() ||
-    `Scene ${scene.id}`;
+  const title = sceneTitle(scene);
 
   return (
     <div className="feed-item" ref={itemRef} data-scene-id={scene.id}>
@@ -1818,6 +1830,32 @@ export const Feed: React.FC = () => {
     navPopRef.current = false;
   }, []);
 
+  // Name the browser tab after whatever is playing. Set imperatively rather
+  // than through state and Helmet: this fires on every scene change, and a
+  // state update here would re-render every tile in the feed, which is exactly
+  // the work the scrolling path avoids doing.
+  const scenesRef = useRef(scenes);
+  useEffect(() => {
+    scenesRef.current = scenes;
+  }, [scenes]);
+
+  const setFeedTitle = useCallback((sceneId: string | undefined) => {
+    const scene = sceneId
+      ? scenesRef.current.find((s) => s.id === sceneId)
+      : undefined;
+    document.title = scene
+      ? `${sceneTitle(scene)}${TITLE_SEPARATOR}${TITLE}`
+      : TITLE;
+  }, []);
+
+  // Hand the tab back when leaving the feed, so another route does not inherit
+  // the name of the last scene watched.
+  useEffect(() => {
+    return () => {
+      document.title = TITLE;
+    };
+  }, []);
+
   // Back/forward: scroll the feed to the scene named in the URL.
   useEffect(() => {
     function onPop() {
@@ -2037,6 +2075,7 @@ export const Feed: React.FC = () => {
       if (id) {
         markViewed(id);
         persistCurrent(id);
+        setFeedTitle(id);
       }
       showMetaAndScheduleFade(item);
       const items = track.querySelectorAll(".feed-item");
