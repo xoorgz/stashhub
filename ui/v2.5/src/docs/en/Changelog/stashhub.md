@@ -11,6 +11,7 @@
 * Feed algorithm: ranked sources rotate which slice they draw from, so the same scenes stop recurring.
 * Feed algorithm: new Unwatched source, newest first, with a play-time range under Advanced.
 * Feed: the browser tab is named after the scene playing, and follows arrow-key navigation.
+* Feed: F toggles fullscreen, Escape leaves it.
 
 ### stashhub v1.4.43
 

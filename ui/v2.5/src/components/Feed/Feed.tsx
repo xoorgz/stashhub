@@ -375,6 +375,50 @@ function toggleFullscreen(el: HTMLElement | null) {
   }
 }
 
+type FsDoc = Document & {
+  fullscreenElement?: Element | null;
+  webkitFullscreenElement?: Element | null;
+  exitFullscreen?: () => Promise<void>;
+  webkitExitFullscreen?: () => Promise<void>;
+};
+
+function isFullscreen(): boolean {
+  const doc = document as FsDoc;
+  return !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+}
+
+function exitFullscreen() {
+  const doc = document as FsDoc;
+  if (!isFullscreen()) return;
+  (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc);
+}
+
+/** Whole-page fullscreen so the feed keeps its overlay and controls, unlike
+ *  the double-click path which fullscreens the bare video. iOS Safari refuses
+ *  requestFullscreen on anything but a video, so fall back to that there.
+ *  Shared by the button and the F key so the two cannot drift apart. */
+function toggleFeedFullscreen(video: HTMLVideoElement | null) {
+  if (isFullscreen()) {
+    exitFullscreen();
+    return;
+  }
+  const docEl = document.documentElement as HTMLElement & {
+    webkitRequestFullscreen?: () => Promise<void> | void;
+    mozRequestFullScreen?: () => Promise<void> | void;
+    msRequestFullscreen?: () => Promise<void> | void;
+  };
+  const req =
+    docEl.requestFullscreen ||
+    docEl.webkitRequestFullscreen ||
+    docEl.mozRequestFullScreen ||
+    docEl.msRequestFullscreen;
+  if (req) {
+    Promise.resolve(req.call(docEl)).catch(() => toggleFullscreen(video));
+  } else {
+    toggleFullscreen(video);
+  }
+}
+
 // ───────── components ─────────
 
 function resolutionLabel(height: number): string | null {
@@ -1496,40 +1540,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
           <button
             type="button"
             className="feed-action feed-fs-btn"
-            title="Fullscreen (double-click video for video-only fullscreen)"
+            title="Fullscreen, or F (double-click video for video-only fullscreen)"
             onClick={(e) => {
               e.preventDefault();
-              // iOS Safari rejects requestFullscreen on non-video elements, so
-              // fall back to the video's webkitEnterFullscreen.
-              const docEl = document.documentElement as HTMLElement & {
-                webkitRequestFullscreen?: () => Promise<void> | void;
-                mozRequestFullScreen?: () => Promise<void> | void;
-                msRequestFullscreen?: () => Promise<void> | void;
-              };
-              const doc = document as Document & {
-                fullscreenElement?: Element | null;
-                webkitFullscreenElement?: Element | null;
-                exitFullscreen?: () => Promise<void>;
-                webkitExitFullscreen?: () => Promise<void>;
-              };
-              if (doc.fullscreenElement || doc.webkitFullscreenElement) {
-                (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc);
-                return;
-              }
-              const req =
-                docEl.requestFullscreen ||
-                docEl.webkitRequestFullscreen ||
-                docEl.mozRequestFullScreen ||
-                docEl.msRequestFullscreen;
-              if (req) {
-                Promise.resolve(req.call(docEl)).catch(() => {
-                  // iOS Safari throws here. Fall back to video element.
-                  toggleFullscreen(videoRef.current);
-                });
-              } else {
-                // No document-fullscreen support at all (older iOS Safari).
-                toggleFullscreen(videoRef.current);
-              }
+              toggleFeedFullscreen(videoRef.current);
             }}
           >
             <FullscreenIcon />
@@ -2208,6 +2222,17 @@ export const Feed: React.FC = () => {
       } else if (e.key === "m" || e.key === "M") {
         e.preventDefault();
         setMuted((m) => !m);
+      } else if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        const item = currentVisibleRef.current;
+        toggleFeedFullscreen(
+          item?.querySelector<HTMLVideoElement>("video.feed-video") ?? null
+        );
+      } else if (e.key === "Escape") {
+        // Browsers already leave fullscreen on Escape, so this only matters
+        // when the page was put there some other way. Not prevented, since
+        // Escape has to keep working for anything else listening for it.
+        exitFullscreen();
       }
     }
     document.addEventListener("keydown", onKey);
