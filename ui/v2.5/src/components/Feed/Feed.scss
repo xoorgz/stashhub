@@ -886,9 +886,27 @@
 
 /* App chrome that lives outside the feed. The side nav is z-index 150 against
    the feed's 50, so it stays on top unless it is taken out explicitly. */
+/* The side nav lives outside the feed and sits above it, so it has to be
+   hidden from <body>. Hiding it is only half the job: SideNav.scss also insets
+   the feed with `left: var(--sidenav-width) !important` at every breakpoint, so
+   without the override below the bar disappears and its space stays behind as
+   a black strip. Higher specificity plus !important to beat those rules
+   whatever the viewport. */
 body.feed-immersive {
-  .sidenav,
-  .top-nav { display: none !important; }
+  .sidenav { display: none !important; }
+
+  .feed-root {
+    left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* Quick, not showy: the expand should feel immediate but not snap. */
+.feed-root { transition: left 180ms ease; }
+.feed-video-wrap { transition: border-radius 180ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .feed-root,
+  .feed-video-wrap { transition: none; }
 }
 
 /* The action rail is anchored to the bottom and grows upward, so a long stack
