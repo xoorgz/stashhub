@@ -12,6 +12,8 @@
 * Feed algorithm: new Unwatched source, newest first, with a play-time range under Advanced.
 * Feed: the browser tab is named after the scene playing, and follows arrow-key navigation.
 * Feed: F toggles fullscreen, Escape leaves it.
+* Feed: immersive mode, video edge to edge with a minimal overlay, swipe and tap unchanged.
+* Feed: picture-in-picture button, including on iPhone.
 
 ### stashhub v1.4.43
 

@@ -72,6 +72,37 @@ export const FullscreenIcon: React.FC = () =>
     18
   );
 
+/** Immersive mode: a screen with the frame pushed to its edges. */
+export const ImmersiveIcon: React.FC<{ on?: boolean }> = ({ on }) =>
+  wrap(
+    on ? (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <polyline points="9 9 12 12 9 15" />
+        <polyline points="15 9 12 12 15 15" />
+      </>
+    ) : (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <polyline points="7 10 7 7 10 7" />
+        <polyline points="17 10 17 7 14 7" />
+        <polyline points="7 14 7 17 10 17" />
+        <polyline points="17 14 17 17 14 17" />
+      </>
+    ),
+    18
+  );
+
+/** Picture in picture: a small pane tucked into the corner of a larger one. */
+export const PipIcon: React.FC = () =>
+  wrap(
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <rect x="12" y="12" width="7" height="5" rx="1" />
+    </>,
+    18
+  );
+
 export const SkipIcon: React.FC = () =>
   wrap(
     <>

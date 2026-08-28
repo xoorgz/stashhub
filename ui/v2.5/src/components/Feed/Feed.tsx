@@ -16,6 +16,8 @@ import {
   DropIcon,
   EyeIcon,
   FullscreenIcon,
+  ImmersiveIcon,
+  PipIcon,
   SkipIcon,
   MuteOffIcon,
   MuteOnIcon,
@@ -73,6 +75,7 @@ function sceneTitle(scene: {
   );
 }
 
+const IMMERSIVE_KEY = "feed.immersive";
 const SKIPPED_TAGS_KEY = "feed.skips.tags";
 const SCENE_SKIPS_KEY = "feed.skips.scenes";
 const SCENE_SKIPS_MAX = 3000;
@@ -419,6 +422,55 @@ function toggleFeedFullscreen(video: HTMLVideoElement | null) {
   }
 }
 
+type PipVideo = HTMLVideoElement & {
+  webkitSetPresentationMode?: (mode: string) => void;
+  webkitSupportsPresentationMode?: (mode: string) => boolean;
+  requestPictureInPicture?: () => Promise<PictureInPictureWindow>;
+  disablePictureInPicture?: boolean;
+};
+
+/** iPhone Safari never implemented requestPictureInPicture, but has had
+ *  webkitSetPresentationMode since iOS 14, and neither needs fullscreen. */
+function pipSupported(video: HTMLVideoElement | null): boolean {
+  if (!video) return false;
+  const v = video as PipVideo;
+  if (v.webkitSupportsPresentationMode) {
+    return v.webkitSupportsPresentationMode("picture-in-picture");
+  }
+  return (
+    typeof v.requestPictureInPicture === "function" &&
+    !!(document as Document & { pictureInPictureEnabled?: boolean })
+      .pictureInPictureEnabled
+  );
+}
+
+function togglePip(video: HTMLVideoElement | null) {
+  if (!video) return;
+  const v = video as PipVideo;
+  const doc = document as Document & {
+    pictureInPictureElement?: Element | null;
+    exitPictureInPicture?: () => Promise<void>;
+  };
+  try {
+    if (v.webkitSetPresentationMode) {
+      const anyV = v as unknown as { webkitPresentationMode?: string };
+      v.webkitSetPresentationMode(
+        anyV.webkitPresentationMode === "picture-in-picture"
+          ? "inline"
+          : "picture-in-picture"
+      );
+      return;
+    }
+    if (doc.pictureInPictureElement) {
+      doc.exitPictureInPicture?.();
+    } else {
+      v.requestPictureInPicture?.().catch(() => {});
+    }
+  } catch {
+    /* browser refused, nothing sensible to do */
+  }
+}
+
 // ───────── components ─────────
 
 function resolutionLabel(height: number): string | null {
@@ -488,6 +540,8 @@ interface FeedItemProps {
   onSkip: () => void;
   onSpawnHearts: (x: number, y: number, count: number) => void;
   onSpawnDrops: (x: number, y: number, count: number) => void;
+  immersive: boolean;
+  onToggleImmersive: () => void;
 }
 
 const FeedItem: React.FC<FeedItemProps> = ({
@@ -504,6 +558,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
   onSkip,
   onSpawnHearts,
   onSpawnDrops,
+  immersive,
+  onToggleImmersive,
 }) => {
   const itemRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -522,6 +578,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const [pulse, setPulse] = useState<"play" | "pause" | "back" | "fwd" | null>(null);
   const pulseTimerRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [canPip, setCanPip] = useState(false);
   // True once playback has actually started; drives the poster→video crossfade.
   const [revealed, setRevealed] = useState(false);
 
@@ -617,10 +674,24 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const v = videoRef.current;
     const w = wrapRef.current;
     if (!v || !w) return;
+    // Checked here rather than during render: the ref is still null on the
+    // first pass, so asking then would hide the button permanently. Safari
+    // only reports support once the element has media attached.
+    setCanPip(pipSupported(v));
     function applyAspect() {
       if (!v || !w) return;
+      setCanPip(pipSupported(v));
       if (v.videoWidth && v.videoHeight) {
         w.style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`;
+        // Drives the fit in immersive mode. Upright clips fill the screen the
+        // way a reel should; wide ones keep their whole frame, because
+        // cropping a landscape video to a portrait screen throws away most of
+        // the picture. Ordinary mode ignores this entirely.
+        const item = itemRef.current;
+        if (item) {
+          item.dataset.fit =
+            v.videoWidth <= v.videoHeight ? "fill" : "whole";
+        }
       }
     }
     v.addEventListener("loadedmetadata", applyAspect);
@@ -1539,6 +1610,32 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
           <button
             type="button"
+            className={`feed-action feed-immersive-btn${immersive ? " is-on" : ""}`}
+            title={immersive ? "Leave immersive mode" : "Immersive mode"}
+            onClick={(e) => {
+              e.preventDefault();
+              onToggleImmersive();
+            }}
+          >
+            <ImmersiveIcon on={immersive} />
+          </button>
+
+          {canPip && (
+            <button
+              type="button"
+              className="feed-action feed-pip-btn"
+              title="Picture in picture"
+              onClick={(e) => {
+                e.preventDefault();
+                togglePip(videoRef.current);
+              }}
+            >
+              <PipIcon />
+            </button>
+          )}
+
+          <button
+            type="button"
             className="feed-action feed-fs-btn"
             title="Fullscreen, or F (double-click video for video-only fullscreen)"
             onClick={(e) => {
@@ -1592,6 +1689,50 @@ export const Feed: React.FC = () => {
   const [interactiveOn, setInteractiveOn] = useState<boolean>(
     () => sessionStorage.getItem(INTERACTIVE_KEY) !== "0"
   );
+  // Immersive mode sticks across sessions: it is a way of watching, not a
+  // per-visit toggle. Also takes real fullscreen where the browser allows it,
+  // which iPhone Safari does not for anything but a bare video.
+  const [immersive, setImmersive] = useState<boolean>(
+    () => localStorage.getItem(IMMERSIVE_KEY) === "1"
+  );
+  const toggleImmersive = useCallback(() => {
+    setImmersive((on) => {
+      const next = !on;
+      try {
+        localStorage.setItem(IMMERSIVE_KEY, next ? "1" : "0");
+      } catch { /* ignore */ }
+      if (next) {
+        const docEl = document.documentElement as HTMLElement & {
+          webkitRequestFullscreen?: () => Promise<void> | void;
+        };
+        const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+        // Best effort. The CSS carries the mode on its own, so a refusal
+        // costs nothing but the browser chrome staying visible.
+        if (req) Promise.resolve(req.call(docEl)).catch(() => {});
+      } else {
+        exitFullscreen();
+      }
+      return next;
+    });
+  }, []);
+  // Leaving fullscreen by Escape or the system gesture should drop the mode
+  // too, otherwise the button and the screen disagree.
+  useEffect(() => {
+    function onFsChange() {
+      if (!isFullscreen() && localStorage.getItem(IMMERSIVE_KEY) === "1") {
+        setImmersive(false);
+        try {
+          localStorage.setItem(IMMERSIVE_KEY, "0");
+        } catch { /* ignore */ }
+      }
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, []);
   // ConfigurationContext is the source of truth for the global fast-mode
   // setting; localStorage only supplies first paint and the same-tab channel.
   const { configuration } = React.useContext(ConfigurationContext);
@@ -2318,7 +2459,7 @@ export const Feed: React.FC = () => {
   }, []);
 
   return (
-    <div className="feed-root">
+    <div className={`feed-root${immersive ? " is-immersive" : ""}`}>
       <div className="feed-track" ref={trackRef}>
         {scenes.map((s) => (
           <FeedItem
@@ -2336,6 +2477,8 @@ export const Feed: React.FC = () => {
             onSkip={handleSkip}
             onSpawnHearts={spawnHearts}
             onSpawnDrops={spawnDrops}
+            immersive={immersive}
+            onToggleImmersive={toggleImmersive}
           />
         ))}
         {scenes.length === 0 && feedState === "loading" && (

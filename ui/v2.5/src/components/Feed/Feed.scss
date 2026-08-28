@@ -835,3 +835,51 @@
   animation: feed-spin 0.8s linear infinite;
 }
 @keyframes feed-spin { to { transform: rotate(360deg); } }
+
+/* ───────── immersive mode ─────────
+   A reel-style view: the video owns the screen, the chrome shrinks to what you
+   actually reach for, and swipe and tap keep working exactly as they do in the
+   normal feed. Deliberately CSS rather than the Fullscreen API, because iPhone
+   Safari only fullscreens a bare <video>, which hands control to Apple's player
+   and takes the overlay, the swipe and the next video with it. Real fullscreen
+   is still requested alongside this where the browser allows it. */
+.feed-root.is-immersive {
+  .feed-item {
+    padding-inline: 0 !important;
+    padding-block: 0 !important;
+  }
+  .feed-stage { padding: 0 !important; gap: 0 !important; }
+
+  .feed-video-wrap {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    aspect-ratio: auto !important;   /* the screen sets the shape, not the file */
+    border-radius: 0 !important;
+  }
+
+  /* Upright clips fill the screen; wide ones keep their whole frame, since
+     cropping a landscape video to a portrait screen loses most of the picture.
+     data-fit is set from the video's real dimensions once metadata lands. */
+  .feed-item[data-fit="fill"] .feed-video,
+  .feed-item[data-fit="fill"] .feed-video-poster { object-fit: cover; background-size: cover; }
+  .feed-item[data-fit="whole"] .feed-video,
+  .feed-item[data-fit="whole"] .feed-video-poster { object-fit: contain; background-size: contain; }
+
+  /* Minimal overlay: keep the controls and the progress bar, drop the reading
+     matter. Tags and the title are for browsing, not for watching. */
+  .feed-tags,
+  .feed-title-tags { display: none; }
+  .feed-meta { padding: 8px 12px 10px; }
+  .feed-title { font-size: 13px; opacity: 0.85; }
+
+  /* Pull the buttons in tighter so more of the frame is visible. */
+  .feed-actions { gap: 10px; }
+  .feed-action { transform: scale(0.92); }
+}
+
+/* The immersive toggle takes the accent colour while it is on, matching the
+   other stateful buttons. Compound so it outranks the base .feed-action rule
+   whatever the source order. */
+.feed-action.feed-immersive-btn.is-on { color: var(--feed-hubs); }
