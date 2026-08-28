@@ -883,3 +883,23 @@
    other stateful buttons. Compound so it outranks the base .feed-action rule
    whatever the source order. */
 .feed-action.feed-immersive-btn.is-on { color: var(--feed-hubs); }
+
+/* App chrome that lives outside the feed. The side nav is z-index 150 against
+   the feed's 50, so it stays on top unless it is taken out explicitly. */
+body.feed-immersive {
+  .sidenav,
+  .top-nav { display: none !important; }
+}
+
+/* The action rail is anchored to the bottom and grows upward, so a long stack
+   used to run off the top of the screen. Cap it to the stage and tighten the
+   spacing when there is not much height to work with. */
+.feed-actions { max-height: 100%; }
+@media (max-height: 780px) {
+  .feed-actions { gap: 7px; }
+  .feed-action { transform: scale(0.9); }
+}
+@media (max-height: 640px) {
+  .feed-actions { gap: 5px; }
+  .feed-action { transform: scale(0.82); }
+}

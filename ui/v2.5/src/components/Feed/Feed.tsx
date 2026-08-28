@@ -15,7 +15,6 @@ import {
   HeartIcon,
   DropIcon,
   EyeIcon,
-  FullscreenIcon,
   ImmersiveIcon,
   PipIcon,
   SkipIcon,
@@ -396,15 +395,12 @@ function exitFullscreen() {
   (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc);
 }
 
-/** Whole-page fullscreen so the feed keeps its overlay and controls, unlike
- *  the double-click path which fullscreens the bare video. iOS Safari refuses
- *  requestFullscreen on anything but a video, so fall back to that there.
- *  Shared by the button and the F key so the two cannot drift apart. */
-function toggleFeedFullscreen(video: HTMLVideoElement | null) {
-  if (isFullscreen()) {
-    exitFullscreen();
-    return;
-  }
+/** Ask for real fullscreen on top of immersive mode. Best effort: iPhone
+ *  Safari refuses it for anything but a bare video, and that path hands
+ *  playback to Apple's own player, losing the overlay, the swipe and the next
+ *  video. The CSS carries the mode by itself, so a refusal costs nothing
+ *  beyond the browser chrome staying put. */
+function requestRealFullscreen() {
   const docEl = document.documentElement as HTMLElement & {
     webkitRequestFullscreen?: () => Promise<void> | void;
     mozRequestFullScreen?: () => Promise<void> | void;
@@ -415,11 +411,7 @@ function toggleFeedFullscreen(video: HTMLVideoElement | null) {
     docEl.webkitRequestFullscreen ||
     docEl.mozRequestFullScreen ||
     docEl.msRequestFullscreen;
-  if (req) {
-    Promise.resolve(req.call(docEl)).catch(() => toggleFullscreen(video));
-  } else {
-    toggleFullscreen(video);
-  }
+  if (req) Promise.resolve(req.call(docEl)).catch(() => {});
 }
 
 type PipVideo = HTMLVideoElement & {
@@ -1611,7 +1603,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
           <button
             type="button"
             className={`feed-action feed-immersive-btn${immersive ? " is-on" : ""}`}
-            title={immersive ? "Leave immersive mode" : "Immersive mode"}
+            title={
+              immersive
+                ? "Leave fullscreen, or F"
+                : "Fullscreen, or F (double-click video for video-only fullscreen)"
+            }
             onClick={(e) => {
               e.preventDefault();
               onToggleImmersive();
@@ -1633,18 +1629,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
               <PipIcon />
             </button>
           )}
-
-          <button
-            type="button"
-            className="feed-action feed-fs-btn"
-            title="Fullscreen, or F (double-click video for video-only fullscreen)"
-            onClick={(e) => {
-              e.preventDefault();
-              toggleFeedFullscreen(videoRef.current);
-            }}
-          >
-            <FullscreenIcon />
-          </button>
 
           <button
             type="button"
@@ -1701,20 +1685,19 @@ export const Feed: React.FC = () => {
       try {
         localStorage.setItem(IMMERSIVE_KEY, next ? "1" : "0");
       } catch { /* ignore */ }
-      if (next) {
-        const docEl = document.documentElement as HTMLElement & {
-          webkitRequestFullscreen?: () => Promise<void> | void;
-        };
-        const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
-        // Best effort. The CSS carries the mode on its own, so a refusal
-        // costs nothing but the browser chrome staying visible.
-        if (req) Promise.resolve(req.call(docEl)).catch(() => {});
-      } else {
-        exitFullscreen();
-      }
+      if (next) requestRealFullscreen();
+      else exitFullscreen();
       return next;
     });
   }, []);
+  // The side nav lives outside this component and sits above it (z-index 150
+  // against the feed's 50), so a class on <body> is the only way to reach it.
+  // Cleared on unmount so leaving the feed always gives the nav back.
+  useEffect(() => {
+    document.body.classList.toggle("feed-immersive", immersive);
+    return () => document.body.classList.remove("feed-immersive");
+  }, [immersive]);
+
   // Leaving fullscreen by Escape or the system gesture should drop the mode
   // too, otherwise the button and the screen disagree.
   useEffect(() => {
@@ -2365,10 +2348,7 @@ export const Feed: React.FC = () => {
         setMuted((m) => !m);
       } else if (e.key === "f" || e.key === "F") {
         e.preventDefault();
-        const item = currentVisibleRef.current;
-        toggleFeedFullscreen(
-          item?.querySelector<HTMLVideoElement>("video.feed-video") ?? null
-        );
+        toggleImmersive();
       } else if (e.key === "Escape") {
         // Browsers already leave fullscreen on Escape, so this only matters
         // when the page was put there some other way. Not prevented, since
