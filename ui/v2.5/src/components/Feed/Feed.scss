@@ -905,8 +905,11 @@
    a black strip. Higher specificity plus !important to beat those rules
    whatever the viewport. */
 body.feed-immersive {
+  /* The whole top row, not just the bar inside it: App renders the chip island
+     alongside it in .topright-island-row, so hiding only .topright-bar left
+     the chips sitting over the video. */
   .sidenav,
-  .topright-bar { display: none !important; }
+  .topright-island-row { display: none !important; }
 
   .feed-root {
     left: 0 !important;

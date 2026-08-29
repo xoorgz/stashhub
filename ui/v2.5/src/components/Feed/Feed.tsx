@@ -390,10 +390,35 @@ function isFullscreen(): boolean {
   return !!(doc.fullscreenElement || doc.webkitFullscreenElement);
 }
 
-function exitFullscreen() {
+function exitFullscreen(): Promise<void> {
   const doc = document as FsDoc;
-  if (!isFullscreen()) return;
-  (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc);
+  if (!isFullscreen()) return Promise.resolve();
+  const fn = doc.exitFullscreen || doc.webkitExitFullscreen;
+  if (!fn) return Promise.resolve();
+  return Promise.resolve(fn.call(doc)).catch(() => undefined);
+}
+
+/** Hand the video to the platform's own player. Immersive mode may already
+ *  hold document fullscreen, and a video cannot enter its own fullscreen from
+ *  inside that, so stand down first and only then ask. That was the whole
+ *  reason the button appeared to do nothing: it was toggling the page's
+ *  fullscreen off rather than opening the native player. */
+async function enterNativeVideoFullscreen(video: HTMLVideoElement | null) {
+  if (!video) return;
+  const v = video as HTMLVideoElement & {
+    webkitEnterFullscreen?: () => void;
+    webkitRequestFullscreen?: () => Promise<void> | void;
+  };
+  if (isFullscreen()) await exitFullscreen();
+  try {
+    // webkitEnterFullscreen first: on iPhone it is the only one that exists,
+    // and it is the one that opens the native player.
+    if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+    else if (v.requestFullscreen) await v.requestFullscreen();
+    else v.webkitRequestFullscreen?.();
+  } catch {
+    /* refused, nothing sensible to do */
+  }
 }
 
 /** Ask for real fullscreen on top of immersive mode. Best effort: iPhone
@@ -807,6 +832,107 @@ const FeedItem: React.FC<FeedItemProps> = ({
       detachTouch();
     };
   }, []);
+
+  // Pinch to zoom the picture itself. Applied as a transform on the <video> so
+  // only the frame scales and the overlay stays put. Two fingers zoom, one
+  // finger pans while zoomed, and releasing near 1x snaps back to fit. The
+  // feed's vertical swipe is only suppressed while actually zoomed in.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    let scale = 1;
+    let tx = 0;
+    let ty = 0;
+    const pts = new Map<number, { x: number; y: number }>();
+    let startDist = 0;
+    let startScale = 1;
+    let panFrom: { x: number; y: number } | null = null;
+
+    const apply = () => {
+      v.style.transform =
+        scale === 1 && tx === 0 && ty === 0
+          ? ""
+          : `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`;
+      v.style.touchAction = scale > 1.01 ? "none" : "";
+    };
+
+    const dist = () => {
+      const [a, b] = Array.from(pts.values());
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+
+    // Keep the frame covering its box so zooming never exposes empty edges.
+    const clampPan = () => {
+      const r = v.getBoundingClientRect();
+      const maxX = Math.max(0, (r.width * scale - r.width) / 2);
+      const maxY = Math.max(0, (r.height * scale - r.height) / 2);
+      tx = Math.min(maxX, Math.max(-maxX, tx));
+      ty = Math.min(maxY, Math.max(-maxY, ty));
+    };
+
+    const onDown = (e: PointerEvent) => {
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) {
+        startDist = dist();
+        startScale = scale;
+        panFrom = null;
+      } else if (pts.size === 1 && scale > 1.01) {
+        panFrom = { x: e.clientX, y: e.clientY };
+      }
+    };
+
+    const onMove = (e: PointerEvent) => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2 && startDist > 0) {
+        e.preventDefault();
+        scale = Math.min(5, Math.max(1, (dist() / startDist) * startScale));
+        clampPan();
+        apply();
+      } else if (pts.size === 1 && panFrom && scale > 1.01) {
+        e.preventDefault();
+        tx += e.clientX - panFrom.x;
+        ty += e.clientY - panFrom.y;
+        panFrom = { x: e.clientX, y: e.clientY };
+        clampPan();
+        apply();
+      }
+    };
+
+    const onUp = (e: PointerEvent) => {
+      pts.delete(e.pointerId);
+      if (pts.size < 2) startDist = 0;
+      if (pts.size === 0) {
+        panFrom = null;
+        // Anything near fit returns to exactly fit, so the feed is never left
+        // a hair zoomed and unable to scroll.
+        if (scale < 1.05) {
+          scale = 1;
+          tx = 0;
+          ty = 0;
+          v.style.transition = "transform 160ms ease";
+          apply();
+          window.setTimeout(() => {
+            v.style.transition = "";
+          }, 180);
+        }
+      }
+    };
+
+    v.addEventListener("pointerdown", onDown);
+    v.addEventListener("pointermove", onMove, { passive: false });
+    v.addEventListener("pointerup", onUp);
+    v.addEventListener("pointercancel", onUp);
+    return () => {
+      v.removeEventListener("pointerdown", onDown);
+      v.removeEventListener("pointermove", onMove);
+      v.removeEventListener("pointerup", onUp);
+      v.removeEventListener("pointercancel", onUp);
+      v.style.transform = "";
+      v.style.touchAction = "";
+    };
+  }, [scene.id]);
 
   // Double-click to fullscreen. Gated on `hover: hover` so a double-tap on a
   // touch-only device stays edge-tap seek.
@@ -1643,7 +1769,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
               title="Native player fullscreen"
               onClick={(e) => {
                 e.preventDefault();
-                toggleFullscreen(videoRef.current);
+                enterNativeVideoFullscreen(videoRef.current);
               }}
             >
               <FullscreenIcon />
