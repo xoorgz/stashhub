@@ -1844,6 +1844,47 @@ export const Feed: React.FC = () => {
     return () => document.body.classList.remove("feed-immersive");
   }, [immersive]);
 
+  // Tiles are exactly 100dvh, and entering or leaving fullscreen changes what
+  // that is. The scroll offset does not follow, so the feed ends up parked
+  // between two tiles: you see the current one plus a slice of its neighbour,
+  // which reads as a second avatar and second button rail. Realign on the next
+  // frame, once the new viewport height has settled.
+  useEffect(() => {
+    const t = trackRef.current;
+    const item = currentVisibleRef.current;
+    if (!t || !item) return;
+    const id = window.requestAnimationFrame(() => {
+      t.scrollTo({ top: item.offsetTop, behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [immersive]);
+
+  // Same correction for fullscreen changes the app did not initiate, and for
+  // rotating the device or resizing the window.
+  useEffect(() => {
+    let raf: number | null = null;
+    function realign() {
+      const t = trackRef.current;
+      const item = currentVisibleRef.current;
+      if (!t || !item) return;
+      if (raf != null) window.cancelAnimationFrame(raf);
+      raf = window.requestAnimationFrame(() => {
+        t.scrollTo({ top: item.offsetTop, behavior: "auto" });
+      });
+    }
+    window.addEventListener("resize", realign);
+    window.addEventListener("orientationchange", realign);
+    document.addEventListener("fullscreenchange", realign);
+    document.addEventListener("webkitfullscreenchange", realign);
+    return () => {
+      if (raf != null) window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", realign);
+      window.removeEventListener("orientationchange", realign);
+      document.removeEventListener("fullscreenchange", realign);
+      document.removeEventListener("webkitfullscreenchange", realign);
+    };
+  }, []);
+
   // Leaving fullscreen by Escape or the system gesture should drop the mode
   // too, otherwise the button and the screen disagree.
   useEffect(() => {

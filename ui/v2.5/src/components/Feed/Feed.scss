@@ -658,6 +658,10 @@
    to spare 60px of right-edge space without crowding the action stack. */
 @media (max-width: 640px) {
   .feed-nav-btn { display: none !important; }
+  /* Same reasoning for the skip button: it only scrolls to the next video,
+     which is what a swipe already does, so it is one more thing sitting over
+     the picture for nothing. */
+  .feed-action.feed-skip-btn { display: none !important; }
   /* Push the daily wrap card below the topright island row so they don't
      overlap horizontally on narrow phones. The island is ~40px tall +
      8px top inset, so 60px clears it. */

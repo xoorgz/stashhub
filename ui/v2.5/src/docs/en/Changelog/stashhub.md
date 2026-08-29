@@ -16,6 +16,8 @@
 * Feed: picture-in-picture and native player fullscreen buttons, shown in immersive mode. Native fullscreen was previously reachable only by double-click, so not at all on a touch device.
 * Feed: immersive mode hides the side and top bars, and its controls fade out, returning on a tap.
 * Feed: pinch to zoom the picture, drag to pan while zoomed, release near fit to snap back.
+* Feed: entering or leaving fullscreen realigns the current video, so the next one no longer peeks in.
+* Feed: the skip button is hidden on mobile, where a swipe already does it.
 
 ### stashhub v1.4.43
 
