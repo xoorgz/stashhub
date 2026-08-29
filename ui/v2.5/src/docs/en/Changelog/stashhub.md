@@ -18,6 +18,7 @@
 * Feed: pinch to zoom the picture, drag to pan while zoomed, release near fit to snap back.
 * Feed: entering or leaving fullscreen realigns the current video, so the next one no longer peeks in.
 * Feed: the skip button is hidden on mobile, where a swipe already does it.
+* Feed: the fullscreen toggle keeps its place when turned on, the extra controls appear above it.
 
 ### stashhub v1.4.43
 

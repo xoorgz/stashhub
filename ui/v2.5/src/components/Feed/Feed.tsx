@@ -1727,22 +1727,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
             onToggle={onToggleInteractive}
           />
 
-          <button
-            type="button"
-            className={`feed-action feed-immersive-btn${immersive ? " is-on" : ""}`}
-            title={
-              immersive
-                ? "Leave fullscreen, or F"
-                : "Fullscreen, or F (double-click video for video-only fullscreen)"
-            }
-            onClick={(e) => {
-              e.preventDefault();
-              onToggleImmersive();
-            }}
-          >
-            <ImmersiveIcon on={immersive} />
-          </button>
-
+          {/* These two render before the toggle on purpose. The rail packs to
+              the bottom, so anything after a button lifts it: with the pair
+              below, turning immersive on shifted the toggle out from under the
+              user's thumb. Rendered above, the toggle never moves. */}
           {/* Both only while immersive: they are watching tools, and the rail
               is long enough already when simply browsing. */}
           {immersive && canPip && (
@@ -1775,6 +1763,22 @@ const FeedItem: React.FC<FeedItemProps> = ({
               <FullscreenIcon />
             </button>
           )}
+
+          <button
+            type="button"
+            className={`feed-action feed-immersive-btn${immersive ? " is-on" : ""}`}
+            title={
+              immersive
+                ? "Leave fullscreen, or F"
+                : "Fullscreen, or F (double-click video for video-only fullscreen)"
+            }
+            onClick={(e) => {
+              e.preventDefault();
+              onToggleImmersive();
+            }}
+          >
+            <ImmersiveIcon on={immersive} />
+          </button>
 
           <button
             type="button"
