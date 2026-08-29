@@ -15,6 +15,7 @@ import {
   HeartIcon,
   DropIcon,
   EyeIcon,
+  FullscreenIcon,
   ImmersiveIcon,
   PipIcon,
   SkipIcon,
@@ -1616,7 +1617,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
             <ImmersiveIcon on={immersive} />
           </button>
 
-          {canPip && (
+          {/* Both only while immersive: they are watching tools, and the rail
+              is long enough already when simply browsing. */}
+          {immersive && canPip && (
             <button
               type="button"
               className="feed-action feed-pip-btn"
@@ -1627,6 +1630,23 @@ const FeedItem: React.FC<FeedItemProps> = ({
               }}
             >
               <PipIcon />
+            </button>
+          )}
+
+          {/* Hands the video to the platform's own player. On iPhone this is
+              the only route to real fullscreen, and it was previously reachable
+              only by double-click, which is gated to devices with a pointer. */}
+          {immersive && (
+            <button
+              type="button"
+              className="feed-action feed-nativefs-btn"
+              title="Native player fullscreen"
+              onClick={(e) => {
+                e.preventDefault();
+                toggleFullscreen(videoRef.current);
+              }}
+            >
+              <FullscreenIcon />
             </button>
           )}
 
@@ -2074,6 +2094,17 @@ export const Feed: React.FC = () => {
       fadeTimers.set(item, t);
     }
 
+    // Any press brings the overlay back and restarts its countdown. Without
+    // this the chrome faded after ten seconds and, in immersive mode where the
+    // buttons fade too, there was no way to get them back short of changing
+    // scene. Passive and non-capturing, so it never interferes with the taps
+    // the buttons and the scrubber already handle.
+    function revealOnPress() {
+      const item = currentVisibleRef.current;
+      if (item) showMetaAndScheduleFade(item);
+    }
+    track.addEventListener("pointerdown", revealOnPress, { passive: true });
+
     function ensureNeighborSrcs(activeItem: HTMLDivElement) {
       // Prime active + N ahead with preload="auto" so a swipe-down has no buffer
       // pause. N is larger on desktop, where the bandwidth is there to spare.
@@ -2270,6 +2301,7 @@ export const Feed: React.FC = () => {
     return () => {
       if (settleTimer != null) window.clearTimeout(settleTimer);
       if (primeRaf != null) window.cancelAnimationFrame(primeRaf);
+      track.removeEventListener("pointerdown", revealOnPress);
       io.disconnect();
     };
   }, [scenes, muted, loadMore, persistCurrent]);

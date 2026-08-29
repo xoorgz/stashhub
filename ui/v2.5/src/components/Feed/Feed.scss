@@ -862,10 +862,16 @@
   /* Upright clips fill the screen; wide ones keep their whole frame, since
      cropping a landscape video to a portrait screen loses most of the picture.
      data-fit is set from the video's real dimensions once metadata lands. */
+  /* !important because the mobile breakpoint sets `object-fit: cover
+     !important` on every feed video, which would otherwise crop landscape
+     clips here exactly as it does in the normal feed. */
   .feed-item[data-fit="fill"] .feed-video,
-  .feed-item[data-fit="fill"] .feed-video-poster { object-fit: cover; background-size: cover; }
+  .feed-item[data-fit="fill"] .feed-video-poster { object-fit: cover !important; background-size: cover; }
   .feed-item[data-fit="whole"] .feed-video,
-  .feed-item[data-fit="whole"] .feed-video-poster { object-fit: contain; background-size: contain; }
+  .feed-item[data-fit="whole"] .feed-video-poster { object-fit: contain !important; background-size: contain; }
+  /* Until metadata lands we do not know the shape. Show the whole frame rather
+     than guess, since a wrong crop is worse than a temporary bar. */
+  .feed-item:not([data-fit]) .feed-video { object-fit: contain !important; }
 
   /* Minimal overlay: keep the controls and the progress bar, drop the reading
      matter. Tags and the title are for browsing, not for watching. */
@@ -873,6 +879,12 @@
   .feed-title-tags { display: none; }
   .feed-meta { padding: 8px 12px 10px; }
   .feed-title { font-size: 13px; opacity: 0.85; }
+
+  /* The rail fades out with the rest of the overlay and comes back on a tap,
+     so nothing sits over the picture while watching. Normal browsing keeps it
+     permanently visible. */
+  .feed-item.meta-faded .feed-actions { opacity: 0; }
+  .feed-actions { transition: opacity 0.4s ease; }
 
   /* Pull the buttons in tighter so more of the frame is visible. */
   .feed-actions { gap: 10px; }
@@ -893,7 +905,8 @@
    a black strip. Higher specificity plus !important to beat those rules
    whatever the viewport. */
 body.feed-immersive {
-  .sidenav { display: none !important; }
+  .sidenav,
+  .topright-bar { display: none !important; }
 
   .feed-root {
     left: 0 !important;
