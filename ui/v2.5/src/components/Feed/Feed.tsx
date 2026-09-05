@@ -661,6 +661,34 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, []);
 
+  // The Delete key is handled at the feed root, which has no access to this
+  // tile's state, so it arrives as an event on the item, the same way keyboard
+  // seeks reach the pulse chip. It opens the confirmation rather than deleting
+  // outright: a key that destroys a file on one press is not something to have
+  // under a thumb resting on the keyboard.
+  useEffect(() => {
+    const item = itemRef.current;
+    if (!item) return;
+    const onDeleteRequest = () => setConfirmDelete(true);
+    item.addEventListener("feed-delete-request", onDeleteRequest);
+    return () => item.removeEventListener("feed-delete-request", onDeleteRequest);
+  }, []);
+
+  // While the confirmation is open it owns Escape, so a cancel does not also
+  // drop out of fullscreen. Capture phase to beat the root handler.
+  useEffect(() => {
+    if (!confirmDelete) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        e.preventDefault();
+        setConfirmDelete(false);
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [confirmDelete]);
+
   // Fast mode streams a pre-generated small/fast-start copy. A per-scene HQ
   // override beats the global setting until the user swipes away.
   const [hqOverride, setHqOverride] = useState(false);
@@ -2626,6 +2654,13 @@ export const Feed: React.FC = () => {
       } else if (e.key === "f" || e.key === "F") {
         e.preventDefault();
         toggleImmersive();
+      } else if (e.key === "Delete") {
+        // Ask the visible tile to open its confirmation. Backspace is
+        // deliberately not bound: on some keyboards it is the back gesture.
+        e.preventDefault();
+        currentVisibleRef.current?.dispatchEvent(
+          new CustomEvent("feed-delete-request")
+        );
       } else if (e.key === "Escape") {
         // Browsers already leave fullscreen on Escape, so this only matters
         // when the page was put there some other way. Not prevented, since

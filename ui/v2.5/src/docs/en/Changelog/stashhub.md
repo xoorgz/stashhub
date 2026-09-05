@@ -25,6 +25,8 @@
 * Feed: a play counts after 5 seconds, and watch time is sent every 3 seconds so it climbs visibly.
 * Feed: the skip button is now a delete button, with confirmation.
 * Deleting a scene no longer removes its funscript. Subtitles were already left alone.
+* Feed: the Delete key opens the delete confirmation for the scene on screen.
+* Fast-mode copies and posters are removed when their scene is deleted.
 
 ### stashhub v1.4.43
 
