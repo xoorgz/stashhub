@@ -874,8 +874,11 @@
   .feed-item[data-fit="whole"] .feed-video,
   .feed-item[data-fit="whole"] .feed-video-poster { object-fit: contain !important; background-size: contain; }
   /* Until metadata lands we do not know the shape. Show the whole frame rather
-     than guess, since a wrong crop is worse than a temporary bar. */
+     than guess, since a wrong crop is worse than a temporary bar. The poster
+     needs the same treatment: leaving it on cover meant the still was zoomed
+     while the video underneath was not, which looked like a stretch on load. */
   .feed-item:not([data-fit]) .feed-video { object-fit: contain !important; }
+  .feed-item:not([data-fit]) .feed-video-poster { background-size: contain !important; }
 
   /* Minimal overlay: keep the controls and the progress bar, drop the reading
      matter. Tags and the title are for browsing, not for watching. */

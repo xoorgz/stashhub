@@ -19,6 +19,9 @@
 * Feed: entering or leaving fullscreen realigns the current video, so the next one no longer peeks in.
 * Feed: the skip button is hidden on mobile, where a swipe already does it.
 * Feed: the fullscreen toggle keeps its place when turned on, the extra controls appear above it.
+* Feed: square videos show their whole frame instead of being cropped to the screen.
+* Feed: the poster matches the video's fit before metadata arrives, so it no longer looks stretched on load.
+* Feed: the scene you are watching is cached too, so seeking inside it no longer waits on the network.
 
 ### stashhub v1.4.43
 

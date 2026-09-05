@@ -707,8 +707,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
         // the picture. Ordinary mode ignores this entirely.
         const item = itemRef.current;
         if (item) {
-          item.dataset.fit =
-            v.videoWidth <= v.videoHeight ? "fill" : "whole";
+          // Strictly taller than wide fills the screen. Square counts as
+          // wide: cropping a 1:1 clip to a tall phone throws away nearly half
+          // the frame, which reads as a stretched, zoomed-in mess.
+          item.dataset.fit = v.videoWidth < v.videoHeight ? "fill" : "whole";
         }
       }
     }
@@ -2364,11 +2366,14 @@ export const Feed: React.FC = () => {
       const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
       const idx = items.indexOf(activeItem);
       if (idx === -1) return;
-      // Next scene only. The one playing is already being fetched by its video
-      // element, and precaching it too downloaded the same file twice over the
-      // same connection, competing with the playback it was meant to help.
+      // The scene playing plus the next one. Caching the current one does mean
+      // fetching it a second time, which is why it was dropped before, but
+      // without it every seek inside the video you are actually watching goes
+      // to the network: measured at 32 seconds on one jump. This only runs once
+      // playback is under way, and the worker abandons it the moment you move
+      // on, so it no longer competes with a cold start.
       const urls: string[] = [];
-      for (let i = idx + 1; i <= Math.min(items.length - 1, idx + 1); i++) {
+      for (let i = idx; i <= Math.min(items.length - 1, idx + 1); i++) {
         const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
         const src = v?.dataset.src;
         if (src && /\/stream\.fast(?:$|[?#])/.test(src)) {
