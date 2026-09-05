@@ -28,7 +28,7 @@
 * Feed: the Delete key opens the delete confirmation for the scene on screen.
 * Fast-mode copies and posters are removed when their scene is deleted.
 * Feed: the eye winks when a play is counted, and stays accented for the rest of the session.
-* Feed: the seek bar is now the scene's loudness envelope, with spoken-part ticks sized to match it.
+* Feed: the seek bar is now the scene's loudness envelope.
 * Feed: hovering the seek bar lightens everything left of the pointer.
 * Feed: fullscreen on a desktop-sized window shows the whole frame instead of cropping to fill.
 * Feed: Cmd or Ctrl with plus, minus and zero zooms the video rather than the page.
@@ -41,6 +41,7 @@
 * Feed: no nav arrows in fullscreen, where arrow keys and swipe already move the feed.
 * Feed: in fullscreen the seek bar and title match the picture's width and stay at the bottom.
 * Feed: on a mouse or trackpad, one scroll gesture moves exactly one video.
+* Feed: no delete button in fullscreen, and the button rail stays inside its own video.
 
 ### stashhub v1.4.43
 

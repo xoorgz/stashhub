@@ -1187,49 +1187,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [scene.id, scene.captions?.length]);
 
-  // Cue start-times drive the progress-bar ticks. VTT parses asynchronously, so
-  // read on addtrack, load and cuechange alike to catch them whenever they land.
-  const [cueStarts, setCueStarts] = useState<number[]>([]);
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v || !v.textTracks) return;
-    let detach: Array<() => void> = [];
-    function read() {
-      const v2 = videoRef.current;
-      if (!v2 || !v2.textTracks?.length) return;
-      const track = v2.textTracks[0];
-      // We don't touch track.mode here. The captions effect above owns it and
-      // keeps track 0 in "hidden" mode always, so cues are parsed regardless of
-      // whether captions are shown, and these progress markers work either way.
-      const cues = track.cues;
-      if (!cues || !cues.length) return;
-      const starts: number[] = [];
-      for (let i = 0; i < cues.length; i++) starts.push(cues[i].startTime);
-      setCueStarts(starts);
-    }
-    function onTrackAdded(ev: Event) {
-      const track = (ev as TrackEvent).track as TextTrack | undefined;
-      if (!track) return;
-      track.addEventListener("cuechange", read);
-      track.addEventListener("load", read);
-      detach.push(() => track.removeEventListener("cuechange", read));
-      detach.push(() => track.removeEventListener("load", read));
-      read();
-    }
-    // Wire existing tracks (if any are present at mount).
-    for (let i = 0; i < v.textTracks.length; i++) {
-      const t = v.textTracks[i];
-      t.addEventListener("cuechange", read);
-      t.addEventListener("load", read);
-      detach.push(() => t.removeEventListener("cuechange", read));
-      detach.push(() => t.removeEventListener("load", read));
-    }
-    read();
-    v.textTracks.addEventListener("addtrack", onTrackAdded);
-    detach.push(() => v.textTracks.removeEventListener("addtrack", onTrackAdded));
-    return () => detach.forEach((d) => d());
-  }, [scene.id, scene.captions?.length]);
-
   // The IO handler's play() rejects when src was only just assigned, leaving the
   // tile on its poster, so retry on every canplay and show a buffering loader.
   useEffect(() => {
@@ -1739,22 +1696,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
             >
               <div className="feed-progress-track" />
               <div className="feed-progress-hover" ref={hoverRef} />
-              {/* Inside the mask, so each mark is clipped to the envelope and
-                  takes its height from the sound at that moment. Before the
-                  played fill, so progress always draws over the marks. */}
-              {cueStarts.length > 0 && scene.files?.[0]?.duration ? (
-                <div className="feed-progress-markers" aria-hidden="true">
-                  {cueStarts.map((t, i) => (
-                    <span
-                      key={i}
-                      className="feed-progress-marker"
-                      style={{
-                        left: `${(t / (scene.files![0].duration || 1)) * 100}%`,
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : null}
               <div className="feed-progress-bar" ref={barRef} />
             </div>
           </div>

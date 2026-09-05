@@ -155,9 +155,14 @@
   .feed-actions {
     position: absolute;
     right: 8px;
+    top: 8px;
     bottom: 40px;           /* clear the feed progress bar */
     align-self: auto;
     z-index: 4;
+    /* Bounded by the tile. Absolutely positioned and taller than the screen,
+       the rail ran past the tile's top edge and the next video's buttons
+       appeared over the one above it. */
+    overflow: hidden;
   }
   .feed-action { width: 36px !important; height: 36px !important; }
   .feed-action .feed-count { font-size: 11px; bottom: -18px; }
@@ -446,29 +451,6 @@
    a class on a shared ancestor. */
 .feed-progress.has-wave ~ .feed-overlay .feed-meta {
   padding-bottom: 36px;
-}
-
-/* Speech marks: one per VTT cue startTime. They live inside the masked
-   wrapper, so each is clipped to the envelope and needs no height of its own,
-   and they are painted before the played fill, which is what keeps progress
-   readable over them. That ordering is why they can be drawn at full strength
-   without swallowing the playhead. */
-.feed-progress-markers {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.feed-progress-marker {
-  position: absolute;
-  /* Confined to the middle of the strip. Running the full height meant a mark
-     on a loud spike was clipped to that spike alone, and its tip read as a dot
-     floating above the quieter shape either side of it. Kept to the centre it
-     always joins the body of the wave. */
-  top: 22%;
-  bottom: 22%;
-  width: 2px;
-  background: rgba(223, 115, 255, 0.6);
-  transform: translateX(-1px);
 }
 
 /* Action stack */
@@ -976,6 +958,9 @@
     }
   }
 
+  /* Nothing that destroys a file belongs under a thumb while watching. */
+  .feed-delete-btn { display: none; }
+
   /* Minimal overlay: drop the tag pills, which are for browsing rather than
      watching. The title itself keeps the size, weight and chips it has in the
      normal feed, so switching views does not restyle it. */
@@ -1009,8 +994,10 @@
     .feed-actions {
       position: absolute;
       right: calc(var(--feed-pillar, 0px) + 10px);
+      top: 12px;
       bottom: 34px;
       align-self: auto;
+      overflow: hidden;
     }
 
     /* Out of the way while the picture is magnified. Zoomed is the one time
