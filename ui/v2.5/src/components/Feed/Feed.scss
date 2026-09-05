@@ -944,3 +944,67 @@ body.feed-immersive {
   .feed-actions { gap: 5px; }
   .feed-action { transform: scale(0.82); }
 }
+
+/* Delete confirmation. Sits inside the tile rather than being a Bootstrap
+   modal, so it inherits the feed's own fixed-position stacking instead of
+   fighting it. */
+.feed-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(3px);
+  padding: 24px;
+}
+.feed-confirm-box {
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 20px 22px;
+  max-width: 360px;
+  width: 100%;
+  color: #fff;
+
+  h4 { margin: 0 0 10px; font-size: 17px; font-weight: 700; }
+}
+.feed-confirm-name {
+  margin: 0 0 8px;
+  font-size: 13px;
+  opacity: 0.85;
+  word-break: break-word;
+}
+.feed-confirm-note {
+  margin: 0 0 18px;
+  font-size: 12px;
+  opacity: 0.6;
+  line-height: 1.45;
+}
+.feed-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.feed-confirm-cancel,
+.feed-confirm-delete {
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  &:disabled { opacity: 0.6; cursor: default; }
+}
+.feed-confirm-cancel {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  &:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+}
+/* Red, not the accent colour: this one destroys a file. */
+.feed-confirm-delete {
+  background: #e5484d;
+  color: #fff;
+  &:hover:not(:disabled) { filter: brightness(1.08); }
+}

@@ -18,7 +18,7 @@ import {
   FullscreenIcon,
   ImmersiveIcon,
   PipIcon,
-  SkipIcon,
+  TrashIcon,
   MuteOffIcon,
   MuteOnIcon,
   OpenSceneIcon,
@@ -75,6 +75,9 @@ function sceneTitle(scene: {
   );
 }
 
+// Seconds of playback before a view counts. Matches what a person would call
+// "actually watched" rather than a glance while scrolling past.
+const PLAY_COUNT_AFTER_MS = 5000;
 const IMMERSIVE_KEY = "feed.immersive";
 const SKIPPED_TAGS_KEY = "feed.skips.tags";
 const SCENE_SKIPS_KEY = "feed.skips.scenes";
@@ -312,6 +315,26 @@ async function saveSceneActivity(
     });
   } catch (e) {
     console.warn("[feed] sceneSaveActivity failed", e);
+  }
+}
+
+// Removes the scene and its video file. delete_generated clears stash's own
+// previews and sprites. Sidecars are untouched: pkg/scene/delete.go no longer
+// removes the funscript, and subtitles were never in its remit, so both stay
+// on disk and are picked back up if the video is ever re-added.
+async function destroyScene(id: string): Promise<boolean> {
+  try {
+    await client.mutate<
+      GQL.SceneDestroyMutation,
+      GQL.SceneDestroyMutationVariables
+    >({
+      mutation: GQL.SceneDestroyDocument,
+      variables: { id, delete_file: true, delete_generated: true },
+    });
+    return true;
+  } catch (e) {
+    console.warn("[feed] sceneDestroy failed", e);
+    return false;
   }
 }
 
@@ -555,7 +578,7 @@ interface FeedItemProps {
   interactiveState: ConnectionState;
   interactiveInitialised: boolean;
   onToggleInteractive: () => void;
-  onSkip: () => void;
+  onDeleted: (sceneId: string) => void;
   onSpawnHearts: (x: number, y: number, count: number) => void;
   onSpawnDrops: (x: number, y: number, count: number) => void;
   immersive: boolean;
@@ -573,7 +596,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   interactiveState,
   interactiveInitialised,
   onToggleInteractive,
-  onSkip,
+  onDeleted,
   onSpawnHearts,
   onSpawnDrops,
   immersive,
@@ -597,6 +620,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const pulseTimerRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [canPip, setCanPip] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   // True once playback has actually started; drives the poster→video crossfade.
   const [revealed, setRevealed] = useState(false);
 
@@ -1265,8 +1290,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [interactiveOn, buttplugStatus, funscriptReady, scene.id]);
 
-  // Register a play after 3s and flush watched seconds every 10s. The Top
-  // Watched and Watched Tags buckets have no other source for this.
+  // Register a play after 5s, and push watched seconds every 3s so the count
+  // visibly climbs rather than jumping in ten second steps. The scene player
+  // ticks every second but only sends every ten, which is why play time used
+  // to look frozen while watching. The Top Watched and Watched Tags buckets
+  // have no other source for this.
   const playTimerRef = useRef<number | null>(null);
   const playRegisteredRef = useRef(false);
   const watchedSinceLastFlushRef = useRef(0);
@@ -1286,7 +1314,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const FLUSH_INTERVAL_MS = 10_000;
+    const FLUSH_INTERVAL_MS = 3_000;
     const flush = () => {
       const delta = Math.round(watchedSinceLastFlushRef.current);
       if (delta <= 0) return;
@@ -1309,7 +1337,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             setPlayCount(serverCount);
           }
         }
-      }, 3000);
+      }, PLAY_COUNT_AFTER_MS);
       if (flushTimerRef.current == null) {
         flushTimerRef.current = window.setInterval(flush, FLUSH_INTERVAL_MS);
       }
@@ -1784,18 +1812,59 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
           <button
             type="button"
-            className="feed-action feed-skip-btn"
-            title="Skip"
+            className="feed-action feed-delete-btn"
+            title="Delete scene"
             onClick={(e) => {
               e.preventDefault();
-              markViewed(scene.id);
-              onSkip();
+              setConfirmDelete(true);
             }}
           >
-            <SkipIcon />
+            <TrashIcon />
           </button>
         </div>
       </div>
+
+      {/* Confirmation is inline rather than a Bootstrap modal: the feed is a
+          self-contained fixed-position layer, and a modal's own positioning
+          and backdrop fight the immersive layout. */}
+      {confirmDelete && (
+        <div className="feed-confirm" role="dialog" aria-modal="true">
+          <div className="feed-confirm-box">
+            <h4>Delete this scene?</h4>
+            <p className="feed-confirm-name">{title}</p>
+            <p className="feed-confirm-note">
+              The video file is removed. Any funscript or subtitle files stay
+              on disk.
+            </p>
+            <div className="feed-confirm-actions">
+              <button
+                type="button"
+                className="feed-confirm-cancel"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="feed-confirm-delete"
+                disabled={deleting}
+                onClick={async () => {
+                  setDeleting(true);
+                  const ok = await destroyScene(scene.id);
+                  setDeleting(false);
+                  setConfirmDelete(false);
+                  // Only drop the tile once the server confirms, so a failed
+                  // delete never makes a scene silently vanish from the feed.
+                  if (ok) onDeleted(scene.id);
+                }}
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2574,7 +2643,6 @@ export const Feed: React.FC = () => {
     fastSlide(t, t.scrollTop + dir * t.clientHeight);
   }, [fastSlide]);
 
-  const handleSkip = useCallback(() => scrollBy(1), [scrollBy]);
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
   const toggleCaptions = useCallback(() => {
     setCaptionsOn((c) => {
@@ -2662,9 +2730,11 @@ export const Feed: React.FC = () => {
             interactiveState={interactiveState}
             interactiveInitialised={interactiveInitialised}
             onToggleInteractive={toggleInteractive}
-            onSkip={handleSkip}
             onSpawnHearts={spawnHearts}
             onSpawnDrops={spawnDrops}
+            onDeleted={(sid) =>
+              setScenes((prev) => prev.filter((x) => x.id !== sid))
+            }
             immersive={immersive}
             onToggleImmersive={toggleImmersive}
           />

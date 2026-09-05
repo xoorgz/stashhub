@@ -22,6 +22,9 @@
 * Feed: square videos show their whole frame instead of being cropped to the screen.
 * Feed: the poster matches the video's fit before metadata arrives, so it no longer looks stretched on load.
 * Feed: the scene you are watching is cached too, so seeking inside it no longer waits on the network.
+* Feed: a play counts after 5 seconds, and watch time is sent every 3 seconds so it climbs visibly.
+* Feed: the skip button is now a delete button, with confirmation.
+* Deleting a scene no longer removes its funscript. Subtitles were already left alone.
 
 ### stashhub v1.4.43
 

@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/stashapp/stash/pkg/file"
-	"github.com/stashapp/stash/pkg/file/video"
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
@@ -163,16 +162,11 @@ func (s *Service) deleteFiles(ctx context.Context, scene *models.Scene, fileDele
 			return err
 		}
 
-		// don't delete files in zip archives
-		if f.ZipFileID == nil {
-			funscriptPath := video.GetFunscriptPath(f.Path)
-			funscriptExists, _ := fsutil.FileExists(funscriptPath)
-			if funscriptExists {
-				if err := fileDeleter.Files([]string{funscriptPath}); err != nil {
-					return err
-				}
-			}
-		}
+		// Sidecars are deliberately left on disk. A funscript takes real effort
+		// to produce and is not recoverable from the video, so deleting a scene
+		// must not take it with them. Subtitles were already left alone; this
+		// keeps funscripts on the same footing. Re-adding the video picks its
+		// sidecars straight back up.
 	}
 
 	return nil
