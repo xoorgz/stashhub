@@ -126,6 +126,15 @@
   }
 }
 
+.scene-open-in-feed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+
+  svg { display: block; }
+}
+
 #scene-details-container {
   .tab-content {
     min-height: 15rem;

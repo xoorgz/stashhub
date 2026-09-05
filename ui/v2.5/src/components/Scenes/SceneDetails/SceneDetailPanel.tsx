@@ -6,6 +6,7 @@ import { TagLink } from "src/components/Shared/TagLink";
 import { PerformerCard } from "src/components/Performers/PerformerCard";
 import { sortPerformers } from "src/core/performers";
 import { DirectorLink } from "src/components/Shared/Link";
+import { Link } from "react-router-dom";
 
 interface ISceneDetailProps {
   scene: GQL.SceneDataFragment;
@@ -77,6 +78,27 @@ export const SceneDetailPanel: React.FC<ISceneDetailProps> = (props) => {
     <>
       <div className="row">
         <div className={`${sceneDetailsWidth} col-12 scene-details`}>
+          {/* Same play triangle the side nav uses for the feed, so the
+              destination is recognisable before the label is read. */}
+          <Link
+            className="btn btn-secondary scene-open-in-feed"
+            to={`/feed/${props.scene.id}`}
+          >
+            <svg
+              width={16}
+              height={16}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            Open in feed
+          </Link>
           <h6>
             <FormattedMessage id="created_at" />:{" "}
             {TextUtils.formatDateTime(intl, props.scene.created_at)}{" "}
