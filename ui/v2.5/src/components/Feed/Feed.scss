@@ -155,7 +155,7 @@
   .feed-actions {
     position: absolute;
     right: 8px;
-    bottom: 22px;           /* clear the feed progress bar */
+    bottom: 40px;           /* clear the feed progress bar */
     align-self: auto;
     z-index: 4;
   }
@@ -386,46 +386,88 @@
   /* Vertical drags starting on the bar scroll the feed; only horizontal
      drags scrub. */
   touch-action: pan-y;
+}
 
-  &::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.28);
-    pointer-events: none;
-  }
+/* Track and played fill live in one wrapper so a single mask shapes both. The
+   played element is clipped by its own width, and the wrapper always spans the
+   full bar, so the silhouette never slides as playback advances. */
+.feed-progress-wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  pointer-events: none;
+  z-index: 7;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+.feed-progress-track {
+  position: absolute;
+  inset: 0;
+  /* Held back so the played fill carries the eye. As an envelope this covers
+     far more area than the old 4px strip did, and at the strip's alpha it
+     competed with the progress instead of sitting behind it. */
+  background: rgba(255, 255, 255, 0.17);
+}
+/* Where a click would land. Sits over the track and under the played fill, so
+   the part already watched keeps its gradient. The cue ticks are outside this
+   wrapper and stay accented over the top. */
+.feed-progress-hover {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: rgba(255, 255, 255, 0.5);
 }
 .feed-progress-bar {
   position: absolute;
   left: 0;
+  top: 0;
   bottom: 0;
-  height: 4px;
   width: 0;
   background: linear-gradient(90deg, #fff, var(--feed-hubs));
-  pointer-events: none;
   transition: width 0.08s linear;
-  z-index: 7;
 }
 
-/* Speech markers: one tick per VTT cue startTime, ride the 4 px progress
-   strip. Hub-purple at 60 % alpha so they show against both unplayed
-   (white-on-dark) and played (hub-purple gradient) sections of the bar. */
+/* With an envelope the strip gets tall enough for the shape to read. Nothing
+   else changes: same colours, same gradient, same cue ticks over the top. */
+.feed-progress.has-wave {
+  height: 34px;
+
+  .feed-progress-wave { height: 26px; }
+}
+
+/* The strip is tall enough now to run under the caption block, and the two
+   are siblings with the bar first, so the meta can be lifted without needing
+   a class on a shared ancestor. */
+.feed-progress.has-wave ~ .feed-overlay .feed-meta {
+  padding-bottom: 36px;
+}
+
+/* Speech marks: one per VTT cue startTime. They live inside the masked
+   wrapper, so each is clipped to the envelope and needs no height of its own,
+   and they are painted before the played fill, which is what keeps progress
+   readable over them. That ordering is why they can be drawn at full strength
+   without swallowing the playhead. */
 .feed-progress-markers {
   position: absolute;
-  inset: auto 0 0 0;
-  height: 4px;
+  inset: 0;
   pointer-events: none;
-  z-index: 8;
 }
 .feed-progress-marker {
   position: absolute;
-  bottom: 0;
+  /* Confined to the middle of the strip. Running the full height meant a mark
+     on a loud spike was clipped to that spike alone, and its tip read as a dot
+     floating above the quieter shape either side of it. Kept to the centre it
+     always joins the body of the wave. */
+  top: 22%;
+  bottom: 22%;
   width: 2px;
-  height: 4px;
-  background: rgba(223, 115, 255, 0.7);
+  background: rgba(223, 115, 255, 0.6);
   transform: translateX(-1px);
 }
 
@@ -436,7 +478,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  padding-bottom: 10px;     /* clear the feed progress bar */
+  padding-bottom: 28px;     /* clear the feed progress bar */
   align-self: flex-end;     /* stay at the bottom of the (vertically centered) stage */
   z-index: 3;
 }
@@ -556,6 +598,46 @@
   margin-bottom: 16px;
 }
 .feed-action.feed-play-count { cursor: default; }
+
+/* Play count just went up. The eye winks and both it and the number take the
+   accent colour, so the increment is noticed without a toast. */
+@keyframes feed-eye-wink {
+  0%, 100% { transform: scaleY(1); }
+  40%, 55% { transform: scaleY(0.08); }
+}
+@keyframes feed-eye-pupil {
+  0%, 100% { opacity: 1; }
+  35%, 60% { opacity: 0; }
+}
+@keyframes feed-count-pop {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  35% { transform: translateX(-50%) scale(1.45); }
+}
+/* Accent stays on for the rest of the session once the play is counted. The
+   wink below is the one-shot part. */
+.feed-action.feed-play-count.is-counted { color: var(--feed-hubs); }
+.feed-action.feed-play-count.is-counted .feed-count { color: var(--feed-hubs); }
+
+.feed-action.feed-play-count.is-bumped {
+  svg {
+    transform-origin: 50% 50%;
+    animation: feed-eye-wink 0.6s ease-in-out;
+  }
+  /* The pupil cannot stay visible through the squash or the closed eye reads
+     as a slit with a dot in it. */
+  svg circle { animation: feed-eye-pupil 0.6s ease-in-out; }
+}
+.feed-action.feed-play-count.is-bumped .feed-count {
+  animation: feed-count-pop 0.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-action.feed-play-count.is-bumped svg,
+  .feed-action.feed-play-count.is-bumped svg circle,
+  .feed-action.feed-play-count.is-bumped .feed-count {
+    animation: none;
+  }
+}
 .feed-action .feed-count {
   position: absolute;
   /* +2px (was -18) so the count badge has visible breathing room from the
@@ -880,12 +962,24 @@
   .feed-item:not([data-fit]) .feed-video { object-fit: contain !important; }
   .feed-item:not([data-fit]) .feed-video-poster { background-size: contain !important; }
 
-  /* Minimal overlay: keep the controls and the progress bar, drop the reading
-     matter. Tags and the title are for browsing, not for watching. */
-  .feed-tags,
-  .feed-title-tags { display: none; }
-  .feed-meta { padding: 8px 12px 10px; }
-  .feed-title { font-size: 13px; opacity: 0.85; }
+  /* Desktop shows the file as it is, whatever its shape. A phone screen is
+     close enough to an upright clip that filling it costs almost nothing, but
+     a desktop window is not, and cropping to it throws most of the frame away.
+     Same specificity as the data-fit rules above, so source order decides. */
+  @media (min-width: 601px) {
+    .feed-item[data-fit] .feed-video,
+    .feed-item[data-fit] .feed-video-poster,
+    .feed-item:not([data-fit]) .feed-video,
+    .feed-item:not([data-fit]) .feed-video-poster {
+      object-fit: contain !important;
+      background-size: contain !important;
+    }
+  }
+
+  /* Minimal overlay: drop the tag pills, which are for browsing rather than
+     watching. The title itself keeps the size, weight and chips it has in the
+     normal feed, so switching views does not restyle it. */
+  .feed-tags { display: none; }
 
   /* The rail fades out with the rest of the overlay and comes back on a tap,
      so nothing sits over the picture while watching. Normal browsing keeps it
@@ -896,7 +990,47 @@
   /* Pull the buttons in tighter so more of the frame is visible. */
   .feed-actions { gap: 10px; }
   .feed-action { transform: scale(0.92); }
+
+  /* Desktop only: the picture is letterboxed, so the rail and the arrows sit
+     against the frame rather than the window. --feed-pillar is the width of
+     one black bar, published from the current video's real dimensions. */
+  @media (min-width: 601px) {
+    /* Horizontal only. Matching the picture's width keeps the bar meaningful
+       for seeking and stops the title running out over the black, but lifting
+       them by the letterbox too threw them far up the screen on a wide video.
+       The bar a letterboxed video leaves below itself is free space, and that
+       is where this belongs. */
+    .feed-overlay,
+    .feed-progress {
+      left: var(--feed-pillar, 0px);
+      right: var(--feed-pillar, 0px);
+    }
+
+    .feed-actions {
+      position: absolute;
+      right: calc(var(--feed-pillar, 0px) + 10px);
+      bottom: 34px;
+      align-self: auto;
+    }
+
+    /* Out of the way while the picture is magnified. Zoomed is the one time
+       the frame is worth more than the buttons. They keep taking pointer
+       events while invisible, which is what lets moving onto them bring them
+       back: hovering the root instead would mean anywhere on the screen. */
+    &.is-zoomed .feed-actions {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    &.is-zoomed .feed-actions:hover {
+      opacity: 1;
+    }
+  }
 }
+
+/* No arrows in immersive: up and down already move the feed on a keyboard and
+   a swipe does it on a touch screen, so they were two more things over the
+   picture for nothing. */
+.feed-root.is-immersive .feed-nav-btn { display: none !important; }
 
 /* The immersive toggle takes the accent colour while it is on, matching the
    other stateful buttons. Compound so it outranks the base .feed-action rule

@@ -108,6 +108,28 @@ func (s *SceneServer) ServeScenePosterFast(scene *models.Scene, w http.ResponseW
 	s.ServeScreenshot(scene, w, r)
 }
 
+// ServeSceneWaveform serves the pre-generated loudness envelope used by the
+// feed's seek bar. 404 when there is none, so the bar stays flat rather than
+// waiting on something that may never arrive.
+func (s *SceneServer) ServeSceneWaveform(scene *models.Scene, w http.ResponseWriter, r *http.Request) {
+	dir := fastModeDir()
+	if dir == "" {
+		http.Error(w, http.StatusText(404), 404)
+		return
+	}
+
+	wavePath := filepath.Join(dir, strconv.Itoa(scene.ID)+".wave")
+	info, err := os.Stat(wavePath)
+	if err != nil || info.IsDir() {
+		http.Error(w, http.StatusText(404), 404)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "private, max-age=2592000, immutable")
+	http.ServeFile(w, r, wavePath)
+}
+
 func (s *SceneServer) ServeScreenshot(scene *models.Scene, w http.ResponseWriter, r *http.Request) {
 	var cover []byte
 	readTxnErr := txn.WithReadTxn(r.Context(), s.TxnManager, func(ctx context.Context) error {

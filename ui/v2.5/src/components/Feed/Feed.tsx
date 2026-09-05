@@ -135,6 +135,13 @@ const DROP_COLORS = [
 ];
 
 // ───────── helpers ─────────
+/** Envelope height at a bucket, as a percentage of the strip. The floor keeps
+ *  a continuous spine through silence. */
+function waveHeightAt(peaks: number[], i: number): number {
+  const at = peaks[Math.max(0, Math.min(peaks.length - 1, i))] || 0;
+  return Math.max(6, Math.min(100, at));
+}
+
 function relativize(u: string | null | undefined): string {
   if (!u) return "";
   return u.replace(/^https?:\/\/[^/]+/i, "");
@@ -444,25 +451,6 @@ async function enterNativeVideoFullscreen(video: HTMLVideoElement | null) {
   }
 }
 
-/** Ask for real fullscreen on top of immersive mode. Best effort: iPhone
- *  Safari refuses it for anything but a bare video, and that path hands
- *  playback to Apple's own player, losing the overlay, the swipe and the next
- *  video. The CSS carries the mode by itself, so a refusal costs nothing
- *  beyond the browser chrome staying put. */
-function requestRealFullscreen() {
-  const docEl = document.documentElement as HTMLElement & {
-    webkitRequestFullscreen?: () => Promise<void> | void;
-    mozRequestFullScreen?: () => Promise<void> | void;
-    msRequestFullscreen?: () => Promise<void> | void;
-  };
-  const req =
-    docEl.requestFullscreen ||
-    docEl.webkitRequestFullscreen ||
-    docEl.mozRequestFullScreen ||
-    docEl.msRequestFullscreen;
-  if (req) Promise.resolve(req.call(docEl)).catch(() => {});
-}
-
 type PipVideo = HTMLVideoElement & {
   webkitSetPresentationMode?: (mode: string) => void;
   webkitSupportsPresentationMode?: (mode: string) => boolean;
@@ -607,6 +595,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
+  const hoverRef = useRef<HTMLDivElement | null>(null);
 
   // Use scene.like_count when available; fall back to local cache.
   const [likeCount, setLikeCount] = useState<number>(
@@ -614,6 +603,26 @@ const FeedItem: React.FC<FeedItemProps> = ({
   );
   const [oCount, setOCount] = useState<number>(scene.o_counter ?? 0);
   const [playCount, setPlayCount] = useState<number>(scene.play_count ?? 0);
+  const [playBumped, setPlayBumped] = useState(false);
+  // The wink is a one-shot, the accent is not: once this scene has been
+  // counted the eye stays lit for the rest of the session, so a glance at the
+  // rail says whether the play landed.
+  const [playCounted, setPlayCounted] = useState(false);
+  const prevPlayCountRef = useRef(playCount);
+  useEffect(() => {
+    if (playCount <= prevPlayCountRef.current) {
+      prevPlayCountRef.current = playCount;
+      return;
+    }
+    prevPlayCountRef.current = playCount;
+    setPlayCounted(true);
+    setPlayBumped(true);
+    // Timed rather than onAnimationEnd: reduced-motion viewers get no
+    // animationend event and the highlight would never clear.
+    const t = window.setTimeout(() => setPlayBumped(false), 1100);
+    return () => window.clearTimeout(t);
+  }, [playCount]);
+
   const [liking, setLiking] = useState(false);
   const [oing, setOing] = useState(false);
   const [pulse, setPulse] = useState<"play" | "pause" | "back" | "fwd" | null>(null);
@@ -713,6 +722,54 @@ const FeedItem: React.FC<FeedItemProps> = ({
     if (!shot) return shot;
     return shot.replace(/\/screenshot(?=$|[?#])/, "/poster.fast");
   }, [scene.paths.screenshot]);
+
+  // Loudness envelope for the seek bar, pre-generated next to the fast copy.
+  // Missing for a scene that has none, in which case the bar stays flat.
+  const waveformSrc = useMemo(() => {
+    const shot = relativize(scene.paths.screenshot);
+    if (!shot) return "";
+    return shot.replace(/\/screenshot(?=$|[?#])/, "/waveform");
+  }, [scene.paths.screenshot]);
+
+  const [peaks, setPeaks] = useState<number[] | null>(null);
+
+  useEffect(() => {
+    if (!waveformSrc) return;
+    let cancelled = false;
+    fetch(waveformSrc)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && Array.isArray(d) && d.length) setPeaks(d as number[]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [waveformSrc]);
+
+  // One silhouette masks both the track and the played fill, so they cannot
+  // drift apart: the played element is clipped by its width inside a wrapper
+  // that always spans the full bar.
+  const waveMask = useMemo(() => {
+    if (!peaks || peaks.length < 8) return "";
+    const n = peaks.length;
+    // One filled shape traced along the top and back along the bottom, the way
+    // an audio editor draws it. Discrete bars left gaps the whole strip through.
+    // Half-heights, so the viewBox is 200 tall and every coordinate is a whole
+    // number: shorter to serialise and nothing to round.
+    const h = (i: number) => waveHeightAt(peaks, i);
+    let top = "";
+    let bottom = "";
+    for (let i = 0; i < n; i++) {
+      top += `${i === 0 ? "M" : "L"}${i} ${100 - h(i)}`;
+      bottom = `L${i} ${100 + h(i)}` + bottom;
+    }
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n - 1} 200"` +
+      ` preserveAspectRatio="none">` +
+      `<path d="${top}${bottom}Z" fill="#fff"/></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  }, [peaks]);
 
   // Swap the live <video> source when the effective mode changes (global
   // setting flips, or the user hits the per-scene HQ toggle), preserving
@@ -877,11 +934,37 @@ const FeedItem: React.FC<FeedItemProps> = ({
       window.addEventListener("touchcancel", touchEnd);
     }
 
+    // Hover preview: everything left of the pointer lightens, the way a video
+    // player shows where a click would land. Pointer devices only, since a
+    // touch fires a synthetic mousemove that would leave the fill stuck on.
+    function hoverAt(clientX: number) {
+      const h = hoverRef.current;
+      if (!h) return;
+      const rect = p!.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      h.style.width = `${ratio * 100}%`;
+    }
+    function hoverMove(ev: MouseEvent) {
+      hoverAt(ev.clientX);
+    }
+    function hoverLeave() {
+      if (hoverRef.current) hoverRef.current.style.width = "0";
+    }
+    const canHover =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(hover: hover)").matches;
+
     p.addEventListener("mousedown", mouseDown);
     p.addEventListener("touchstart", touchStart, { passive: true });
+    if (canHover) {
+      p.addEventListener("mousemove", hoverMove);
+      p.addEventListener("mouseleave", hoverLeave);
+    }
     return () => {
       p.removeEventListener("mousedown", mouseDown);
       p.removeEventListener("touchstart", touchStart);
+      p.removeEventListener("mousemove", hoverMove);
+      p.removeEventListener("mouseleave", hoverLeave);
       window.removeEventListener("mousemove", mouseMove);
       window.removeEventListener("mouseup", mouseUp);
       detachTouch();
@@ -910,6 +993,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
           ? ""
           : `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`;
       v.style.touchAction = scale > 1.01 ? "none" : "";
+      // On the root, not the item: the nav arrows are fixed and live outside
+      // the tile, and they have to fade with the rail.
+      v.closest(".feed-root")?.classList.toggle("is-zoomed", scale > 1.01);
     };
 
     const dist = () => {
@@ -975,11 +1061,39 @@ const FeedItem: React.FC<FeedItemProps> = ({
       }
     };
 
+    // Keyboard zoom lands on the item, dispatched by the feed root, and drives
+    // the same scale the pinch does so the two cannot disagree.
+    const item = itemRef.current;
+    const onZoom = (e: Event) => {
+      const dir = (e as CustomEvent<string>).detail;
+      if (dir === "reset") {
+        scale = 1;
+        tx = 0;
+        ty = 0;
+      } else {
+        scale = Math.min(5, Math.max(1, dir === "in" ? scale * 1.25 : scale / 1.25));
+        if (scale <= 1.001) {
+          scale = 1;
+          tx = 0;
+          ty = 0;
+        }
+        clampPan();
+      }
+      v.style.transition = "transform 140ms ease";
+      apply();
+      window.setTimeout(() => {
+        v.style.transition = "";
+      }, 160);
+    };
+    item?.addEventListener("feed-zoom", onZoom);
+
     v.addEventListener("pointerdown", onDown);
     v.addEventListener("pointermove", onMove, { passive: false });
     v.addEventListener("pointerup", onUp);
     v.addEventListener("pointercancel", onUp);
     return () => {
+      v.closest(".feed-root")?.classList.remove("is-zoomed");
+      item?.removeEventListener("feed-zoom", onZoom);
       v.removeEventListener("pointerdown", onDown);
       v.removeEventListener("pointermove", onMove);
       v.removeEventListener("pointerup", onUp);
@@ -1611,21 +1725,38 @@ const FeedItem: React.FC<FeedItemProps> = ({
               <span className="feed-funscript-label feed-funscript-label-bot">0</span>
             </div>
           ) : null}
-          <div className="feed-progress" ref={progressRef}>
-            <div className="feed-progress-bar" ref={barRef} />
-            {cueStarts.length > 0 && scene.files?.[0]?.duration ? (
-              <div className="feed-progress-markers" aria-hidden="true">
-                {cueStarts.map((t, i) => (
-                  <span
-                    key={i}
-                    className="feed-progress-marker"
-                    style={{
-                      left: `${(t / (scene.files![0].duration || 1)) * 100}%`,
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
+          <div
+            className={`feed-progress${waveMask ? " has-wave" : ""}`}
+            ref={progressRef}
+          >
+            <div
+              className="feed-progress-wave"
+              style={
+                waveMask
+                  ? { WebkitMaskImage: waveMask, maskImage: waveMask }
+                  : undefined
+              }
+            >
+              <div className="feed-progress-track" />
+              <div className="feed-progress-hover" ref={hoverRef} />
+              {/* Inside the mask, so each mark is clipped to the envelope and
+                  takes its height from the sound at that moment. Before the
+                  played fill, so progress always draws over the marks. */}
+              {cueStarts.length > 0 && scene.files?.[0]?.duration ? (
+                <div className="feed-progress-markers" aria-hidden="true">
+                  {cueStarts.map((t, i) => (
+                    <span
+                      key={i}
+                      className="feed-progress-marker"
+                      style={{
+                        left: `${(t / (scene.files![0].duration || 1)) * 100}%`,
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              <div className="feed-progress-bar" ref={barRef} />
+            </div>
           </div>
           {pulse && (
             <div className={`feed-pulse feed-pulse-${pulse}`} aria-hidden="true">
@@ -1724,7 +1855,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
             <span className="feed-count">{oCount}</span>
           </button>
 
-          <div className="feed-action feed-play-count" title="Play count">
+          <div
+            className={`feed-action feed-play-count${
+              playCounted ? " is-counted" : ""
+            }${playBumped ? " is-bumped" : ""}`}
+            title="Play count"
+          >
             <EyeIcon />
             <span className="feed-count">{playCount}</span>
           </div>
@@ -1899,9 +2035,39 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
 export const Feed: React.FC = () => {
   const trackRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const ioRef = useRef<IntersectionObserver | null>(null);
   const loadingMoreRef = useRef(false);
   const currentVisibleRef = useRef<HTMLDivElement | null>(null);
+
+  // Where the picture actually is inside the video element. With contain the
+  // element still fills its box and the frame is letterboxed inside it, so
+  // controls anchored to the element land on the black bars rather than on the
+  // video. Published as CSS vars on the root, which is the one place both the
+  // per-item rail and the fixed nav arrows can read.
+  const syncPictureBox = useCallback(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const v = currentVisibleRef.current?.querySelector<HTMLVideoElement>("video");
+    let pillar = 0;
+    let letterbox = 0;
+    if (v && v.videoWidth > 0 && v.videoHeight > 0) {
+      const r = v.getBoundingClientRect();
+      // Read the resolved fit rather than guessing from the viewport: mobile
+      // and portrait clips still use cover, where there are no bars at all.
+      if (
+        r.width > 0 &&
+        r.height > 0 &&
+        window.getComputedStyle(v).objectFit === "contain"
+      ) {
+        const k = Math.min(r.width / v.videoWidth, r.height / v.videoHeight);
+        pillar = Math.max(0, (r.width - v.videoWidth * k) / 2);
+        letterbox = Math.max(0, (r.height - v.videoHeight * k) / 2);
+      }
+    }
+    root.style.setProperty("--feed-pillar", `${Math.round(pillar)}px`);
+    root.style.setProperty("--feed-letterbox", `${Math.round(letterbox)}px`);
+  }, []);
 
   const [scenes, setScenes] = useState<QueuedScene[]>([]);
   // Pixels removed from above the viewport by a trim, applied to scrollTop
@@ -1934,11 +2100,26 @@ export const Feed: React.FC = () => {
       try {
         localStorage.setItem(IMMERSIVE_KEY, next ? "1" : "0");
       } catch { /* ignore */ }
-      if (next) requestRealFullscreen();
-      else exitFullscreen();
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    const t = trackRef.current;
+    // A frame late, so the immersive class has been applied and the element
+    // has its new size before anything is measured.
+    const tick = () => requestAnimationFrame(syncPictureBox);
+    tick();
+    window.addEventListener("resize", tick);
+    document.addEventListener("fullscreenchange", tick);
+    // loadedmetadata does not bubble, so it is caught on the way down.
+    t?.addEventListener("loadedmetadata", tick, true);
+    return () => {
+      window.removeEventListener("resize", tick);
+      document.removeEventListener("fullscreenchange", tick);
+      t?.removeEventListener("loadedmetadata", tick, true);
+    };
+  }, [syncPictureBox, immersive]);
   // The side nav lives outside this component and sits above it (z-index 150
   // against the feed's 50), so a class on <body> is the only way to reach it.
   // Cleared on unmount so leaving the feed always gives the nav back.
@@ -1988,24 +2169,6 @@ export const Feed: React.FC = () => {
     };
   }, []);
 
-  // Leaving fullscreen by Escape or the system gesture should drop the mode
-  // too, otherwise the button and the screen disagree.
-  useEffect(() => {
-    function onFsChange() {
-      if (!isFullscreen() && localStorage.getItem(IMMERSIVE_KEY) === "1") {
-        setImmersive(false);
-        try {
-          localStorage.setItem(IMMERSIVE_KEY, "0");
-        } catch { /* ignore */ }
-      }
-    }
-    document.addEventListener("fullscreenchange", onFsChange);
-    document.addEventListener("webkitfullscreenchange", onFsChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", onFsChange);
-      document.removeEventListener("webkitfullscreenchange", onFsChange);
-    };
-  }, []);
   // ConfigurationContext is the source of truth for the global fast-mode
   // setting; localStorage only supplies first paint and the same-tab channel.
   const { configuration } = React.useContext(ConfigurationContext);
@@ -2544,6 +2707,8 @@ export const Feed: React.FC = () => {
           if (entry.intersectionRatio >= 0.7) {
             pendingItem = item;
             currentVisibleRef.current = item; // immediate for keyboard/persist reads
+            // A different scene means a different shape, so the bars move.
+            requestAnimationFrame(syncPictureBox);
             // Prime upcoming tiles at once, throttled to one rAF, so a swipe
             // that never settles still lands on a buffered video.
             if (primeRaf == null) {
@@ -2577,7 +2742,7 @@ export const Feed: React.FC = () => {
       track.removeEventListener("pointerdown", revealOnPress);
       io.disconnect();
     };
-  }, [scenes, muted, loadMore, persistCurrent]);
+  }, [scenes, muted, loadMore, persistCurrent, syncPictureBox]);
 
   // Keyboard nav. A ~220 ms ease-out-cubic slide, quicker than the browser's
   // ~300 ms smooth scroll, cancelling any in-flight slide so presses chain.
@@ -2616,6 +2781,24 @@ export const Feed: React.FC = () => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement | null)?.tagName ?? "";
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      // Cmd/Ctrl with plus, minus or zero zooms the picture instead of the
+      // page. Browsers do let these be intercepted, which is how drawing apps
+      // bind the same keys to their canvas.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+        const zoom =
+          e.key === "+" || e.key === "=" ? "in"
+          : e.key === "-" || e.key === "_" ? "out"
+          : e.key === "0" ? "reset"
+          : "";
+        if (zoom) {
+          e.preventDefault();
+          currentVisibleRef.current?.dispatchEvent(
+            new CustomEvent("feed-zoom", { detail: zoom })
+          );
+          return;
+        }
+      }
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       const t = trackRef.current;
       if (!t) return;
@@ -2662,9 +2845,15 @@ export const Feed: React.FC = () => {
           new CustomEvent("feed-delete-request")
         );
       } else if (e.key === "Escape") {
-        // Browsers already leave fullscreen on Escape, so this only matters
-        // when the page was put there some other way. Not prevented, since
-        // Escape has to keep working for anything else listening for it.
+        // Immersive is a page mode, so the browser will not undo it for us.
+        // Not prevented: Escape has to keep working for anything else
+        // listening, and it still leaves a native video fullscreen.
+        if (localStorage.getItem(IMMERSIVE_KEY) === "1") {
+          setImmersive(false);
+          try {
+            localStorage.setItem(IMMERSIVE_KEY, "0");
+          } catch { /* ignore */ }
+        }
         exitFullscreen();
       }
     }
@@ -2677,6 +2866,37 @@ export const Feed: React.FC = () => {
     if (!t) return;
     fastSlide(t, t.scrollTop + dir * t.clientHeight);
   }, [fastSlide]);
+
+  // One wheel gesture, one video. Without this a notch scrolls part of a tile
+  // and snap decides where it lands, and a trackpad flick runs through
+  // several. Pointer devices only: touch scrolling is already a swipe.
+  useEffect(() => {
+    const t = trackRef.current;
+    if (!t) return;
+    if (!window.matchMedia("(hover: hover)").matches) return;
+
+    // Momentum arrives as a continuous stream, a real gesture as a burst with
+    // a gap in front of it. Re-arming only after the stream goes quiet is what
+    // stops one flick from running through the queue.
+    const QUIET_MS = 140;
+    let lastAt = 0;
+    let armed = true;
+
+    function onWheel(e: WheelEvent) {
+      // Leave the browser's own zoom gesture alone.
+      if (e.ctrlKey || e.metaKey) return;
+      e.preventDefault();
+      const now = performance.now();
+      if (now - lastAt > QUIET_MS) armed = true;
+      lastAt = now;
+      if (!armed || Math.abs(e.deltaY) < 2) return;
+      armed = false;
+      scrollBy(e.deltaY > 0 ? 1 : -1);
+    }
+
+    t.addEventListener("wheel", onWheel, { passive: false });
+    return () => t.removeEventListener("wheel", onWheel);
+  }, [scrollBy]);
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
   const toggleCaptions = useCallback(() => {
@@ -2750,7 +2970,10 @@ export const Feed: React.FC = () => {
   }, []);
 
   return (
-    <div className={`feed-root${immersive ? " is-immersive" : ""}`}>
+    <div
+      className={`feed-root${immersive ? " is-immersive" : ""}`}
+      ref={rootRef}
+    >
       <div className="feed-track" ref={trackRef}>
         {scenes.map((s) => (
           <FeedItem

@@ -70,6 +70,7 @@ func (rs sceneRoutes) Routes() chi.Router {
 		r.Get("/stream.mpd/{segment}_a.webm", rs.StreamDASHAudioSegment)
 
 		r.Get("/poster.fast", rs.PosterFast)
+		r.Get("/waveform", rs.Waveform)
 		r.Get("/screenshot", rs.Screenshot)
 		r.Get("/preview", rs.Preview)
 		r.Get("/webp", rs.Webp)
@@ -116,6 +117,15 @@ func (rs sceneRoutes) PosterFast(w http.ResponseWriter, r *http.Request) {
 		SceneCoverGetter: rs.sceneFinder,
 	}
 	ss.ServeScenePosterFast(scene, w, r)
+}
+
+func (rs sceneRoutes) Waveform(w http.ResponseWriter, r *http.Request) {
+	scene := r.Context().Value(sceneKey).(*models.Scene)
+	ss := manager.SceneServer{
+		TxnManager:       rs.txnManager,
+		SceneCoverGetter: rs.sceneFinder,
+	}
+	ss.ServeSceneWaveform(scene, w, r)
 }
 
 func (rs sceneRoutes) StreamMp4(w http.ResponseWriter, r *http.Request) {
