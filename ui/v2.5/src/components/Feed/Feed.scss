@@ -152,16 +152,21 @@
   }
   .feed-video { object-fit: cover !important; }
   /* Stack actions floating over the video bottom-right edge */
-  .feed-actions {
+  /* Scoped to .feed-item so it outranks the bare `.feed-actions { max-height:
+     100% }` further down, which is equal specificity and would otherwise win
+     on source order and undo the cap below. */
+  .feed-item .feed-actions {
     position: absolute;
     right: 8px;
-    top: 8px;
     bottom: 40px;           /* clear the feed progress bar */
     align-self: auto;
     z-index: 4;
-    /* Bounded by the tile. Absolutely positioned and taller than the screen,
-       the rail ran past the tile's top edge and the next video's buttons
-       appeared over the one above it. */
+    /* Bounded by the tile, but anchored at the bottom. Pinning the top too
+       stretched the box to full height and the buttons ended up centred;
+       a max-height keeps them low and still clips a rail that is too tall
+       to fit, which is what stopped it spilling onto the tile above. */
+    justify-content: flex-end;
+    max-height: calc(100% - 48px);
     overflow: hidden;
   }
   .feed-action { width: 36px !important; height: 36px !important; }
@@ -994,9 +999,10 @@
     .feed-actions {
       position: absolute;
       right: calc(var(--feed-pillar, 0px) + 10px);
-      top: 12px;
       bottom: 34px;
       align-self: auto;
+      justify-content: flex-end;
+      max-height: calc(100% - 46px);
       overflow: hidden;
     }
 
