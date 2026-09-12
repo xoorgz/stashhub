@@ -51,6 +51,23 @@ interface BucketOpts {
   sceneFilter: GQL.SceneFilterType;
 }
 
+// Library size, fetched once. Ranked buckets need it to walk their whole
+// ranking instead of stopping at a few hardcoded pages. The promise is cached
+// so the first batch of concurrent ranked fetches shares one query.
+let totalCountPromise: Promise<number> | null = null;
+function totalSceneCount(): Promise<number> {
+  if (!totalCountPromise) {
+    totalCountPromise = client
+      .query<GQL.FindScenesQuery, GQL.FindScenesQueryVariables>({
+        query: GQL.FindScenesDocument,
+        variables: { filter: { per_page: 1, page: 1 }, scene_filter: {} },
+      })
+      .then((r) => r.data.findScenes.count)
+      .catch(() => 0);
+  }
+  return totalCountPromise;
+}
+
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return new Promise<T>((resolve) => {
     let done = false;
@@ -189,8 +206,9 @@ function rankedPool(perPage: number): number {
 // A fixed sort key returns the same head every time, so page 1 means the same
 // scenes every session however hard they are shuffled: order changes, the cast
 // does not. topWatched made it worse by feeding itself, since watching a scene
-// raises its play_duration and pins it near the top. Rotating the page moves
-// the pool instead, which is what a 2000 scene library needs.
+// raises its play_duration and pins it near the top. The page now walks the
+// ranking as the session progresses; this is only the floor when the library
+// size cannot be read.
 const RANKED_PAGES = 5;
 
 function shuffleInPlace<T>(arr: T[]): T[] {
@@ -278,12 +296,17 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   const fetchSlimStrict = (opts: BucketOpts) =>
     fetchSlim({ ...opts, sceneFilter: withStrict(opts.sceneFilter) });
 
-  // Rotate which slice of a ranked bucket is drawn from. Deep pages run out
-  // when few scenes qualify, so fall back to the head rather than hand back an
-  // empty bucket and lose its share of the queue.
+  // Walk a ranked bucket through its whole ranking over a session. Capping at
+  // a few pages made the feed re-serve the same few hundred hot scenes and then
+  // wrap; exclude grows with every scene seen, so it drives the page deeper
+  // until the entire library has been offered. A deep page that runs dry falls
+  // back to the head rather than handing back an empty bucket.
   const fetchRanked = async (opts: BucketOpts, perPage: number) => {
     const pool = rankedPool(perPage);
-    const page = 1 + Math.floor(Math.random() * RANKED_PAGES);
+    const total = await totalSceneCount();
+    const pages = total > 0 ? Math.max(1, Math.ceil(total / pool)) : RANKED_PAGES;
+    const progress = total > 0 ? exclude.size / total : 0;
+    const page = Math.min(pages, 1 + Math.floor(progress * pages));
     const ids = await fetchBucketStrict({
       ...opts,
       filter: { ...opts.filter, per_page: pool, page },
