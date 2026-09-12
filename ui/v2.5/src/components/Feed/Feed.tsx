@@ -2643,9 +2643,16 @@ export const Feed: React.FC = () => {
       // Only runs on a settled tile, never mid-fling.
       const excess = idx - KEEP_BEHIND;
       if (excess >= TRIM_CHUNK) {
-        const itemH = item.offsetHeight;
-        if (itemH > 0) {
-          pendingTrimRef.current += excess * itemH;
+        // Sum the real heights of the tiles being dropped, not excess x one
+        // height. Any tile can differ and a wrong total is what made the
+        // scroller visibly jump back over already-seen videos.
+        const dropped = Array.from(items).slice(0, excess);
+        const droppedH = dropped.reduce(
+          (sum, el) => sum + (el as HTMLElement).offsetHeight,
+          0
+        );
+        if (droppedH > 0) {
+          pendingTrimRef.current += droppedH;
           setScenes((prev) => prev.slice(excess));
         }
       }
@@ -2757,10 +2764,14 @@ export const Feed: React.FC = () => {
       if (!t) return;
       if (e.key === "ArrowDown" || e.key === "j") {
         e.preventDefault();
-        fastSlide(t, t.scrollTop + t.clientHeight);
+        const item = t.querySelector<HTMLElement>(".feed-item");
+        const step = item?.offsetHeight || t.clientHeight;
+        fastSlide(t, (Math.round(t.scrollTop / step) + 1) * step);
       } else if (e.key === "ArrowUp" || e.key === "k") {
         e.preventDefault();
-        fastSlide(t, t.scrollTop - t.clientHeight);
+        const item = t.querySelector<HTMLElement>(".feed-item");
+        const step = item?.offsetHeight || t.clientHeight;
+        fastSlide(t, (Math.round(t.scrollTop / step) - 1) * step);
       } else if (e.key === "ArrowRight" || e.key === "l" || e.key === "L") {
         // Seek the currently-visible video forward 10s and fire the same
         // pulse chip the edge-tap shows, so keyboard nav gets the same
@@ -2817,7 +2828,13 @@ export const Feed: React.FC = () => {
   const scrollBy = useCallback((dir: 1 | -1) => {
     const t = trackRef.current;
     if (!t) return;
-    fastSlide(t, t.scrollTop + dir * t.clientHeight);
+    // Step by the tile's measured height and round to the nearest boundary, so
+    // a slide always lands on a snap point. clientHeight differs from the tile
+    // height when dvh and the real viewport disagree, which left the scroller
+    // just off-snap and let mandatory snapping jump it back a tile.
+    const item = t.querySelector<HTMLElement>(".feed-item");
+    const step = item?.offsetHeight || t.clientHeight;
+    fastSlide(t, (Math.round(t.scrollTop / step) + dir) * step);
   }, [fastSlide]);
 
   // One wheel gesture, one video. Without this a notch scrolls part of a tile
