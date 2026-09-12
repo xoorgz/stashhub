@@ -60,6 +60,7 @@ const LIKES_KEY = "feed.likes";
 const LIKE_THRESHOLD = 5;
 const MUTED_KEY = "feed.muted";
 const CAPTIONS_KEY = "feed.captions";
+const HQ_KEY = "feed.hq";
 const CURRENT_KEY = "feed.currentSceneId";
 /** Display name for a scene. Shared so the browser tab and the on-screen
  *  caption can never disagree about what is playing. */
@@ -558,6 +559,8 @@ const FeedTitleTags: React.FC<{
 interface FeedItemProps {
   scene: Scene;
   fastModeEnabled: boolean;
+  hqOverride: boolean;
+  onToggleHq: () => void;
   muted: boolean;
   onToggleMute: () => void;
   captionsOn: boolean;
@@ -576,6 +579,8 @@ interface FeedItemProps {
 const FeedItem: React.FC<FeedItemProps> = ({
   scene,
   fastModeEnabled,
+  hqOverride,
+  onToggleHq,
   muted,
   onToggleMute,
   captionsOn,
@@ -698,9 +703,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     return () => document.removeEventListener("keydown", onKey, true);
   }, [confirmDelete]);
 
-  // Fast mode streams a pre-generated small/fast-start copy. A per-scene HQ
-  // override beats the global setting until the user swipes away.
-  const [hqOverride, setHqOverride] = useState(false);
+  // Fast mode streams a pre-generated small/fast-start copy. The HQ override
+  // is owned by the feed now, so it survives a swipe to the next video.
   const useFast = fastModeEnabled && !hqOverride;
   const fullSrc = useMemo(
     () => relativize(scene.paths.stream || scene.paths.preview),
@@ -1837,7 +1841,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
               }
               onClick={(e) => {
                 e.preventDefault();
-                setHqOverride((v) => !v);
+                onToggleHq();
               }}
             >
               <FastModeIcon filled={useFast} />
@@ -2028,6 +2032,11 @@ export const Feed: React.FC = () => {
   const INTERACTIVE_KEY = "feed.interactive";
   const [interactiveOn, setInteractiveOn] = useState<boolean>(
     () => sessionStorage.getItem(INTERACTIVE_KEY) !== "0"
+  );
+  // Full-quality override for fast mode. Lifted to the feed so it holds across
+  // videos instead of snapping back to fast mode on every swipe.
+  const [hqOverride, setHqOverride] = useState<boolean>(
+    () => sessionStorage.getItem(HQ_KEY) === "1"
   );
   // Immersive mode sticks across sessions: it is a way of watching, not a
   // per-visit toggle. Also takes real fullscreen where the browser allows it,
@@ -2266,6 +2275,9 @@ export const Feed: React.FC = () => {
   useEffect(() => {
     sessionStorage.setItem(CAPTIONS_KEY, captionsOn ? "1" : "0");
   }, [captionsOn]);
+  useEffect(() => {
+    sessionStorage.setItem(HQ_KEY, hqOverride ? "1" : "0");
+  }, [hqOverride]);
 
   // Initial load. Resumes the saved scene if one is present.
   useEffect(() => {
@@ -2854,6 +2866,13 @@ export const Feed: React.FC = () => {
       return next;
     });
   }, []);
+  const toggleHq = useCallback(() => {
+    setHqOverride((v) => {
+      const next = !v;
+      try { sessionStorage.setItem(HQ_KEY, next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   // Drop splash spawner, burst outward in a radial pattern, with a downward
   // bias and rotation for a "wet" feel. Travels far so the whole viewport sees
   // it, not just a small area near the button.
@@ -2921,6 +2940,8 @@ export const Feed: React.FC = () => {
             key={s.__uid}
             scene={s}
             fastModeEnabled={fastModeEnabled}
+            hqOverride={hqOverride}
+            onToggleHq={toggleHq}
             muted={muted}
             onToggleMute={toggleMute}
             captionsOn={captionsOn}
