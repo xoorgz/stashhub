@@ -1837,7 +1837,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
               title={
                 useFast
                   ? "Playing fast mode. Tap for full quality."
-                  : "Full quality for this video. Tap to go back to fast mode."
+                  : "Full quality. Tap to go back to fast mode."
               }
               onClick={(e) => {
                 e.preventDefault();
@@ -2707,6 +2707,13 @@ export const Feed: React.FC = () => {
   // Keyboard nav. A ~220 ms ease-out-cubic slide, quicker than the browser's
   // ~300 ms smooth scroll, cancelling any in-flight slide so presses chain.
   const slideRafRef = useRef<number | null>(null);
+  // Where an in-flight slide is heading. Stepping from the live scrollTop meant
+  // a second press during the 220ms animation rounded back to the tile already
+  // being left and re-targeted the same one, so quick presses were swallowed.
+  const slideTargetRef = useRef<number | null>(null);
+  // The key handler is installed before scrollBy exists, so it calls through a
+  // ref rather than duplicating the stepping maths.
+  const scrollByRef = useRef<(dir: 1 | -1) => void>(() => {});
   const fastSlide = useCallback((track: HTMLElement, target: number) => {
     if (slideRafRef.current != null) {
       cancelAnimationFrame(slideRafRef.current);
@@ -2715,6 +2722,7 @@ export const Feed: React.FC = () => {
     const startTop = track.scrollTop;
     const dist = target - startTop;
     if (dist === 0) return;
+    slideTargetRef.current = target;
     // scroll-snap-type: mandatory re-snaps every frame and would teleport the
     // animated scrollTop, so disable snap for the duration and restore after.
     const prevSnap = track.style.scrollSnapType;
@@ -2731,6 +2739,7 @@ export const Feed: React.FC = () => {
         slideRafRef.current = requestAnimationFrame(step);
       } else {
         slideRafRef.current = null;
+        slideTargetRef.current = null;
         track.style.scrollSnapType = prevSnap;
       }
     };
@@ -2764,14 +2773,10 @@ export const Feed: React.FC = () => {
       if (!t) return;
       if (e.key === "ArrowDown" || e.key === "j") {
         e.preventDefault();
-        const item = t.querySelector<HTMLElement>(".feed-item");
-        const step = item?.offsetHeight || t.clientHeight;
-        fastSlide(t, (Math.round(t.scrollTop / step) + 1) * step);
+        scrollByRef.current(1);
       } else if (e.key === "ArrowUp" || e.key === "k") {
         e.preventDefault();
-        const item = t.querySelector<HTMLElement>(".feed-item");
-        const step = item?.offsetHeight || t.clientHeight;
-        fastSlide(t, (Math.round(t.scrollTop / step) - 1) * step);
+        scrollByRef.current(-1);
       } else if (e.key === "ArrowRight" || e.key === "l" || e.key === "L") {
         // Seek the currently-visible video forward 10s and fire the same
         // pulse chip the edge-tap shows, so keyboard nav gets the same
@@ -2834,8 +2839,18 @@ export const Feed: React.FC = () => {
     // just off-snap and let mandatory snapping jump it back a tile.
     const item = t.querySelector<HTMLElement>(".feed-item");
     const step = item?.offsetHeight || t.clientHeight;
-    fastSlide(t, (Math.round(t.scrollTop / step) + dir) * step);
+    // Count from where the current slide is going, not where it is now, so a
+    // press during the animation advances a further tile. Only while one is
+    // actually running: a native touch scroll would leave the target stale.
+    const base =
+      slideRafRef.current != null && slideTargetRef.current != null
+        ? slideTargetRef.current
+        : t.scrollTop;
+    fastSlide(t, (Math.round(base / step) + dir) * step);
   }, [fastSlide]);
+  useEffect(() => {
+    scrollByRef.current = scrollBy;
+  }, [scrollBy]);
 
   // One wheel gesture, one video. Without this a notch scrolls part of a tile
   // and snap decides where it lands, and a trackpad flick runs through

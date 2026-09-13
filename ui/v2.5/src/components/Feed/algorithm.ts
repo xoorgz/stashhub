@@ -68,6 +68,28 @@ function totalSceneCount(): Promise<number> {
   return totalCountPromise;
 }
 
+// Rows a bucket's own filter matches. Paging against the library total instead
+// walked straight off the end of every filtered bucket: "liked" holds ~500 of
+// 2676 scenes, "top O-count" ~180, so the computed page exceeded their last
+// real page early on, came back empty, and fell back to page 1 forever. That
+// is what pinned the feed to the same few hundred scenes.
+const bucketCountCache = new Map<string, Promise<number>>();
+function bucketCount(sceneFilter: GQL.SceneFilterType): Promise<number> {
+  const key = JSON.stringify(sceneFilter);
+  let hit = bucketCountCache.get(key);
+  if (!hit) {
+    hit = client
+      .query<GQL.FindScenesQuery, GQL.FindScenesQueryVariables>({
+        query: GQL.FindScenesDocument,
+        variables: { filter: { per_page: 1, page: 1 }, scene_filter: sceneFilter },
+      })
+      .then((r) => r.data.findScenes.count)
+      .catch(() => 0);
+    bucketCountCache.set(key, hit);
+  }
+  return hit;
+}
+
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return new Promise<T>((resolve) => {
     let done = false;
@@ -303,9 +325,15 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   // back to the head rather than handing back an empty bucket.
   const fetchRanked = async (opts: BucketOpts, perPage: number) => {
     const pool = rankedPool(perPage);
-    const total = await totalSceneCount();
-    const pages = total > 0 ? Math.max(1, Math.ceil(total / pool)) : RANKED_PAGES;
-    const progress = total > 0 ? exclude.size / total : 0;
+    // Page count comes from the bucket's own rows; how far to walk comes from
+    // the library, since progress is "how much have I seen overall".
+    const [total, rows] = await Promise.all([
+      totalSceneCount(),
+      bucketCount(withStrict(opts.sceneFilter)),
+    ]);
+    const span = rows > 0 ? rows : total;
+    const pages = span > 0 ? Math.max(1, Math.ceil(span / pool)) : RANKED_PAGES;
+    const progress = total > 0 ? Math.min(1, exclude.size / total) : 0;
     const page = Math.min(pages, 1 + Math.floor(progress * pages));
     const ids = await fetchBucketStrict({
       ...opts,
