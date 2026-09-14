@@ -1006,6 +1006,42 @@
       overflow: hidden;
     }
 
+    /* The rail is eleven items tall, about 616px at full size. Our fullscreen
+       stays inside the browser window now, so the viewport is the window, not
+       the screen, and on a laptop that stack reaches the top edge: anchored to
+       the bottom, but too tall to read as a bottom cluster. The height rules
+       further down the file were meant to handle this, but they are single
+       class selectors and these immersive ones outrank them, so immersive was
+       looser on a short window than the normal feed. Compact it here instead,
+       where the specificity matches. Each step keeps the count badge clear of
+       the button below it: badge reaches 17-18px under a button, so the
+       margin plus the gap stays at or above that. */
+    @media (max-height: 900px) {
+      .feed-actions { gap: 7px; }
+      .feed-action,
+      .feed-avatar { width: 36px; height: 36px; }
+      .feed-action.feed-like-btn,
+      .feed-action.feed-o-btn,
+      .feed-action.feed-play-count { margin-bottom: 14px; }
+    }
+    @media (max-height: 780px) {
+      .feed-actions { gap: 6px; }
+      .feed-action,
+      .feed-avatar { width: 34px; height: 34px; }
+      .feed-action.feed-like-btn,
+      .feed-action.feed-o-btn,
+      .feed-action.feed-play-count { margin-bottom: 13px; }
+      .feed-action .feed-count { bottom: -17px; font-size: 11px; line-height: 14px; }
+    }
+    @media (max-height: 680px) {
+      .feed-actions { gap: 5px; }
+      .feed-action,
+      .feed-avatar { width: 32px; height: 32px; }
+      .feed-action.feed-like-btn,
+      .feed-action.feed-o-btn,
+      .feed-action.feed-play-count { margin-bottom: 12px; }
+    }
+
     /* Out of the way while the picture is magnified. Zoomed is the one time
        the frame is worth more than the buttons. They keep taking pointer
        events while invisible, which is what lets moving onto them bring them
