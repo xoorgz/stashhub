@@ -966,6 +966,37 @@
   /* Nothing that destroys a file belongs under a thumb while watching. */
   .feed-delete-btn { display: none; }
 
+  /* Phone: immersive adds picture-in-picture and native fullscreen and drops
+     delete, so the rail is twelve items. At 36px with 10px gaps that is ~618px
+     against a ~670px visual viewport, so it is bottom anchored but spans the
+     whole screen and reads as stuck to the top. The height rules further down
+     were meant to compact it, but they are single class selectors and every
+     immersive rule outranks them, so immersive stayed at full size. Compact it
+     here, at matching specificity. Sizes need !important because the mobile
+     breakpoint sets them that way, and !important beats specificity. */
+  @media (max-width: 640px) {
+    .feed-actions { gap: 6px; padding-bottom: 10px; }
+    .feed-action,
+    .feed-avatar { width: 34px !important; height: 34px !important; }
+    .feed-action svg { width: 20px; height: 20px; }
+    .feed-action.feed-like-btn,
+    .feed-action.feed-o-btn,
+    .feed-action.feed-play-count { margin-bottom: 13px; }
+    /* Badge reaches 16px under its button, so margin plus gap stays above it. */
+    .feed-action .feed-count { bottom: -16px; font-size: 10px; line-height: 13px; }
+
+    @media (max-height: 720px) {
+      .feed-actions { gap: 4px; padding-bottom: 8px; }
+      .feed-action,
+      .feed-avatar { width: 30px !important; height: 30px !important; }
+      .feed-action svg { width: 18px; height: 18px; }
+      .feed-action.feed-like-btn,
+      .feed-action.feed-o-btn,
+      .feed-action.feed-play-count { margin-bottom: 11px; }
+      .feed-action .feed-count { bottom: -14px; font-size: 10px; line-height: 12px; }
+    }
+  }
+
   /* Minimal overlay: drop the tag pills, which are for browsing rather than
      watching. The title itself keeps the size, weight and chips it has in the
      normal feed, so switching views does not restyle it. */
