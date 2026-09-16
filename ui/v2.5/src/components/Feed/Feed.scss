@@ -65,6 +65,10 @@
   overflow-x: hidden;
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
+  /* Trimming tiles off the top is compensated in JS. Chrome also does it by
+     itself through scroll anchoring, and the two together moved the scroller
+     twice, dropping it several videos back to replay what was just watched. */
+  overflow-anchor: none;
   scrollbar-width: none;
   -ms-overflow-style: none;
   /* Vertical panning is always the browser's, from anywhere in the feed.

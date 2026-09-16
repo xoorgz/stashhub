@@ -2018,6 +2018,16 @@ export const Feed: React.FC = () => {
   // Pixels removed from above the viewport by a trim, applied to scrollTop
   // before the browser paints so the view never jumps.
   const pendingTrimRef = useRef(0);
+  const slideRafRef = useRef<number | null>(null);
+  // Start and destination of an in-flight slide, held in refs rather than the
+  // animation's closure so a trim can shift both. Stepping from the live
+  // scrollTop also meant a second press during the 220ms animation rounded back
+  // to the tile being left and re-targeted it, swallowing quick presses.
+  const slideStartRef = useRef(0);
+  const slideTargetRef = useRef<number | null>(null);
+  // The key handler is installed before scrollBy exists, so it calls through a
+  // ref rather than duplicating the stepping maths.
+  const scrollByRef = useRef<(dir: 1 | -1) => void>(() => {});
   const [loadedIds] = useState<Set<string>>(() => new Set());
   const [feedState, setFeedState] = useState<"loading" | "ready" | "empty">("loading");
   const [reloadKey, setReloadKey] = useState(0);
@@ -2455,7 +2465,15 @@ export const Feed: React.FC = () => {
     if (!px) return;
     pendingTrimRef.current = 0;
     const track = trackRef.current;
-    if (track) track.scrollTop = Math.max(0, track.scrollTop - px);
+    if (!track) return;
+    track.scrollTop = Math.max(0, track.scrollTop - px);
+    // A slide in flight holds coordinates from before the trim. Without this
+    // its next frame writes the old scrollTop straight back and the feed lands
+    // several tiles above where it was, replaying what was just watched.
+    if (slideRafRef.current != null) {
+      slideStartRef.current -= px;
+      if (slideTargetRef.current != null) slideTargetRef.current -= px;
+    }
   }, [scenes]);
 
   // IntersectionObserver: play/pause + lazy src + load more + meta show
@@ -2706,22 +2724,14 @@ export const Feed: React.FC = () => {
 
   // Keyboard nav. A ~220 ms ease-out-cubic slide, quicker than the browser's
   // ~300 ms smooth scroll, cancelling any in-flight slide so presses chain.
-  const slideRafRef = useRef<number | null>(null);
-  // Where an in-flight slide is heading. Stepping from the live scrollTop meant
-  // a second press during the 220ms animation rounded back to the tile already
-  // being left and re-targeted the same one, so quick presses were swallowed.
-  const slideTargetRef = useRef<number | null>(null);
-  // The key handler is installed before scrollBy exists, so it calls through a
-  // ref rather than duplicating the stepping maths.
-  const scrollByRef = useRef<(dir: 1 | -1) => void>(() => {});
   const fastSlide = useCallback((track: HTMLElement, target: number) => {
     if (slideRafRef.current != null) {
       cancelAnimationFrame(slideRafRef.current);
       slideRafRef.current = null;
     }
     const startTop = track.scrollTop;
-    const dist = target - startTop;
-    if (dist === 0) return;
+    if (target === startTop) return;
+    slideStartRef.current = startTop;
     slideTargetRef.current = target;
     // scroll-snap-type: mandatory re-snaps every frame and would teleport the
     // animated scrollTop, so disable snap for the duration and restore after.
@@ -2734,7 +2744,10 @@ export const Feed: React.FC = () => {
       const elapsed = ts - startTs;
       const p = Math.min(1, elapsed / duration);
       const ease = 1 - Math.pow(1 - p, 3);
-      track.scrollTop = startTop + dist * ease;
+      // Read both ends back each frame: a trim between frames rewrites them.
+      const from = slideStartRef.current;
+      const to = slideTargetRef.current ?? target;
+      track.scrollTop = from + (to - from) * ease;
       if (p < 1) {
         slideRafRef.current = requestAnimationFrame(step);
       } else {
