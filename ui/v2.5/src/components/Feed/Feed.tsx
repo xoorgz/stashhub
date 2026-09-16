@@ -2660,7 +2660,7 @@ export const Feed: React.FC = () => {
       // Drop tiles far above the active one, each holds a <video> and a poster.
       // Only runs on a settled tile, never mid-fling.
       const excess = idx - KEEP_BEHIND;
-      if (excess >= TRIM_CHUNK) {
+      if (excess >= TRIM_CHUNK && pendingTrimRef.current === 0) {
         // Sum the real heights of the tiles being dropped, not excess x one
         // height. Any tile can differ and a wrong total is what made the
         // scroller visibly jump back over already-seen videos.
@@ -2730,12 +2730,22 @@ export const Feed: React.FC = () => {
       slideRafRef.current = null;
     }
     const startTop = track.scrollTop;
-    if (target === startTop) return;
+    if (target === startTop) {
+      // Nothing to animate, but a cancelled slide may have left snapping off.
+      track.style.scrollSnapType = "";
+      slideTargetRef.current = null;
+      return;
+    }
     slideStartRef.current = startTop;
     slideTargetRef.current = target;
     // scroll-snap-type: mandatory re-snaps every frame and would teleport the
-    // animated scrollTop, so disable snap for the duration and restore after.
-    const prevSnap = track.style.scrollSnapType;
+    // animated scrollTop, so turn it off for the duration. Never save and
+    // restore the old inline value: a second press mid-slide read back the
+    // "none" the first one had just set, restored that on finishing, and
+    // snapping stayed off for the rest of the session. The feed could then rest
+    // between two tiles, where neither reaches the 0.7 ratio the observer needs,
+    // so nothing played and it sat there until enough presses shoved it over.
+    // Clearing the inline value instead hands control back to the stylesheet.
     track.style.scrollSnapType = "none";
     const duration = 220;
     let startTs: number | null = null;
@@ -2753,7 +2763,7 @@ export const Feed: React.FC = () => {
       } else {
         slideRafRef.current = null;
         slideTargetRef.current = null;
-        track.style.scrollSnapType = prevSnap;
+        track.style.scrollSnapType = "";
       }
     };
     slideRafRef.current = requestAnimationFrame(step);
