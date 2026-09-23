@@ -2600,19 +2600,32 @@ export const Feed: React.FC = () => {
     // Driven from the settle path on purpose: flying past a hundred tiles must
     // not queue a hundred downloads, and the list doubles as the cancel signal
     // for whatever was wanted a moment ago.
+    function isDesktopClient() {
+      return typeof window.matchMedia === "function"
+        && window.matchMedia("(hover: hover)").matches;
+    }
+
     function cacheAhead(activeItem: HTMLDivElement) {
       if (!fastModeRef.current) return;
       const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
       const idx = items.indexOf(activeItem);
       if (idx === -1) return;
-      // The scene playing plus the next one. Caching the current one does mean
-      // fetching it a second time, which is why it was dropped before, but
+      // The scene playing plus the ones after it. Caching the current one does
+      // mean fetching it a second time, which is why it was dropped before, but
       // without it every seek inside the video you are actually watching goes
       // to the network: measured at 32 seconds on one jump. This only runs once
       // playback is under way, and the worker abandons it the moment you move
       // on, so it no longer competes with a cold start.
+      //
+      // Two ahead on desktop: the uplink sits around 2% used and bulk clients
+      // are capped at the proxy now, so the bytes are free, and holding a key
+      // down used to outrun a single-tile lookahead. Phones stay at one, where
+      // the cost is battery and heat rather than bandwidth. The worker cancels
+      // whatever is no longer wanted, so overshooting on a fast scroll is
+      // abandoned rather than paid for.
+      const ahead = isDesktopClient() ? 2 : 1;
       const urls: string[] = [];
-      for (let i = idx; i <= Math.min(items.length - 1, idx + 1); i++) {
+      for (let i = idx; i <= Math.min(items.length - 1, idx + ahead); i++) {
         const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
         const src = v?.dataset.src;
         if (src && /\/stream\.fast(?:$|[?#])/.test(src)) {

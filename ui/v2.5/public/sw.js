@@ -9,14 +9,14 @@
  * reloading disables it entirely.
  */
 
-const CACHE = "stashhub-feed-v1";
+const CACHE = "stashhub-feed-v2";
 
 // A rolling window, not an archive. Watching a thousand scenes a week is tens
 // of gigabytes; keeping them would fill a phone and wear its flash for no
 // gain, since an endless shuffle rarely returns to the same scene. Only what
 // is in play needs to be here: what you are watching, what you just left, and
 // what is next.
-const MAX_ENTRIES = 8;
+const MAX_ENTRIES = 14;
 
 // Ceiling, lowered further at runtime to a slice of whatever the device
 // actually has free.
@@ -50,7 +50,22 @@ const inflight = new Map();
 let disabled = false;
 
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+// Claim clients, and drop caches from earlier versions. Without this a version
+// bump strands the old cache, holding up to its full budget of the user's
+// storage quota forever.
+self.addEventListener("activate", (e) =>
+  e.waitUntil(
+    (async () => {
+      const names = await caches.keys();
+      await Promise.all(
+        names
+          .filter((n) => n.startsWith("stashhub-feed-") && n !== CACHE)
+          .map((n) => caches.delete(n))
+      );
+      await self.clients.claim();
+    })()
+  )
+);
 
 /** Cache key without the apikey query, so the same file is not stored twice
  *  under two URLs when the token is refreshed. */
