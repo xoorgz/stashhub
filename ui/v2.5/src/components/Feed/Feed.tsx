@@ -55,7 +55,7 @@ const VIEWED_KEY = "feed.viewedIds";
 const VIEWED_LIMIT = 500;
 // How many just-served scenes to hold back when a new cycle starts, so nothing
 // repeats right at the boundary.
-const RECYCLE_KEEP = 25;
+const RECYCLE_KEEP = 200;
 const LIKES_KEY = "feed.likes";
 const LIKE_THRESHOLD = 5;
 const MUTED_KEY = "feed.muted";
@@ -84,7 +84,7 @@ const SKIPPED_TAGS_KEY = "feed.skips.tags";
 const SCENE_SKIPS_KEY = "feed.skips.scenes";
 const SCENE_SKIPS_MAX = 3000;
 const QUEUE_TARGET = 30;
-const REFILL_AT = 5;
+const REFILL_AT = 10;
 
 const HEART_COLORS = ["#ff3b6b", "#ff1744", "#ff5070", "#ff7090", "#ff2d55", "#ff6086"];
 
@@ -2437,8 +2437,16 @@ export const Feed: React.FC = () => {
       const exclude = new Set([...viewed, ...loadedIds]);
       let ids = await buildQueue({ targetCount: 20, exclude });
       let details = await fetchSceneDetails(ids);
-      // Endless feed: when the dedup build returns nothing, reshuffle the whole
-      // library and hold back only the last few tiles.
+      if (details.length === 0) {
+        // Buckets draw a page each; one page can come back fully watched. A
+        // wider draw reseeds the random bucket and pulls deeper ranked pages,
+        // which is nearly always enough to avoid replaying anything.
+        ids = await buildQueue({ targetCount: 60, exclude });
+        details = await fetchSceneDetails(ids);
+      }
+      // Endless feed: only once a wider draw also comes back empty is the
+      // library genuinely exhausted. Reshuffle it and hold back what was seen
+      // most recently.
       if (details.length === 0) {
         const recentList = Array.from(loadedIds).slice(-RECYCLE_KEEP);
         const recent = new Set(recentList);
@@ -2687,6 +2695,14 @@ export const Feed: React.FC = () => {
             currentVisibleRef.current = item; // immediate for keyboard/persist reads
             // A different scene means a different shape, so the bars move.
             requestAnimationFrame(syncPictureBox);
+            // Refill here rather than only in activate(): that sits behind the
+            // settle timer, so a held key never triggers it and the feed runs
+            // out of tiles with nothing left to scroll onto.
+            {
+              const all = track.querySelectorAll(".feed-item");
+              const at = Array.prototype.indexOf.call(all, item);
+              if (at !== -1 && all.length - at <= REFILL_AT) loadMore();
+            }
             // Prime upcoming tiles at once, throttled to one rAF, so a swipe
             // that never settles still lands on a buffered video.
             if (primeRaf == null) {
