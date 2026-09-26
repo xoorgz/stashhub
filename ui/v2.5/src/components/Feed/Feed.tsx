@@ -1983,6 +1983,8 @@ export const Feed: React.FC = () => {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const ioRef = useRef<IntersectionObserver | null>(null);
   const loadingMoreRef = useRef(false);
+  // Consecutive refills that came back empty. See loadMore.
+  const emptyBuildsRef = useRef(0);
   const currentVisibleRef = useRef<HTMLDivElement | null>(null);
 
   // Where the picture actually is inside the video element. With contain the
@@ -2444,10 +2446,21 @@ export const Feed: React.FC = () => {
         ids = await buildQueue({ targetCount: 60, exclude });
         details = await fetchSceneDetails(ids);
       }
-      // Endless feed: only once a wider draw also comes back empty is the
-      // library genuinely exhausted. Reshuffle it and hold back what was seen
-      // most recently.
+      // An empty build is far more often a failure than an exhausted library.
+      // Every bucket query sits behind a 30s timeout that resolves to an empty
+      // list, so a slow server returns nothing at all. Recycling on that wiped
+      // the viewed history for good and replayed everything already watched:
+      // a transient slowdown became a permanent loop. So an empty build now
+      // just ends this attempt and the next scroll tries again, and only a
+      // run of them in a row is taken to mean the library is spent.
       if (details.length === 0) {
+        emptyBuildsRef.current += 1;
+        if (emptyBuildsRef.current < 3) return;
+      } else {
+        emptyBuildsRef.current = 0;
+      }
+      if (details.length === 0) {
+        emptyBuildsRef.current = 0;
         const recentList = Array.from(loadedIds).slice(-RECYCLE_KEEP);
         const recent = new Set(recentList);
         loadedIds.clear();
