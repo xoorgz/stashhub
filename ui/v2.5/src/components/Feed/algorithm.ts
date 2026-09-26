@@ -1,5 +1,6 @@
 import * as GQL from "src/core/generated-graphql";
 import { getClient } from "src/core/StashService";
+import { baseURL } from "src/core/createClient";
 import {
   loadAlgorithmSettings,
   AlgorithmSettings,
@@ -232,6 +233,35 @@ function rankedPool(perPage: number): number {
 // ranking as the session progresses; this is only the floor when the library
 // size cannot be read.
 const RANKED_PAGES = 5;
+
+// What a recent like adds on top of the all-time count. At 1, three likes in
+// the past week roughly quadruple a scene's pull against its count alone.
+const LIKE_RECENCY_BOOST = 1;
+
+/** [likes, recency] per liked scene id. Empty on failure, which callers treat
+ *  as "no scores" and fall back to the plain ranking. */
+async function fetchLikeScores(): Promise<Map<string, [number, number]>> {
+  const body = await withTimeout(
+    fetch(`${baseURL}scene/like-scores`, { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : {}))
+      .catch(() => ({})),
+    15_000,
+    {}
+  );
+  return new Map(Object.entries(body as Record<string, [number, number]>));
+}
+
+/** Weighted random order (Efraimidis-Spirakis). Every item appears once; the
+ *  chance of landing early is proportional to its weight. */
+function weightedShuffle<T>(items: T[], weight: (item: T) => number): T[] {
+  return items
+    .map((item) => ({
+      item,
+      key: Math.pow(Math.random(), 1 / Math.max(weight(item), 1e-6)),
+    }))
+    .sort((a, b) => b.key - a.key)
+    .map((x) => x.item);
+}
 
 function shuffleInPlace<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -471,34 +501,52 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
     );
   }
 
-  // Liked. Fetch top N by like_count desc, then shuffle client-side since
-  // a single sort key cannot combine ordering and randomization.
+  // Liked. Weighted by sqrt(likes), raised for likes given recently, so a
+  // scene with 200 likes surfaces more than one with 10 and a fresh favourite
+  // more than an old one. The square root keeps a handful of top scenes from
+  // taking over the bucket and looping. Drawn from the whole liked pool rather
+  // than walking pages by like count, which moved away from the best liked as
+  // a session went on.
   if (settings.likedEnabled && settings.likedWeight > 0) {
     fetches.push(
       (async () => {
         const perPage = pageFor(settings.likedWeight);
-        // Filtered to actually-liked scenes so rotating onto a deeper page
-        // still returns likes rather than sliding into unliked filler.
-        const ids = await fetchRanked(
-          {
-            filter: {
-              sort: "like_count",
-              direction: GQL.SortDirectionEnum.Desc,
-            },
-            sceneFilter: {
-              like_count: {
-                value: 0,
-                modifier: GQL.CriterionModifier.GreaterThan,
-              },
-            },
-          },
-          perPage
+        const scores = await fetchLikeScores();
+        const filtered = strictTagIds.length > 0 || ccActive || toyActive;
+
+        // An active chip or CC/toy filter can only be applied by the server,
+        // and a failed score fetch leaves nothing to draw from, so both take
+        // the old ranked page and weight whatever it returns.
+        const candidates =
+          filtered || scores.size === 0
+            ? await fetchRanked(
+                {
+                  filter: {
+                    sort: "like_count",
+                    direction: GQL.SortDirectionEnum.Desc,
+                  },
+                  sceneFilter: {
+                    like_count: {
+                      value: 0,
+                      modifier: GQL.CriterionModifier.GreaterThan,
+                    },
+                  },
+                },
+                perPage
+              )
+            : Array.from(scores.keys());
+
+        const ids = weightedShuffle(
+          candidates.filter((id) => !exclude.has(id)),
+          (id) => {
+            const [likes, recency] = scores.get(id) ?? [1, 0];
+            return Math.sqrt(Math.max(likes, 1)) * (1 + LIKE_RECENCY_BOOST * recency);
+          }
         );
-        // Fisher-Yates shuffle on the descending-by-likes window.
         return {
           name: "liked",
           weight: settings.likedWeight,
-          ids: shuffleInPlace(ids).slice(0, perPage),
+          ids: ids.slice(0, perPage * 3),
         };
       })()
     );

@@ -3,10 +3,13 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -53,6 +56,8 @@ type sceneRoutes struct {
 
 func (rs sceneRoutes) Routes() chi.Router {
 	r := chi.NewRouter()
+
+	r.Get("/like-scores", rs.LikeScores)
 
 	r.Route("/{sceneId}", func(r chi.Router) {
 		r.Use(rs.SceneCtx)
@@ -126,6 +131,63 @@ func (rs sceneRoutes) Waveform(w http.ResponseWriter, r *http.Request) {
 		SceneCoverGetter: rs.sceneFinder,
 	}
 	ss.ServeSceneWaveform(scene, w, r)
+}
+
+// likeScoreGetter is met by the sqlite scene store. Asserted rather than added
+// to the shared interface, which the test mocks would then have to grow.
+type likeScoreGetter interface {
+	GetLikeCounts(ctx context.Context) (map[int]int, error)
+	GetLikeDatesSince(ctx context.Context, since time.Time) (map[int][]time.Time, error)
+}
+
+// LikeScores returns, for every liked scene, its like count and a recency score
+// where each like adds 0.5^(age/half_life_days): a like today counts 1, one a
+// half-life ago 0.5. The feed weights its liked bucket by both.
+func (rs sceneRoutes) LikeScores(w http.ResponseWriter, r *http.Request) {
+	getter, ok := rs.sceneFinder.(likeScoreGetter)
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
+		return
+	}
+
+	halfLife := 14.0
+	if v, err := strconv.ParseFloat(r.URL.Query().Get("half_life_days"), 64); err == nil && v > 0 {
+		halfLife = v
+	}
+	// Past six half-lives a like is worth under 2%, not worth reading.
+	now := time.Now()
+	since := now.Add(-time.Duration(halfLife * 6 * float64(24*time.Hour)))
+
+	var counts map[int]int
+	var dates map[int][]time.Time
+	if err := rs.withReadTxn(r, func(ctx context.Context) error {
+		var err error
+		if counts, err = getter.GetLikeCounts(ctx); err != nil {
+			return err
+		}
+		dates, err = getter.GetLikeDatesSince(ctx, since)
+		return err
+	}); err != nil {
+		if !errors.Is(err, context.Canceled) {
+			logger.Warnf("like scores: %v", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// [likes, recency] per scene id.
+	out := make(map[string][2]float64, len(counts))
+	for id, likes := range counts {
+		var recency float64
+		for _, d := range dates[id] {
+			recency += math.Pow(0.5, now.Sub(d).Hours()/24/halfLife)
+		}
+		out[strconv.Itoa(id)] = [2]float64{float64(likes), math.Round(recency*1000) / 1000}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func (rs sceneRoutes) StreamMp4(w http.ResponseWriter, r *http.Request) {

@@ -218,6 +218,14 @@ var (
 		},
 		dateColumn: goqu.T(scenesODatesTable).Col(sceneODateColumn),
 	}
+
+	scenesLikeTableMgr = &viewHistoryTable{
+		table: table{
+			table:    goqu.T(scenesLikeDatesTable),
+			idColumn: goqu.T(scenesLikeDatesTable).Col(sceneIDColumn),
+		},
+		dateColumn: goqu.T(scenesLikeDatesTable).Col(sceneLikeDateColumn),
+	}
 )
 
 var (

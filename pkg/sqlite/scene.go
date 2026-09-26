@@ -37,6 +37,8 @@ const (
 	sceneViewDateColumn   = "view_date"
 	scenesODatesTable     = "scenes_o_dates"
 	sceneODateColumn      = "o_date"
+	scenesLikeDatesTable  = "scenes_like_dates"
+	sceneLikeDateColumn   = "like_date"
 
 	sceneCoverBlobColumn = "cover_blob"
 )
@@ -489,14 +491,73 @@ func (qb *SceneStore) Destroy(ctx context.Context, id int) error {
 }
 
 // SetLikeCount writes the like_count column for a scene. Negative values are
-// clamped to 0.
+// clamped to 0. The like history follows the count: a rise records one dated
+// row per like, a fall removes the most recent ones.
 func (qb *SceneStore) SetLikeCount(ctx context.Context, id int, value int) error {
 	if value < 0 {
 		value = 0
 	}
+
+	var current int
+	if err := dbWrapper.Get(ctx, &current, "SELECT like_count FROM scenes WHERE id = ?", id); err != nil {
+		return fmt.Errorf("reading like_count: %w", err)
+	}
+
 	stmt := "UPDATE scenes SET like_count = ?, updated_at = ? WHERE id = ?"
-	_, err := dbWrapper.Exec(ctx, stmt, value, time.Now(), id)
-	return err
+	if _, err := dbWrapper.Exec(ctx, stmt, value, time.Now(), id); err != nil {
+		return err
+	}
+
+	for n := current; n < value; n++ {
+		if _, err := scenesLikeTableMgr.addDates(ctx, id, nil); err != nil {
+			return err
+		}
+	}
+	for n := value; n < current; n++ {
+		if _, err := scenesLikeTableMgr.deleteDates(ctx, id, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetLikeCounts returns like_count for every scene that has at least one like.
+func (qb *SceneStore) GetLikeCounts(ctx context.Context) (map[int]int, error) {
+	var rows []struct {
+		ID    int `db:"id"`
+		Likes int `db:"like_count"`
+	}
+	if err := dbWrapper.Select(ctx, &rows, "SELECT id, like_count FROM scenes WHERE like_count > 0"); err != nil {
+		return nil, err
+	}
+	ret := make(map[int]int, len(rows))
+	for _, r := range rows {
+		ret[r.ID] = r.Likes
+	}
+	return ret, nil
+}
+
+// GetLikeDatesSince returns every like recorded at or after since, per scene.
+func (qb *SceneStore) GetLikeDatesSince(ctx context.Context, since time.Time) (map[int][]time.Time, error) {
+	t := scenesLikeTableMgr
+	q := dialect.Select(t.idColumn, t.dateColumn).From(t.table.table).Where(
+		t.dateColumn.Gte(UTCTimestamp{Timestamp{since}}),
+	)
+
+	ret := map[int][]time.Time{}
+	const single = false
+	if err := queryFunc(ctx, q, single, func(rows *sqlx.Rows) error {
+		var id int
+		var date Timestamp
+		if err := rows.Scan(&id, &date); err != nil {
+			return err
+		}
+		ret[id] = append(ret[id], date.Timestamp)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 // returns nil, nil if not found
