@@ -45,6 +45,7 @@
 * Feed: on a mouse or trackpad, one scroll gesture moves exactly one video.
 * Feed: no delete button in fullscreen, and the button rail stays inside its own video.
 * Feed algorithm: liked scenes are weighted by likes and by how recently they were liked.
+* Feed: holding the down key no longer drops you back a dozen videos when older tiles are trimmed.
 
 ### stashhub v1.4.43
 

@@ -2020,6 +2020,10 @@ export const Feed: React.FC = () => {
   // Pixels removed from above the viewport by a trim, applied to scrollTop
   // before the browser paints so the view never jumps.
   const pendingTrimRef = useRef(0);
+  // The tile being watched when a trim was queued, and how far the scroller
+  // sat from its top. Restoring that pair is immune to the browser clamping
+  // scrollTop, which arithmetic on scrollTop is not. See the trim effect.
+  const trimAnchorRef = useRef<{ el: HTMLElement; delta: number } | null>(null);
   const slideRafRef = useRef<number | null>(null);
   // Start and destination of an in-flight slide, held in refs rather than the
   // animation's closure so a trim can shift both. Stepping from the live
@@ -2485,9 +2489,21 @@ export const Feed: React.FC = () => {
     const px = pendingTrimRef.current;
     if (!px) return;
     pendingTrimRef.current = 0;
+    const anchor = trimAnchorRef.current;
+    trimAnchorRef.current = null;
     const track = trackRef.current;
     if (!track) return;
-    track.scrollTop = Math.max(0, track.scrollTop - px);
+    // Put the watched tile back where it was on screen. Subtracting the removed
+    // height from scrollTop went wrong near the end of the list, which is
+    // exactly where holding a key down leaves you: the list shrinks below the
+    // scroll position, the browser clamps scrollTop to the new maximum on its
+    // own, and subtracting again pinned the feed at 0, a full KEEP_BEHIND of
+    // tiles back. Reproduced headless: 14 backward jumps in one run.
+    if (anchor && anchor.el.isConnected) {
+      track.scrollTop = anchor.el.offsetTop + anchor.delta;
+    } else {
+      track.scrollTop = Math.max(0, track.scrollTop - px);
+    }
     // A slide in flight holds coordinates from before the trim. Without this
     // its next frame writes the old scrollTop straight back and the feed lands
     // several tiles above where it was, replaying what was just watched.
@@ -2705,6 +2721,10 @@ export const Feed: React.FC = () => {
         );
         if (droppedH > 0) {
           pendingTrimRef.current += droppedH;
+          trimAnchorRef.current = {
+            el: item,
+            delta: track.scrollTop - item.offsetTop,
+          };
           setScenes((prev) => prev.slice(excess));
         }
       }
