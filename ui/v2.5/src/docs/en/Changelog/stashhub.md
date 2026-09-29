@@ -1,5 +1,7 @@
 ### stashhub v1.4.44
 
+* Scene player drives Intiface toys from the funscript, like the feed.
+* Settings: Maximum strength caps vibrating and oscillating toys.
 * Feed: buffering no longer restarts the download, which could leave a scene reloading forever.
 * Feed: stepping between videos keeps what is already buffered instead of refetching it.
 * Feed poster is the scene's first frame, so the picture no longer jumps when playback starts.

@@ -37,6 +37,11 @@ import {
   InteractiveContext,
 } from "src/hooks/Interactive/context";
 import { SceneInteractiveStatus } from "src/hooks/Interactive/status";
+import {
+  buttplug,
+  loadInteractiveConfig,
+  useButtplug,
+} from "src/hooks/Interactive/buttplug";
 import { languageMap } from "src/utils/caption";
 import { VIDEO_PLAYER_ID } from "./util";
 
@@ -243,6 +248,8 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
       initialised: interactiveInitialised,
       state: interactiveState,
     } = React.useContext(InteractiveContext);
+
+    const { status: buttplugStatus } = useButtplug();
 
     const [fullscreen, setFullscreen] = useState(false);
     const [showScrubber, setShowScrubber] = useState(false);
@@ -502,6 +509,50 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
         player.off("fullscreenchange", fullscreenchange);
       };
     }, [getPlayer]);
+
+    // Drive an Intiface toy from the scene's funscript, as the feed does. The
+    // manager owns its loop; this binds the playing <video> and releases it.
+    useEffect(() => {
+      if (!scene.interactive || !scene.paths.funscript) return;
+      const cfg = loadInteractiveConfig();
+      if (!cfg.intifaceEnabled) return;
+      if (buttplug.status === "disconnected" || buttplug.status === "error") {
+        buttplug.connect(cfg.intifaceUrl);
+      }
+    }, [scene.interactive, scene.paths.funscript]);
+
+    useEffect(() => {
+      const player = getPlayer();
+      const url = scene.paths.funscript;
+      if (!player || !scene.interactive || !url || buttplugStatus !== "ready")
+        return;
+      const video = player.tech(true)?.el() as HTMLVideoElement | undefined;
+      if (!video) return;
+      let actions: Array<{ at: number; pos: number }> | null = null;
+      let cancelled = false;
+      const onPlay = () => {
+        if (actions) buttplug.bind(video, actions);
+      };
+      const onPause = () => buttplug.unbind(video);
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((json) => {
+          if (cancelled || !json?.actions?.length) return;
+          actions = json.actions;
+          if (!player.paused()) onPlay();
+        })
+        .catch(() => {});
+      player.on("playing", onPlay);
+      player.on("pause", onPause);
+      player.on("ended", onPause);
+      return () => {
+        cancelled = true;
+        player.off("playing", onPlay);
+        player.off("pause", onPause);
+        player.off("ended", onPause);
+        buttplug.unbind(video);
+      };
+    }, [getPlayer, scene.interactive, scene.paths.funscript, buttplugStatus]);
 
     // delay before second play event after a play event to adjust for video player issues
     const DELAY_FOR_SECOND_PLAY_MS = 1000;

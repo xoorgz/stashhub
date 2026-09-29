@@ -35,11 +35,14 @@ export const INTERACTIVE_CONFIG_EVENT = "stashhub:interactive-config-changed";
 export interface InteractiveConfig {
   intifaceEnabled: boolean;
   intifaceUrl: string;
+  // Ceiling for vibration and oscillation strength, 0.1-1.
+  maxIntensity: number;
 }
 
 export const DEFAULT_INTERACTIVE_CONFIG: InteractiveConfig = {
   intifaceEnabled: false,
   intifaceUrl: DEFAULT_INTIFACE_URL,
+  maxIntensity: 1,
 };
 
 export function loadInteractiveConfig(): InteractiveConfig {
@@ -85,12 +88,20 @@ class ButtplugManager {
   private nextAt = 0;
   private stopped = true;
 
+  private maxIntensity = loadInteractiveConfig().maxIntensity;
+
   private listeners = new Set<() => void>();
   private snap: ButtplugSnapshot = {
     status: "disconnected",
     deviceName: null,
     error: null,
   };
+
+  constructor() {
+    window.addEventListener(INTERACTIVE_CONFIG_EVENT, () => {
+      this.maxIntensity = loadInteractiveConfig().maxIntensity;
+    });
+  }
 
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
@@ -261,9 +272,13 @@ class ButtplugManager {
     if (dev.linearAttributes.length > 0) {
       dev.linear(clamp01(target.pos / 100), sendDur).catch(() => {});
     } else if (dev.oscillateAttributes.length > 0) {
-      dev.oscillate(this.strokeSpeed(prev, target)).catch(() => {});
+      dev
+        .oscillate(this.strokeSpeed(prev, target) * this.maxIntensity)
+        .catch(() => {});
     } else if (dev.vibrateAttributes.length > 0) {
-      dev.vibrate(this.strokeSpeed(prev, target)).catch(() => {});
+      dev
+        .vibrate(this.strokeSpeed(prev, target) * this.maxIntensity)
+        .catch(() => {});
     }
   }
 

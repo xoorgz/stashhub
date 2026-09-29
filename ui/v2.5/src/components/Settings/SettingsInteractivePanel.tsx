@@ -31,6 +31,10 @@ function sanitizeInteractive(input: unknown): InteractiveConfig | null {
       typeof r.intifaceUrl === "string" && r.intifaceUrl
         ? r.intifaceUrl
         : DEFAULT_INTERACTIVE_CONFIG.intifaceUrl,
+    maxIntensity:
+      typeof r.maxIntensity === "number" && r.maxIntensity >= 0.1 && r.maxIntensity <= 1
+        ? r.maxIntensity
+        : DEFAULT_INTERACTIVE_CONFIG.maxIntensity,
   };
 }
 
@@ -127,7 +131,7 @@ export const SettingsInteractivePanel: React.FC = () => {
       <div className="setting">
         <div>
           <p>
-            Sync the feed to a stroker or other toy. Works with any device
+            Sync the feed and the scene player to a stroker or other toy. Works with any device
             Intiface Central supports, including the Handy, Kiiroo Keon and
             Powerblow, and Lovense. Install Intiface Central, connect the device
             to it, then enable Intiface below. Only scenes that already have a
@@ -157,8 +161,8 @@ export const SettingsInteractivePanel: React.FC = () => {
         <div>
           <h3>Enable Intiface</h3>
           <div className="value">
-            Turn on the Intiface transport. When the feed interactive toggle is
-            on, it connects automatically.
+            Turn on the Intiface transport. The feed (with its interactive
+            toggle on) and any scene with a funscript connect automatically.
           </div>
         </div>
         <div>
@@ -184,6 +188,31 @@ export const SettingsInteractivePanel: React.FC = () => {
             value={cfg.intifaceUrl}
             spellCheck={false}
             onChange={(e) => update({ intifaceUrl: e.target.value })}
+            style={{ width: 220 }}
+          />
+        </div>
+      </div>
+
+      <div className="setting">
+        <div>
+          <h3>Maximum strength</h3>
+          <div className="value">
+            Ceiling for vibrating and oscillating toys, now{" "}
+            {Math.round(cfg.maxIntensity * 100)}%. Lower it for a gentler,
+            longer session. Strokers follow the script as written.
+          </div>
+        </div>
+        <div>
+          <input
+            type="range"
+            className="custom-range"
+            min={10}
+            max={100}
+            step={5}
+            value={Math.round(cfg.maxIntensity * 100)}
+            onChange={(e) =>
+              update({ maxIntensity: Number(e.target.value) / 100 })
+            }
             style={{ width: 220 }}
           />
         </div>
