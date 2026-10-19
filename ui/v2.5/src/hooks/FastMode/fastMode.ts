@@ -8,10 +8,15 @@ export interface FastModeConfig {
   // Off by default: this is a speed/quality tradeoff, not something every
   // install should silently opt into.
   enabled: boolean;
+  // Scenes after the current one the feed downloads to the device.
+  cacheAhead: number;
 }
+
+export const CACHE_AHEAD_MAX = 20;
 
 export const DEFAULT_FAST_MODE_CONFIG: FastModeConfig = {
   enabled: false,
+  cacheAhead: 6,
 };
 
 // The encode parameters stash-fastmode.sh actually produces. Single source of
@@ -48,6 +53,10 @@ export function sanitizeFastMode(input: unknown): FastModeConfig | null {
   return {
     enabled:
       typeof r.enabled === "boolean" ? r.enabled : DEFAULT_FAST_MODE_CONFIG.enabled,
+    cacheAhead:
+      typeof r.cacheAhead === "number" && Number.isFinite(r.cacheAhead)
+        ? Math.min(CACHE_AHEAD_MAX, Math.max(0, Math.round(r.cacheAhead)))
+        : DEFAULT_FAST_MODE_CONFIG.cacheAhead,
   };
 }
 

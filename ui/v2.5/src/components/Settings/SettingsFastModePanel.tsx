@@ -8,6 +8,7 @@ import {
   saveFastModeConfig,
   FastModeConfig,
   FAST_MODE_UI_KEY,
+  CACHE_AHEAD_MAX,
   fastModeFromConfigUi,
 } from "src/hooks/FastMode/fastMode";
 import { purgeVideoCache } from "src/hooks/FastMode/videoCache";
@@ -127,12 +128,34 @@ export const SettingsFastModePanel: React.FC = () => {
 
         <div className="setting">
           <div>
+            <h3>Videos to download ahead</h3>
+            <div className="value">
+              While you watch, the feed downloads this many upcoming scenes to
+              the device, one at a time, so they start without the network. The
+              oldest are removed by themselves. 0 keeps only the current one.
+            </div>
+          </div>
+          <div>
+            <Form.Control
+              type="number"
+              min={0}
+              max={CACHE_AHEAD_MAX}
+              value={cfg.cacheAhead}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isNaN(n)) return;
+                update({ cacheAhead: Math.min(CACHE_AHEAD_MAX, Math.max(0, n)) });
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="setting">
+          <div>
             <h3>Clear cached videos</h3>
             <div className="value">
-              The feed keeps the scene you are watching and the next one on the
-              device so seeking inside them needs no network. It holds a handful
-              at most and drops the oldest by itself. Clearing also switches the
-              cache off until the page is reloaded.
+              Removes every scene stored on this device. Clearing also switches
+              the cache off until the page is reloaded.
             </div>
           </div>
           <div>

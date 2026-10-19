@@ -46,6 +46,7 @@ import {
 import {
   registerVideoCache,
   precacheVideos,
+  cachedVideoSrc,
 } from "src/hooks/FastMode/videoCache";
 import { ConfigurationContext } from "src/hooks/Config";
 import { TITLE, TITLE_SEPARATOR } from "src/hooks/title";
@@ -1583,6 +1584,21 @@ const FeedItem: React.FC<FeedItemProps> = ({
     [scene.id, oCooldownUntil, onSpawnDrops]
   );
 
+  // A device copy that fails to play (evicted, or a browser that cannot play
+  // blob URLs) falls back to the network at the same position.
+  const handleVideoError = useCallback(() => {
+    const v = videoRef.current;
+    const src = v?.dataset.src;
+    if (!v || !src || !v.src.startsWith("blob:")) return;
+    const at = v.currentTime;
+    v.addEventListener("loadedmetadata", () => {
+      v.currentTime = at;
+      if (v.closest<HTMLElement>(".feed-item")?.dataset.active) v.play().catch(() => {});
+    }, { once: true });
+    v.src = src;
+    v.load();
+  }, []);
+
   const handleVideoClick = useCallback((e: React.MouseEvent<HTMLVideoElement>) => {
     const v = videoRef.current;
     if (!v) return;
@@ -1645,6 +1661,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             loop
             preload="metadata"
             onClick={handleVideoClick}
+            onError={handleVideoError}
           >
             {(scene.captions ?? []).map((c, i) => (
               <track
@@ -2584,9 +2601,7 @@ export const Feed: React.FC = () => {
         const aggressive = i >= idx - autoBehind && i <= idx + autoAhead;
         const desiredPreload = aggressive ? "auto" : "metadata";
         if (v.preload !== desiredPreload) v.preload = desiredPreload;
-        const src = v.dataset.src;
-        if (src && !v.src) {
-          v.src = src;
+        if (attachSrc(v)) {
           try { v.load(); } catch { /* ignore */ }
         }
       }
@@ -2624,37 +2639,37 @@ export const Feed: React.FC = () => {
       }
     }
 
-    // Ask the worker to hold the scene being watched plus the next one, and to
-    // abandon anything else. Whole files, so a seek inside them costs nothing.
-    // Driven from the settle path on purpose: flying past a hundred tiles must
-    // not queue a hundred downloads, and the list doubles as the cancel signal
-    // for whatever was wanted a moment ago.
-    function isDesktopClient() {
-      return typeof window.matchMedia === "function"
-        && window.matchMedia("(hover: hover)").matches;
+    // Prefer the copy already on the device. A neighbour primed from the
+    // network before its download finished is switched over until it plays.
+    function attachSrc(v: HTMLVideoElement): boolean {
+      const { src } = v.dataset;
+      if (!src) return false;
+      const local = cachedVideoSrc(src);
+      if (v.src && (!local || v.src === local || v.currentTime > 0)) return false;
+      v.src = local ?? src;
+      return true;
     }
 
+    // Ask the cache to hold the scene being watched, the ones just left and
+    // the next ones, and to abandon anything else. Whole files, downloaded one
+    // at a time in order, so a seek inside them costs nothing. Driven from the
+    // settle path on purpose: flying past a hundred tiles must not queue a
+    // hundred downloads, and the list doubles as the cancel signal.
     function cacheAhead(activeItem: HTMLDivElement) {
       if (!fastModeRef.current) return;
       const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
       const idx = items.indexOf(activeItem);
       if (idx === -1) return;
-      // The scene playing plus the ones after it. Caching the current one does
-      // mean fetching it a second time, which is why it was dropped before, but
-      // without it every seek inside the video you are actually watching goes
-      // to the network: measured at 32 seconds on one jump. This only runs once
-      // playback is under way, and the worker abandons it the moment you move
-      // on, so it no longer competes with a cold start.
-      //
-      // Two ahead on desktop: the uplink sits around 2% used and bulk clients
-      // are capped at the proxy now, so the bytes are free, and holding a key
-      // down used to outrun a single-tile lookahead. Phones stay at one, where
-      // the cost is battery and heat rather than bandwidth. The worker cancels
-      // whatever is no longer wanted, so overshooting on a fast scroll is
-      // abandoned rather than paid for.
-      const ahead = isDesktopClient() ? 2 : 1;
+      // Behind is kept so scrolling back plays from the device too. How far
+      // ahead is the fast mode setting; tiles not rendered yet are picked up
+      // on the next settle.
+      const behind = 2;
+      const ahead = loadFastModeConfig().cacheAhead;
       const urls: string[] = [];
-      for (let i = idx; i <= Math.min(items.length - 1, idx + ahead); i++) {
+      const order = [idx];
+      for (let i = idx + 1; i <= Math.min(items.length - 1, idx + ahead); i++) order.push(i);
+      for (let i = idx - 1; i >= Math.max(0, idx - behind); i--) order.push(i);
+      for (const i of order) {
         const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
         const src = v?.dataset.src;
         if (src && /\/stream\.fast(?:$|[?#])/.test(src)) {
@@ -2682,8 +2697,7 @@ export const Feed: React.FC = () => {
       // Start the active video before priming neighbours. preload goes first: a
       // torn-down tile carries preload="none", which makes load() fetch nothing.
       video.preload = "auto";
-      if (video.dataset.src && !video.src) {
-        video.src = video.dataset.src;
+      if (attachSrc(video)) {
         try { video.load(); } catch { /* ignore */ }
       }
       video.muted = muted;

@@ -15,12 +15,16 @@ const CACHE = "stashhub-feed-v2";
 // of gigabytes; keeping them would fill a phone and wear its flash for no
 // gain, since an endless shuffle rarely returns to the same scene. Only what
 // is in play needs to be here: what you are watching, what you just left, and
-// what is next.
-const MAX_ENTRIES = 14;
+// what is next. The page raises this to fit its lookahead setting.
+const MIN_ENTRIES = 14;
+let maxEntries = MIN_ENTRIES;
+
+// Scenes the page still wants. Eviction never drops these.
+let wanted = new Set();
 
 // Ceiling, lowered further at runtime to a slice of whatever the device
 // actually has free.
-const MAX_TOTAL_BYTES_DEFAULT = 1024 * 1024 * 1024;
+const MAX_TOTAL_BYTES_DEFAULT = 2 * 1024 * 1024 * 1024;
 
 // A single very long scene should not swallow the whole budget.
 const MAX_ENTRY_BYTES = 250 * 1024 * 1024;
@@ -102,34 +106,43 @@ async function evictIfNeeded(cache) {
   }
 
   const cap = await budget();
-  let i = 0;
-  while (
-    i < sizes.length &&
-    (total > cap || sizes.length - i > MAX_ENTRIES)
-  ) {
-    await cache.delete(sizes[i].req);
-    total -= sizes[i].size;
-    i++;
+  let count = sizes.length;
+  for (const { req, size } of sizes) {
+    if (total <= cap && count <= maxEntries) break;
+    if (wanted.has(req.url)) continue;
+    await cache.delete(req);
+    total -= size;
+    count--;
   }
+  return total <= cap;
 }
 
-async function precache(url) {
-  if (disabled) return;
+/** Resolves false once the budget is full, which stops the queue. A scene
+ *  already downloading is awaited, not started a second time. */
+function precache(url) {
+  if (disabled) return Promise.resolve(false);
   const key = cacheKey(url);
-  if (inflight.has(key)) return;
-
-  const cache = await caches.open(CACHE);
-  if (await cache.match(key)) return;
+  const running = inflight.get(key);
+  if (running) return running.done;
 
   const controller = new AbortController();
-  inflight.set(key, controller);
+  const done = download(url, key, controller).finally(() => {
+    if (inflight.get(key)?.controller === controller) inflight.delete(key);
+  });
+  inflight.set(key, { controller, done });
+  return done;
+}
+
+async function download(url, key, controller) {
+  const cache = await caches.open(CACHE);
+  if (await cache.match(key)) return true;
   try {
     // Full file, no Range: one sequential read is what makes later seeks free.
     const res = await fetch(url, {
       signal: controller.signal,
       credentials: "same-origin",
     });
-    if (!res.ok) return;
+    if (!res.ok) return true;
 
     // Scenes without a fast copy fall back to their original, which can be
     // hundreds of megabytes. Abort rather than just returning, so the body
@@ -137,21 +150,32 @@ async function precache(url) {
     const len = parseInt(res.headers.get("content-length") || "0", 10);
     if (len > MAX_ENTRY_BYTES) {
       controller.abort();
-      return;
+      return true;
     }
 
     await cache.put(key, res.clone());
-    await evictIfNeeded(cache);
+    return await evictIfNeeded(cache);
   } catch (e) {
     /* aborted or offline, nothing to do */
-  } finally {
-    inflight.delete(key);
+    return true;
+  }
+}
+
+// One download at a time, in queue order, so the scene playing now and the
+// next one are never sharing the link with scenes further down.
+let queueGen = 0;
+
+async function runQueue(urls) {
+  const gen = ++queueGen;
+  for (const u of urls) {
+    if (gen !== queueGen) return;
+    if (!(await precache(u))) return;
   }
 }
 
 function cancel(urls) {
   const keep = new Set((urls || []).map(cacheKey));
-  for (const [key, controller] of inflight) {
+  for (const [key, { controller }] of inflight) {
     if (!keep.has(key)) {
       controller.abort();
       inflight.delete(key);
@@ -163,8 +187,11 @@ self.addEventListener("message", (event) => {
   const data = event.data || {};
   if (data.type === "precache") {
     // Only the ones still wanted keep downloading.
-    cancel(data.urls);
-    (data.urls || []).forEach((u) => precache(u));
+    const urls = data.urls || [];
+    wanted = new Set(urls.map(cacheKey));
+    maxEntries = Math.max(MIN_ENTRIES, urls.length + 4);
+    cancel(urls);
+    event.waitUntil(runQueue(urls));
   } else if (data.type === "purge") {
     disabled = true;
     cancel([]);
