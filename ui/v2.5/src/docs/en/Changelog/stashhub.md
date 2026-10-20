@@ -3,12 +3,13 @@
 * Scene player drives Intiface toys from the funscript, like the feed.
 * Settings: Maximum strength caps vibrating and oscillating toys.
 * Feed: buffering no longer restarts the download, which could leave a scene reloading forever.
-* Feed: stepping between videos keeps what is already buffered instead of refetching it.
+* Feed: the next video no longer waits 5-20 seconds behind paused ones.
 * Feed poster is the scene's first frame, so the picture no longer jumps when playback starts.
 * Tasks: new Feed posters option generates those stills.
 * Fast mode downloads upcoming feed scenes to the device, one at a time, oldest removed first.
 * Settings: Videos to download ahead under Fast mode, 6 by default.
 * Feed cache works in browsers without service workers, such as DuckDuckGo on iOS.
+* Feed cache was blocked by the security policy, now allowed.
 * Settings: Clear cached videos button under Fast mode.
 * Feed: only the playing video downloads freely, so a neighbour can no longer saturate the connection.
 * Feed: poster clears the moment playback starts, no more pale seams at the corners.

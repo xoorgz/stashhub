@@ -2569,8 +2569,6 @@ export const Feed: React.FC = () => {
       const items = Array.from(track!.querySelectorAll<HTMLDivElement>(".feed-item"));
       const idx = items.indexOf(activeItem);
       if (idx === -1) return;
-      const isDesktop = typeof window.matchMedia === "function"
-        && window.matchMedia("(hover: hover)").matches;
       // Two budgets: preload="auto" is a full download so keep it tiny, and a
       // bare src is a few KB but still holds a media pipeline per element on iOS.
       // Only the tile being watched may download without limit. preload="auto"
@@ -2607,34 +2605,21 @@ export const Feed: React.FC = () => {
       }
       // Backstop sweep: a fast fling can coalesce the observer callbacks.
       //
-      // Between the prime window and full teardown sits a retain zone: src is
-      // left in place with preload="none", so the element fetches nothing more
-      // but keeps what it already buffered. Dropping src calls load(), which
-      // throws that buffer away and aborts any request in flight, and stepping
-      // back onto the tile then re-downloads from zero. That is what made
-      // moving back and forth stall, visible in the log as requests cancelled
-      // at zero bytes. Only past the retain zone is src actually released,
-      // since every element holding one costs a media pipeline on iOS.
-      const keepBehind = srcBehind + 1;
-      const keepAhead = srcAhead + 1;
-      const retainBehind = isDesktop ? 6 : 4;
-      const retainAhead = isDesktop ? 6 : 4;
+      // Everything outside the prime window releases its src. A paused element
+      // keeps its request open with unread data, and all videos share one HTTP/2
+      // connection whose receive window those streams exhaust, so the next
+      // scene got no bytes until an old one was closed. Scrolling back is
+      // served by the video cache instead.
       for (let i = 0; i < items.length; i++) {
         if (i === idx) continue;
         const v = items[i].querySelector<HTMLVideoElement>("video.feed-video");
         if (!v) continue;
         if (!v.paused) v.pause();
-        const outsidePrime = i < idx - keepBehind || i > idx + keepAhead;
-        const outsideRetain = i < idx - retainBehind || i > idx + retainAhead;
-        if (outsideRetain) {
-          if (v.src) {
-            v.removeAttribute("src");
-            v.preload = "none";
-            try { v.load(); } catch { /* ignore */ }
-          }
-        } else if (outsidePrime && v.src && v.preload !== "none") {
-          // Stop pulling more without discarding what is already there.
+        if (i >= start && i <= end) continue;
+        if (v.src) {
+          v.removeAttribute("src");
           v.preload = "none";
+          try { v.load(); } catch { /* ignore */ }
         }
       }
     }
