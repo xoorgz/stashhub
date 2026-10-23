@@ -28,6 +28,8 @@ const validTabs = [
   "tasks",
   "notifications",
   "algorithm",
+  "interactive",
+  "fastmode",
   "notices",
   "library",
   "interface",
