@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { ConfigurationContext } from "src/hooks/Config";
 import {
   loadFilterChipsFromServer,
   ALGORITHM_SETTINGS_EVENT,
@@ -6,7 +7,7 @@ import {
   loadAlgorithmSettings,
 } from "../Settings/SettingsAlgorithmPanel";
 import { FilterChipIcon } from "../Feed/feedIcons";
-import { CcOnIcon, InteractiveIcon } from "../Feed/icons";
+import { CcOnIcon, InteractiveIcon, NewIcon } from "../Feed/icons";
 
 // Per-device active state lives in localStorage. The feed listens for
 // the same event the settings panel fires so it can rebuild the queue
@@ -17,6 +18,7 @@ const ACTIVE_EVENT = "stashhub:feed-chip-active-changed";
 // Built-in attribute filters, independent of the tag chips and each other.
 const CC_KEY = "feed.filter.cc";
 const TOY_KEY = "feed.filter.toy";
+export const NEW_KEY = "feed.filter.new";
 
 function readFlag(key: string): boolean {
   try {
@@ -63,6 +65,28 @@ export const FeedChipIsland: React.FC = () => {
   const [active, setActive] = useState<number[]>(() => readActive());
   const [ccOn, setCcOn] = useState<boolean>(() => readFlag(CC_KEY));
   const [toyOn, setToyOn] = useState<boolean>(() => readFlag(TOY_KEY));
+  const [newOn, setNewOn] = useState<boolean>(() => readFlag(NEW_KEY));
+  const { configuration } = useContext(ConfigurationContext);
+  const showNew = configuration?.ui?.showFeedNewFilter ?? false;
+
+  // NEW takes the funscript chip's slot, so the hidden one must not keep filtering.
+  useEffect(() => {
+    if (showNew && readFlag(TOY_KEY)) {
+      setToyOn(false);
+      writeFlag(TOY_KEY, false);
+    }
+    if (!showNew && readFlag(NEW_KEY)) {
+      setNewOn(false);
+      writeFlag(NEW_KEY, false);
+    }
+  }, [showNew]);
+
+  // Also fired by the feed's empty-state reset button.
+  useEffect(() => {
+    const sync = () => setNewOn(readFlag(NEW_KEY));
+    window.addEventListener(ACTIVE_EVENT, sync);
+    return () => window.removeEventListener(ACTIVE_EVENT, sync);
+  }, []);
 
   const toggleCc = useCallback(() => {
     setCcOn((prev) => {
@@ -70,6 +94,9 @@ export const FeedChipIsland: React.FC = () => {
       writeFlag(CC_KEY, next);
       return next;
     });
+  }, []);
+  const toggleNew = useCallback(() => {
+    writeFlag(NEW_KEY, !readFlag(NEW_KEY));
   }, []);
   const toggleToy = useCallback(() => {
     setToyOn((prev) => {
@@ -132,19 +159,35 @@ export const FeedChipIsland: React.FC = () => {
       >
         <CcOnIcon />
       </button>
-      <button
-        type="button"
-        className={`feed-chip-island-btn${toyOn ? " is-active" : ""}`}
-        title="Videos with a funscript only"
-        aria-label="Videos with a funscript only"
-        aria-pressed={toyOn}
-        onClick={(e) => {
-          e.preventDefault();
-          toggleToy();
-        }}
-      >
-        <InteractiveIcon />
-      </button>
+      {showNew ? (
+        <button
+          type="button"
+          className={`feed-chip-island-btn${newOn ? " is-active" : ""}`}
+          title="New and barely watched videos only"
+          aria-label="New and barely watched videos only"
+          aria-pressed={newOn}
+          onClick={(e) => {
+            e.preventDefault();
+            toggleNew();
+          }}
+        >
+          <NewIcon />
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={`feed-chip-island-btn${toyOn ? " is-active" : ""}`}
+          title="Videos with a funscript only"
+          aria-label="Videos with a funscript only"
+          aria-pressed={toyOn}
+          onClick={(e) => {
+            e.preventDefault();
+            toggleToy();
+          }}
+        >
+          <InteractiveIcon />
+        </button>
+      )}
       {visible.map(({ c, idx }) => {
         const isActive = active.includes(idx);
         const title = c.label || `Chip ${idx + 1}`;

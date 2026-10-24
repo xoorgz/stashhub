@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Form } from "react-bootstrap";
 import { SettingSection } from "./SettingSection";
+import { BooleanSetting } from "./Inputs";
+import { useSettings } from "./context";
 import { TagSelect } from "../Shared/Select";
 import * as GQL from "src/core/generated-graphql";
 import { getClient } from "src/core/StashService";
@@ -311,6 +313,7 @@ const Row: React.FC<{
 
 export const SettingsAlgorithmPanel: React.FC = () => {
   const [s, setS] = useState<AlgorithmSettings>(() => loadAlgorithmSettings());
+  const { ui, saveUI } = useSettings();
 
   // Chip defs are DB-backed; on mount, pull whatever's stored server-side
   // and merge into local state. Other algorithm settings stay in
@@ -394,6 +397,16 @@ export const SettingsAlgorithmPanel: React.FC = () => {
       >
         Saved
       </div>
+
+      <SettingSection heading="Top bar">
+        <BooleanSetting
+          id="show-feed-new-filter"
+          heading="Show new filter"
+          subHeading="Replaces the funscript filter with NEW: videos added in the last 60 days or played at most twice, in random order."
+          checked={ui.showFeedNewFilter ?? false}
+          onChange={(v) => saveUI({ showFeedNewFilter: v })}
+        />
+      </SettingSection>
 
       <SettingSection heading="Feed algorithm">
         <div className="setting">

@@ -151,6 +151,13 @@ export const CcOnIcon: React.FC = () => (
   </svg>
 );
 
+export const NewIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
+    <rect x="1.5" y="6.5" width="21" height="11" rx="3" />
+    <text x="12" y="14.6" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="currentColor" stroke="none" fontFamily="system-ui, sans-serif">NEW</text>
+  </svg>
+);
+
 export const CcOffIcon: React.FC = () => (
   <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
     <rect x="2" y="5" width="20" height="14" rx="1" />

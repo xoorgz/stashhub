@@ -43,6 +43,9 @@ export interface IUIConfig {
   // unknown to prevent direct access - use getFrontPageContent
   frontPageContent?: unknown;
 
+  // stashhub: NEW chip in the feed top bar, takes the funscript chip's slot
+  showFeedNewFilter?: boolean;
+
   showChildTagContent?: boolean;
   showChildStudioContent?: boolean;
   showTagCardOnHover?: boolean;

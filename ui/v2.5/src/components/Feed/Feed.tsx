@@ -63,6 +63,14 @@ const MUTED_KEY = "feed.muted";
 const CAPTIONS_KEY = "feed.captions";
 const HQ_KEY = "feed.hq";
 const CURRENT_KEY = "feed.currentSceneId";
+
+function newFilterOn(): boolean {
+  try {
+    return localStorage.getItem("feed.filter.new") === "1";
+  } catch {
+    return false;
+  }
+}
 /** Display name for a scene. Shared so the browser tab and the on-screen
  *  caption can never disagree about what is playing. */
 function sceneTitle(scene: {
@@ -3078,7 +3086,22 @@ export const Feed: React.FC = () => {
         {scenes.length === 0 && feedState === "loading" && (
           <div className="feed-loading">Loading…</div>
         )}
-        {scenes.length === 0 && feedState === "empty" && (
+        {scenes.length === 0 && feedState === "empty" && newFilterOn() && (
+          <div className="feed-empty">
+            <div className="feed-empty-msg">No new videos right now.</div>
+            <button
+              type="button"
+              className="feed-empty-retry"
+              onClick={() => {
+                try { localStorage.setItem("feed.filter.new", "0"); } catch { /* ignore */ }
+                window.dispatchEvent(new CustomEvent("stashhub:feed-chip-active-changed"));
+              }}
+            >
+              Reset feed
+            </button>
+          </div>
+        )}
+        {scenes.length === 0 && feedState === "empty" && !newFilterOn() && (
           <div className="feed-empty">
             <div className="feed-empty-msg">No videos in queue.</div>
             <div className="feed-empty-debug">{debugInfo}</div>

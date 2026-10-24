@@ -19,6 +19,10 @@ export interface BuildQueueOpts {
   recycle?: boolean;
 }
 
+// NEW chip: added within NEW_DAYS, or played at most NEW_MAX_PLAYS times.
+const NEW_DAYS = 60;
+const NEW_MAX_PLAYS = 2;
+
 let cachedHottestTagId: { name: string; id: string | null } | null = null;
 
 async function getHottestTagId(tagName: string): Promise<string | null> {
@@ -312,9 +316,11 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
   // tag chips and of each other.
   let ccActive = false;
   let toyActive = false;
+  let newActive = false;
   try {
     ccActive = localStorage.getItem("feed.filter.cc") === "1";
     toyActive = localStorage.getItem("feed.filter.toy") === "1";
+    newActive = localStorage.getItem("feed.filter.new") === "1";
   } catch {
     /* ignore */
   }
@@ -338,6 +344,22 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
           },
         },
       };
+    }
+    if (newActive) {
+      // One sub-filter per level in stash, so the OR group nests under any tag AND.
+      const recent: GQL.SceneFilterType = {
+        created_at: {
+          value: new Date(Date.now() - NEW_DAYS * 86400_000).toISOString(),
+          modifier: GQL.CriterionModifier.GreaterThan,
+        },
+        OR: {
+          play_count: {
+            value: NEW_MAX_PLAYS + 1,
+            modifier: GQL.CriterionModifier.LessThan,
+          },
+        },
+      };
+      out = { ...out, AND: out.AND ? { ...out.AND, AND: recent } : recent };
     }
     return out;
   };
@@ -474,6 +496,15 @@ export async function buildQueue(opts: BuildQueueOpts = {}): Promise<string[]> {
       topSkipTagIds.length,
       "high-skip tags"
     );
+  }
+
+  // NEW replaces the buckets: just the matching scenes, shuffled.
+  if (newActive) {
+    const ids = await fetchBucketStrict({
+      filter: { per_page: -1, sort: seed },
+      sceneFilter: {},
+    });
+    return ids.filter((id) => !exclude.has(id)).slice(0, targetCount);
   }
 
   const fetches: Array<Promise<BucketSpec | null>> = [];
