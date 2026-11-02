@@ -1138,20 +1138,25 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
   // Cues render in a React overlay so iOS accessibility caption prefs cannot
   // restyle them. Track 0 stays "hidden" so cues parse without being painted.
+  // WebKit's caption preference can flip a track back to "showing" after
+  // load, painting it under the overlay, so re-apply on every change.
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !v.textTracks) return;
     const apply = () => {
       for (let i = 0; i < v.textTracks.length; i++) {
-        v.textTracks[i].mode = i === 0 ? "hidden" : "disabled";
+        const mode = i === 0 ? "hidden" : "disabled";
+        if (v.textTracks[i].mode !== mode) v.textTracks[i].mode = mode;
       }
     };
     apply();
     v.textTracks.addEventListener("addtrack", apply);
     v.textTracks.addEventListener("removetrack", apply);
+    v.textTracks.addEventListener("change", apply);
     return () => {
       v.textTracks.removeEventListener("addtrack", apply);
       v.textTracks.removeEventListener("removetrack", apply);
+      v.textTracks.removeEventListener("change", apply);
     };
   }, [scene.captions?.length]);
 

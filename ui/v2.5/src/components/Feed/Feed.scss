@@ -9,6 +9,15 @@
    native ::cue entirely with our own React-rendered overlay below, so
    iOS accessibility caption prefs can't override our styling. */
 
+/* Never paint native cues in the feed, only the overlay. */
+.feed-video-wrap video::-webkit-media-text-track-container {
+  display: none;
+}
+.feed-video-wrap video::cue {
+  color: transparent;
+  background: transparent;
+}
+
 .feed-caption {
   position: absolute;
   left: 0;

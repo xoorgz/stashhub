@@ -2,6 +2,7 @@
 
 * Feed: NEW filter shows videos added in the last 60 days or played at most twice, shuffled. Turn on under Feed Algorithm, it takes the funscript filter's place.
 * Login: the box is centred on phones, with no scrollbar.
+* Feed: fix captions showing twice on iPhone.
 * Scene player drives Intiface toys from the funscript, like the feed.
 * Settings: Maximum strength caps vibrating and oscillating toys.
 * Feed: buffering no longer restarts the download, which could leave a scene reloading forever.
