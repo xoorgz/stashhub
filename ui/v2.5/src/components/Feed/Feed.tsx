@@ -89,6 +89,16 @@ function sceneTitle(scene: {
 // Seconds of playback before a view counts. Matches what a person would call
 // "actually watched" rather than a glance while scrolling past.
 const PLAY_COUNT_AFTER_MS = 5000;
+// Seeks stop this far short of the end. On iPhone a skip that landed within a
+// frame of the end (duration - 0.1) sometimes left the video stalled.
+const END_GUARD_S = 1.5;
+function seekClamped(v: HTMLVideoElement, t: number) {
+  const max = Number.isFinite(v.duration) ? Math.max(0, v.duration - END_GUARD_S) : t;
+  v.currentTime = Math.max(0, Math.min(t, max));
+}
+// A playing video that has waited this long for data is nudged: re-seek where
+// it is, or start over when it is stuck at the very end.
+const STALL_NUDGE_MS = 2500;
 const IMMERSIVE_KEY = "feed.immersive";
 const SKIPPED_TAGS_KEY = "feed.skips.tags";
 const SCENE_SKIPS_KEY = "feed.skips.scenes";
@@ -870,7 +880,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
       const rect = p!.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       if (v!.duration && isFinite(v!.duration)) {
-        v!.currentTime = ratio * v!.duration;
+        seekClamped(v!, ratio * v!.duration);
         if (barRef.current) barRef.current.style.width = `${ratio * 100}%`;
       }
     }
@@ -1598,6 +1608,34 @@ const FeedItem: React.FC<FeedItemProps> = ({
     [scene.id, oCooldownUntil, onSpawnDrops]
   );
 
+  // A video that should be playing but has waited for data too long gets a
+  // nudge, so a seek that stalls recovers instead of sitting frozen.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    let timer: number | undefined;
+    const clear = () => window.clearTimeout(timer);
+    const onWaiting = () => {
+      clear();
+      timer = window.setTimeout(() => {
+        if (v.paused || v.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) return;
+        const atEnd = Number.isFinite(v.duration) && v.currentTime > v.duration - END_GUARD_S * 2;
+        console.warn(`feed: playback stalled at ${v.currentTime.toFixed(1)}s, ${atEnd ? "starting over" : "re-seeking"}`);
+        v.currentTime = atEnd ? 0 : v.currentTime;
+        v.play().catch(() => {});
+      }, STALL_NUDGE_MS);
+    };
+    v.addEventListener("waiting", onWaiting);
+    v.addEventListener("playing", clear);
+    v.addEventListener("pause", clear);
+    return () => {
+      clear();
+      v.removeEventListener("waiting", onWaiting);
+      v.removeEventListener("playing", clear);
+      v.removeEventListener("pause", clear);
+    };
+  }, []);
+
   // A device copy that fails to play (evicted, or a browser that cannot play
   // blob URLs) falls back to the network at the same position.
   const handleVideoError = useCallback(() => {
@@ -1625,12 +1663,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const ratio = rect.width > 0 ? x / rect.width : 0.5;
     if (ratio < 0.1) {
       if (Number.isFinite(v.duration)) {
-        v.currentTime = Math.max(0, v.currentTime - 10);
+        seekClamped(v, v.currentTime - 10);
       }
       setPulse("back");
     } else if (ratio > 0.9) {
       if (Number.isFinite(v.duration)) {
-        v.currentTime = Math.min(v.duration - 0.1, v.currentTime + 10);
+        seekClamped(v, v.currentTime + 10);
       }
       setPulse("fwd");
     } else if (v.paused) {
@@ -2354,7 +2392,7 @@ export const Feed: React.FC = () => {
         }
       } else if (v && Number.isFinite(v.duration)) {
         const fwd = c === "fwd10";
-        v.currentTime = fwd ? Math.min(v.duration - 0.1, v.currentTime + 10) : Math.max(0, v.currentTime - 10);
+        seekClamped(v, v.currentTime + (fwd ? 10 : -10));
         item?.dispatchEvent(new CustomEvent("feed-pulse-trigger", { detail: fwd ? "fwd" : "back" }));
       }
     }
@@ -2928,7 +2966,7 @@ export const Feed: React.FC = () => {
         const item = currentVisibleRef.current;
         const v = item?.querySelector<HTMLVideoElement>("video");
         if (v && Number.isFinite(v.duration)) {
-          v.currentTime = Math.min(v.duration - 0.1, v.currentTime + 10);
+          seekClamped(v, v.currentTime + 10);
         }
         item?.dispatchEvent(
           new CustomEvent("feed-pulse-trigger", { detail: "fwd" })
@@ -2938,7 +2976,7 @@ export const Feed: React.FC = () => {
         const item = currentVisibleRef.current;
         const v = item?.querySelector<HTMLVideoElement>("video");
         if (v) {
-          v.currentTime = Math.max(0, v.currentTime - 10);
+          seekClamped(v, v.currentTime - 10);
         }
         item?.dispatchEvent(
           new CustomEvent("feed-pulse-trigger", { detail: "back" })
