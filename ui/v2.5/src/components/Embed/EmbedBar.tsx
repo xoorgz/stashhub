@@ -49,6 +49,7 @@ const skipIcon = (dir: "back" | "fwd") =>
 export const EmbedClose: React.FC = () =>
   EMBEDDED ? (
     <button type="button" className="embed-close" aria-label="Close" title="Close"
+      onContextMenu={(e) => e.preventDefault()}
       onClick={() => window.parent.postMessage({ stashhub: "close" }, "*")}>
       <span><svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}
         strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></span>
@@ -91,7 +92,7 @@ export const EmbedBar: React.FC = () => {
 
   if (!onFeed) return null;
   return (
-    <nav className="embed-bar">
+    <nav className="embed-bar" onContextMenu={(e) => e.preventDefault()}>
       <div className="embed-bar-pill">
         {btn("Back 10 seconds", () => command("back10"), skipIcon("back"))}
         {btn("Forward 10 seconds", () => command("fwd10"), skipIcon("fwd"))}
