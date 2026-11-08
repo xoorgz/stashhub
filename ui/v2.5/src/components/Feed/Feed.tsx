@@ -1531,28 +1531,20 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [scene.id, scene.tags]);
 
-  const handleLike = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
-      e.preventDefault();
+  // A like whose hearts rise from (x, y): the rail heart, or the framed bar's.
+  const likeAt = useCallback(
+    (x: number, y: number) => {
       // Optimistic UI bump. The mutation result replaces this with the real count.
       setLikeCount((prev) => prev + 1);
       setLiking(true);
       window.setTimeout(() => setLiking(false), 600);
-
-      const rect = e.currentTarget.getBoundingClientRect();
-      onSpawnHearts(rect.left + rect.width / 2, rect.top + rect.height / 2, 5);
+      onSpawnHearts(x, y, 5);
 
       bumpLike(scene.id).then((next) => {
         setLikeCount(next);
         if (next === LIKE_THRESHOLD) {
           for (let wave = 0; wave < 4; wave++) {
-            window.setTimeout(() => {
-              onSpawnHearts(
-                rect.left + rect.width / 2,
-                rect.top + rect.height / 2,
-                5
-              );
-            }, 80 * wave);
+            window.setTimeout(() => onSpawnHearts(x, y, 5), 80 * wave);
           }
           setSceneRating(scene.id, 100);
         }
@@ -1560,6 +1552,24 @@ const FeedItem: React.FC<FeedItemProps> = ({
     },
     [scene.id, onSpawnHearts]
   );
+  const handleLike = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      likeAt(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    },
+    [likeAt]
+  );
+  useEffect(() => {
+    const item = itemRef.current;
+    if (!item) return;
+    const onLikeRequest = (e: Event) => {
+      const { x, y } = (e as CustomEvent<{ x: number; y: number }>).detail;
+      likeAt(x, y);
+    };
+    item.addEventListener("feed-like-request", onLikeRequest);
+    return () => item.removeEventListener("feed-like-request", onLikeRequest);
+  }, [likeAt]);
 
   const [oCooldownUntil, setOCooldownUntil] = useState<number>(() =>
     getLastOAt(scene.id) + O_COOLDOWN_MS
@@ -2045,6 +2055,8 @@ export const Feed: React.FC = () => {
     }
     root.style.setProperty("--feed-pillar", `${Math.round(pillar)}px`);
     root.style.setProperty("--feed-letterbox", `${Math.round(letterbox)}px`);
+    // The framed bottom bar sits outside the feed and matches the picture's width.
+    document.documentElement.style.setProperty("--feed-pillar", `${Math.round(pillar)}px`);
   }, []);
 
   const [scenes, setScenes] = useState<QueuedScene[]>([]);
@@ -2324,13 +2336,13 @@ export const Feed: React.FC = () => {
   // The framed bottom bar's buttons. Runs inside their click, keeping its user activation.
   useEffect(() => {
     function onCommand(e: Event) {
-      const c = (e as CustomEvent<FeedCommand>).detail;
+      const { cmd: c, x = 0, y = 0 } = (e as CustomEvent<{ cmd: FeedCommand; x?: number; y?: number }>).detail;
       const item = currentVisibleRef.current;
       const v = item?.querySelector<HTMLVideoElement>("video");
       if (c === "mute") {
         setMuted((m) => !m);
       } else if (c === "like") {
-        item?.querySelector<HTMLButtonElement>(".feed-like-btn")?.click();
+        item?.dispatchEvent(new CustomEvent("feed-like-request", { detail: { x, y } }));
       } else if (c === "pip") {
         const pv = v as (HTMLVideoElement & { webkitSetPresentationMode?: (m: string) => void; webkitPresentationMode?: string }) | undefined;
         if (document.pictureInPictureElement) {
@@ -2347,7 +2359,10 @@ export const Feed: React.FC = () => {
       }
     }
     document.addEventListener(FEED_COMMAND_EVENT, onCommand);
-    return () => document.removeEventListener(FEED_COMMAND_EVENT, onCommand);
+    return () => {
+      document.removeEventListener(FEED_COMMAND_EVENT, onCommand);
+      document.documentElement.style.removeProperty("--feed-pillar");
+    };
   }, []);
   useEffect(() => {
     sessionStorage.setItem(CAPTIONS_KEY, captionsOn ? "1" : "0");

@@ -22,11 +22,14 @@ export const FEED_COMMAND_EVENT = "stashhub:feed-command";
 export const FEED_MUTED_EVENT = "stashhub:feed-muted";
 export type FeedCommand = "back10" | "fwd10" | "mute" | "pip" | "like";
 
-const command = (c: FeedCommand) =>
-  document.dispatchEvent(new CustomEvent<FeedCommand>(FEED_COMMAND_EVENT, { detail: c }));
+const command = (cmd: FeedCommand, at?: HTMLElement) => {
+  const r = at?.getBoundingClientRect();
+  const detail = { cmd, x: r ? r.left + r.width / 2 : 0, y: r ? r.top + r.height / 2 : 0 };
+  document.dispatchEvent(new CustomEvent(FEED_COMMAND_EVENT, { detail }));
+};
 
 const icon = (path: React.ReactNode) => (
-  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {path}
   </svg>
@@ -47,7 +50,8 @@ export const EmbedClose: React.FC = () =>
   EMBEDDED ? (
     <button type="button" className="embed-close" aria-label="Close" title="Close"
       onClick={() => window.parent.postMessage({ stashhub: "close" }, "*")}>
-      {icon(<path d="M18 6 6 18M6 6l12 12" />)}
+      <span><svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}
+        strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></span>
     </button>
   ) : null;
 
@@ -72,8 +76,15 @@ export const EmbedBar: React.FC = () => {
     };
   }, []);
 
-  const btn = (label: string, onClick: () => void, child: React.ReactNode, active = false) => (
-    <button type="button" className={`embed-bar-btn${active ? " is-active" : ""}`}
+  const [liking, setLiking] = useState(false);
+  const like = (e: React.MouseEvent<HTMLButtonElement>) => {
+    command("like", e.currentTarget);
+    setLiking(true);
+    window.setTimeout(() => setLiking(false), 600);
+  };
+
+  const btn = (label: string, onClick: (e: React.MouseEvent<HTMLButtonElement>) => void, child: React.ReactNode, active = false, extra = "") => (
+    <button type="button" className={`embed-bar-btn${active ? " is-active" : ""}${extra}`}
       aria-label={label} title={label} aria-pressed={active || undefined} onClick={onClick}>
       {child}
     </button>
@@ -92,8 +103,7 @@ export const EmbedBar: React.FC = () => {
             {btn("Picture in picture", () => command("pip"),
               icon(<><rect x="2" y="4" width="20" height="16" rx="2" /><rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor" /></>))}
             {showNew && btn("New videos only", () => writeFlag(NEW_KEY, !readFlag(NEW_KEY)), <NewIcon />, newOn)}
-            <span className="embed-bar-gap" />
-            {btn("Like", () => command("like"), <HeartIcon />)}
+            {btn("Like", like, <HeartIcon />, false, liking ? " liking" : "")}
           </>
         )}
       </div>
