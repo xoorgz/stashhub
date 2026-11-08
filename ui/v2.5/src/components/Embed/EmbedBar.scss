@@ -3,8 +3,8 @@
 html.is-embedded {
   --embed-bar-h: 68px;
 
-  body { padding-bottom: var(--embed-bar-h); }
-  .sidenav, .feed-root { bottom: var(--embed-bar-h); }
+  /* The bar is only on the feed. */
+  body:has(.feed-root) .sidenav, .feed-root { bottom: var(--embed-bar-h); }
   .feed-item { height: calc(100dvh - var(--embed-bar-h)); }
 }
 

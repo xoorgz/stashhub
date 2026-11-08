@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
-import { useHistory, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { ConfigurationContext } from "src/hooks/Config";
 import { HeartIcon, MuteOffIcon, MuteOnIcon, NewIcon } from "../Feed/icons";
 import { ACTIVE_EVENT, NEW_KEY, readFlag, writeFlag } from "../TopRightBar/FeedChipIsland";
@@ -55,9 +55,8 @@ export const EmbedClose: React.FC = () =>
     </button>
   ) : null;
 
-/** Bottom controls when framed: the frame has no browser chrome of its own. */
+/** The feed's controls when framed, where nothing of the page may sit near the phone's home indicator. */
 export const EmbedBar: React.FC = () => {
-  const history = useHistory();
   const { pathname } = useLocation();
   const onFeed = pathname === "/" || pathname.startsWith("/feed/");
   const { configuration } = useContext(ConfigurationContext);
@@ -90,22 +89,17 @@ export const EmbedBar: React.FC = () => {
     </button>
   );
 
+  if (!onFeed) return null;
   return (
     <nav className="embed-bar">
       <div className="embed-bar-pill">
-        {btn("Back", () => history.goBack(), icon(<path d="M19 12H5M12 19l-7-7 7-7" />))}
-        {btn("Forward", () => history.goForward(), icon(<path d="M5 12h14M12 5l7 7-7 7" />))}
-        {onFeed && (
-          <>
-            {btn("Back 10 seconds", () => command("back10"), skipIcon("back"))}
-            {btn("Forward 10 seconds", () => command("fwd10"), skipIcon("fwd"))}
-            {btn(muted ? "Unmute" : "Mute", () => command("mute"), muted ? <MuteOffIcon /> : <MuteOnIcon />)}
-            {btn("Picture in picture", () => command("pip"),
-              icon(<><rect x="2" y="4" width="20" height="16" rx="2" /><rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor" /></>))}
-            {showNew && btn("New videos only", () => writeFlag(NEW_KEY, !readFlag(NEW_KEY)), <NewIcon />, newOn)}
-            {btn("Like", like, <HeartIcon />, false, liking ? " liking" : "")}
-          </>
-        )}
+        {btn("Back 10 seconds", () => command("back10"), skipIcon("back"))}
+        {btn("Forward 10 seconds", () => command("fwd10"), skipIcon("fwd"))}
+        {btn(muted ? "Unmute" : "Mute", () => command("mute"), muted ? <MuteOffIcon /> : <MuteOnIcon />)}
+        {btn("Picture in picture", () => command("pip"),
+          icon(<><rect x="2" y="4" width="20" height="16" rx="2" /><rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor" /></>))}
+        {showNew && btn("New videos only", () => writeFlag(NEW_KEY, !readFlag(NEW_KEY)), <NewIcon />, newOn)}
+        {btn("Like", like, <HeartIcon />, false, liking ? " liking" : "")}
       </div>
     </nav>
   );
