@@ -50,7 +50,7 @@ import {
 } from "src/hooks/FastMode/videoCache";
 import { ConfigurationContext } from "src/hooks/Config";
 import { TITLE, TITLE_SEPARATOR } from "src/hooks/title";
-import { FEED_COMMAND_EVENT, FEED_MUTED_EVENT, FeedCommand } from "../Embed/EmbedBar";
+import { EMBEDDED, FEED_COMMAND_EVENT, FEED_MUTED_EVENT, FeedCommand } from "../Embed/EmbedBar";
 import "./Feed.scss";
 
 const VIEWED_KEY = "feed.viewedIds";
@@ -1531,7 +1531,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
   }, [scene.id, scene.tags]);
 
-  // A like whose hearts rise from (x, y): the rail heart, or the framed bar's.
+  // A like whose hearts rise from (x, y): the rail heart or the floating one.
   const likeAt = useCallback(
     (x: number, y: number) => {
       // Optimistic UI bump. The mutation result replaces this with the real count.
@@ -1560,16 +1560,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     },
     [likeAt]
   );
-  useEffect(() => {
-    const item = itemRef.current;
-    if (!item) return;
-    const onLikeRequest = (e: Event) => {
-      const { x, y } = (e as CustomEvent<{ x: number; y: number }>).detail;
-      likeAt(x, y);
-    };
-    item.addEventListener("feed-like-request", onLikeRequest);
-    return () => item.removeEventListener("feed-like-request", onLikeRequest);
-  }, [likeAt]);
 
   const [oCooldownUntil, setOCooldownUntil] = useState<number>(() =>
     getLastOAt(scene.id) + O_COOLDOWN_MS
@@ -1772,6 +1762,18 @@ const FeedItem: React.FC<FeedItemProps> = ({
             </div>
           )}
           <div className="feed-overlay">
+            {EMBEDDED && (
+              <button
+                type="button"
+                className={`feed-float-like${liking ? " liking" : ""}`}
+                aria-label="Like"
+                title="Like"
+                onClick={handleLike}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                <HeartIcon filled={likeCount > 0} />
+              </button>
+            )}
             <div className="feed-meta">
               <div className="feed-title">
                 <span className="feed-title-text">{title}</span>
@@ -2336,13 +2338,11 @@ export const Feed: React.FC = () => {
   // The framed bottom bar's buttons. Runs inside their click, keeping its user activation.
   useEffect(() => {
     function onCommand(e: Event) {
-      const { cmd: c, x = 0, y = 0 } = (e as CustomEvent<{ cmd: FeedCommand; x?: number; y?: number }>).detail;
+      const c = (e as CustomEvent<{ cmd: FeedCommand }>).detail.cmd;
       const item = currentVisibleRef.current;
       const v = item?.querySelector<HTMLVideoElement>("video");
       if (c === "mute") {
         setMuted((m) => !m);
-      } else if (c === "like") {
-        item?.dispatchEvent(new CustomEvent("feed-like-request", { detail: { x, y } }));
       } else if (c === "pip") {
         const pv = v as (HTMLVideoElement & { webkitSetPresentationMode?: (m: string) => void; webkitPresentationMode?: string }) | undefined;
         if (document.pictureInPictureElement) {

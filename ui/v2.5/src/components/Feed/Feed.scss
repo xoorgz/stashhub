@@ -1110,6 +1110,31 @@
    whatever the source order. */
 .feed-action.feed-immersive-btn.is-on { color: var(--feed-hubs); }
 
+/* The full-view toggle stays put when tapped: last in the bottom-anchored rail
+   in both modes, never compacted, and its margin makes up for the rail's
+   smaller bottom padding in full view (28px normally, 10px or 8px there). */
+.feed-action.feed-immersive-btn { order: 1; }
+@media (max-width: 640px) {
+  /* Same size and scale as in the normal rail (see the max-height rules near
+     the end of this file), not full view's scale(0.92). */
+  .feed-root.is-immersive .feed-actions .feed-action.feed-immersive-btn {
+    width: 36px !important;
+    height: 36px !important;
+    margin-bottom: 18px;
+    transform: none;
+  }
+  @media (max-height: 780px) {
+    .feed-root.is-immersive .feed-actions .feed-action.feed-immersive-btn { transform: scale(0.9); }
+  }
+  @media (max-height: 640px) {
+    .feed-root.is-immersive .feed-actions .feed-action.feed-immersive-btn { transform: scale(0.82); }
+  }
+  .feed-root.is-immersive .feed-actions .feed-action.feed-immersive-btn svg { width: 20px; height: 20px; }
+  @media (max-height: 720px) {
+    .feed-root.is-immersive .feed-actions .feed-action.feed-immersive-btn { margin-bottom: 20px; }
+  }
+}
+
 /* App chrome that lives outside the feed. The side nav is z-index 150 against
    the feed's 50, so it stays on top unless it is taken out explicitly. */
 /* The side nav lives outside the feed and sits above it, so it has to be

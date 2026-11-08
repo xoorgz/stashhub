@@ -1,6 +1,7 @@
 ### stashhub v1.4.44
 
-* Framed in another app, stashhub shows a bottom bar on the feed as wide as the video (skip 10 seconds, mute, picture in picture, NEW, like with the feed's hearts) and a close under the Feed pill.
+* Framed in another app, stashhub shows a bottom bar on the feed as wide as the video (skip 10 seconds, mute, picture in picture, NEW), a large like button at the video's bottom left and a close at the top left.
+* Feed: the full view button stays in the same place when tapped.
 * Feed: NEW filter shows videos added in the last 60 days or played at most twice, shuffled. Turn on under Feed Algorithm, it takes the funscript filter's place.
 * Login: the box is centred on phones, with no scrollbar.
 * Feed: fix captions showing twice on iPhone.

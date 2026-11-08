@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ConfigurationContext } from "src/hooks/Config";
-import { HeartIcon, MuteOffIcon, MuteOnIcon, NewIcon } from "../Feed/icons";
+import { MuteOffIcon, MuteOnIcon, NewIcon } from "../Feed/icons";
 import { ACTIVE_EVENT, NEW_KEY, readFlag, writeFlag } from "../TopRightBar/FeedChipIsland";
 import "./EmbedBar.scss";
 
@@ -20,13 +20,10 @@ if (EMBEDDED) document.documentElement.classList.add("is-embedded");
  *  so picture-in-picture and unmuting keep the tap's user activation. */
 export const FEED_COMMAND_EVENT = "stashhub:feed-command";
 export const FEED_MUTED_EVENT = "stashhub:feed-muted";
-export type FeedCommand = "back10" | "fwd10" | "mute" | "pip" | "like";
+export type FeedCommand = "back10" | "fwd10" | "mute" | "pip";
 
-const command = (cmd: FeedCommand, at?: HTMLElement) => {
-  const r = at?.getBoundingClientRect();
-  const detail = { cmd, x: r ? r.left + r.width / 2 : 0, y: r ? r.top + r.height / 2 : 0 };
-  document.dispatchEvent(new CustomEvent(FEED_COMMAND_EVENT, { detail }));
-};
+const command = (cmd: FeedCommand) =>
+  document.dispatchEvent(new CustomEvent(FEED_COMMAND_EVENT, { detail: { cmd } }));
 
 const icon = (path: React.ReactNode) => (
   <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -76,13 +73,6 @@ export const EmbedBar: React.FC = () => {
     };
   }, []);
 
-  const [liking, setLiking] = useState(false);
-  const like = (e: React.MouseEvent<HTMLButtonElement>) => {
-    command("like", e.currentTarget);
-    setLiking(true);
-    window.setTimeout(() => setLiking(false), 600);
-  };
-
   const btn = (label: string, onClick: (e: React.MouseEvent<HTMLButtonElement>) => void, child: React.ReactNode, active = false, extra = "") => (
     <button type="button" className={`embed-bar-btn${active ? " is-active" : ""}${extra}`}
       aria-label={label} title={label} aria-pressed={active || undefined} onClick={onClick}>
@@ -100,7 +90,6 @@ export const EmbedBar: React.FC = () => {
         {btn("Picture in picture", () => command("pip"),
           icon(<><rect x="2" y="4" width="20" height="16" rx="2" /><rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor" /></>))}
         {showNew && btn("New videos only", () => writeFlag(NEW_KEY, !readFlag(NEW_KEY)), <NewIcon />, newOn)}
-        {btn("Like", like, <HeartIcon />, false, liking ? " liking" : "")}
       </div>
     </nav>
   );
