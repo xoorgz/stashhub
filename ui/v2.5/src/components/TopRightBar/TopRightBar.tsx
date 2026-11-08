@@ -1,6 +1,7 @@
 import React, { useCallback } from "react";
 import { useHistory } from "react-router-dom";
 import { NotificationBell } from "./NotificationBell";
+import { EmbedClose } from "../Embed/EmbedBar";
 import "./TopRightBar.scss";
 
 const scenesSvg = (
@@ -75,6 +76,7 @@ export const TopRightBar: React.FC = () => {
         {feedSvg}
         <span>Feed</span>
       </button>
+      <EmbedClose />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 ### stashhub v1.4.44
 
+* Framed in another app, stashhub shows a bottom bar (back, forward, skip 10 seconds, mute, picture in picture, NEW, like) and a close under the Feed pill.
 * Feed: NEW filter shows videos added in the last 60 days or played at most twice, shuffled. Turn on under Feed Algorithm, it takes the funscript filter's place.
 * Login: the box is centred on phones, with no scrollbar.
 * Feed: fix captions showing twice on iPhone.

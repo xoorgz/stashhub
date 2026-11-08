@@ -29,6 +29,7 @@ import { MainNavbar } from "./components/MainNavbar";
 import { SideNav } from "./components/SideNav/SideNav";
 import { TopRightBar } from "./components/TopRightBar/TopRightBar";
 import { FeedChipIsland } from "./components/TopRightBar/FeedChipIsland";
+import { EMBEDDED, EmbedBar } from "./components/Embed/EmbedBar";
 import { PageNotFound } from "./components/PageNotFound";
 import * as GQL from "./core/generated-graphql";
 import { makeTitleProps } from "./hooks/title";
@@ -228,6 +229,7 @@ export const App: React.FC = () => {
             <FeedChipIsland />
             <TopRightBar />
           </div>
+          {EMBEDDED && <EmbedBar />}
         </>
       );
     }

@@ -13,14 +13,14 @@ import { CcOnIcon, InteractiveIcon, NewIcon } from "../Feed/icons";
 // the same event the settings panel fires so it can rebuild the queue
 // when chips toggle.
 const ACTIVE_KEY = "feed.filterChips.active";
-const ACTIVE_EVENT = "stashhub:feed-chip-active-changed";
+export const ACTIVE_EVENT = "stashhub:feed-chip-active-changed";
 
 // Built-in attribute filters, independent of the tag chips and each other.
 const CC_KEY = "feed.filter.cc";
 const TOY_KEY = "feed.filter.toy";
 export const NEW_KEY = "feed.filter.new";
 
-function readFlag(key: string): boolean {
+export function readFlag(key: string): boolean {
   try {
     return localStorage.getItem(key) === "1";
   } catch {
@@ -28,7 +28,7 @@ function readFlag(key: string): boolean {
   }
 }
 
-function writeFlag(key: string, on: boolean) {
+export function writeFlag(key: string, on: boolean) {
   try {
     localStorage.setItem(key, on ? "1" : "0");
   } catch {

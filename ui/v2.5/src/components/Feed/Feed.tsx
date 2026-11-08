@@ -50,6 +50,7 @@ import {
 } from "src/hooks/FastMode/videoCache";
 import { ConfigurationContext } from "src/hooks/Config";
 import { TITLE, TITLE_SEPARATOR } from "src/hooks/title";
+import { FEED_COMMAND_EVENT, FEED_MUTED_EVENT, FeedCommand } from "../Embed/EmbedBar";
 import "./Feed.scss";
 
 const VIEWED_KEY = "feed.viewedIds";
@@ -2317,7 +2318,37 @@ export const Feed: React.FC = () => {
   // Persist mute per tab
   useEffect(() => {
     sessionStorage.setItem(MUTED_KEY, muted ? "1" : "0");
+    window.dispatchEvent(new CustomEvent(FEED_MUTED_EVENT, { detail: muted }));
   }, [muted]);
+
+  // The framed bottom bar's buttons. Runs inside their click, keeping its user activation.
+  useEffect(() => {
+    function onCommand(e: Event) {
+      const c = (e as CustomEvent<FeedCommand>).detail;
+      const item = currentVisibleRef.current;
+      const v = item?.querySelector<HTMLVideoElement>("video");
+      if (c === "mute") {
+        setMuted((m) => !m);
+      } else if (c === "like") {
+        item?.querySelector<HTMLButtonElement>(".feed-like-btn")?.click();
+      } else if (c === "pip") {
+        const pv = v as (HTMLVideoElement & { webkitSetPresentationMode?: (m: string) => void; webkitPresentationMode?: string }) | undefined;
+        if (document.pictureInPictureElement) {
+          document.exitPictureInPicture().catch(() => {});
+        } else if (pv?.requestPictureInPicture) {
+          pv.requestPictureInPicture().catch((err) => console.warn("feed: picture in picture refused", err));
+        } else if (pv?.webkitSetPresentationMode) {
+          pv.webkitSetPresentationMode(pv.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture");
+        }
+      } else if (v && Number.isFinite(v.duration)) {
+        const fwd = c === "fwd10";
+        v.currentTime = fwd ? Math.min(v.duration - 0.1, v.currentTime + 10) : Math.max(0, v.currentTime - 10);
+        item?.dispatchEvent(new CustomEvent("feed-pulse-trigger", { detail: fwd ? "fwd" : "back" }));
+      }
+    }
+    document.addEventListener(FEED_COMMAND_EVENT, onCommand);
+    return () => document.removeEventListener(FEED_COMMAND_EVENT, onCommand);
+  }, []);
   useEffect(() => {
     sessionStorage.setItem(CAPTIONS_KEY, captionsOn ? "1" : "0");
   }, [captionsOn]);
