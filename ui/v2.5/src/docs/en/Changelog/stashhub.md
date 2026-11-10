@@ -1,6 +1,6 @@
 ### stashhub v1.4.44
 
-* Framed in another app, stashhub shows a bottom bar on the feed as wide as the video (skip 10 seconds, mute, picture in picture, NEW), a large like button at the video's bottom left and a close at the top left.
+* Framed in another app, stashhub shows a bottom bar on the feed as wide as the video (skip 10 seconds, mute, picture in picture, NEW), a large like button at the video's bottom left and a close at the top left. Taps there never start an iOS text selection.
 * Feed: the full view button stays in the same place when tapped.
 * Feed: skips and the progress bar stop 1.5 seconds short of the end, and a video stuck waiting for data recovers by itself.
 * Feed: NEW filter shows videos added in the last 60 days or played at most twice, shuffled. Turn on under Feed Algorithm, it takes the funscript filter's place.

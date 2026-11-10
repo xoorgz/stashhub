@@ -97,6 +97,21 @@ body.feed-immersive .embed-bar { left: 0; }
   }
 }
 
+/* iOS extends a selection from a non-selectable button to the nearest
+   selectable text or ancestor, so quick taps on the like picked the page. */
+@media (pointer: coarse) {
+  html.is-embedded:has(.feed-root),
+  html.is-embedded:has(.feed-root) * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  html.is-embedded:has(.feed-root) :is(input, textarea) {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
 /* Like for the left thumb: large, at the video's bottom left above the title. */
 .feed-float-like {
   pointer-events: auto;
